@@ -27,6 +27,9 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
     {
         base.OnModelCreating(builder);
 
+        // TiDB has new collation enabled and doesn't support ascii_general_ci for GUIDs
+        builder.UseGuidCollation(string.Empty);
+
         builder.Entity<ApplicationUser>(u =>
         {
             u.OwnsOne(x => x.EnergyProfile, ep => { ep.WithOwner(); ep.Property(x => x.AverageSleepHours).HasPrecision(4, 1); });

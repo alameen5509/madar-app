@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+:root {
+  --primary:    #5E5495;
+  --sidebar:    #2A2542;
+  --gold:       #C9A84C;
+  --gold-light: #E8C96A;
+  --bg:         #F8F6F0;
+  --card:       #FFFFFF;
+  --text:       #1A1830;
+  --muted:      #7C7A8E;
+}
+
+* { box-sizing: border-box; }
+
+html { direction: rtl; }
+
+body {
+  font-family: 'Cairo', 'Segoe UI', sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+/* ── Zellige / girih tile pattern for sidebar ── */
+.pattern-zellige {
+  background-color: var(--sidebar);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cg fill='none' stroke='%23ffffff09' stroke-width='0.8'%3E%3Cpolygon points='30,2 56,16 56,44 30,58 4,44 4,16'/%3E%3Cpolygon points='30,10 50,21 50,43 30,54 10,43 10,21'/%3E%3Cline x1='30' y1='2' x2='30' y2='10'/%3E%3Cline x1='56' y1='16' x2='50' y2='21'/%3E%3Cline x1='56' y1='44' x2='50' y2='43'/%3E%3Cline x1='30' y1='58' x2='30' y2='54'/%3E%3Cline x1='4' y1='44' x2='10' y2='43'/%3E%3Cline x1='4' y1='16' x2='10' y2='21'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ── Prayer octagon ── */
+.octagon {
+  clip-path: polygon(
+    30% 0%, 70% 0%, 100% 30%,
+    100% 70%, 70% 100%, 30% 100%,
+    0% 70%, 0% 30%
+  );
+}
+
+/* ── Scroll / manuscript card ── */
+.scroll-card {
+  background: linear-gradient(180deg, #fdfaf3 0%, #f5f0e4 100%);
+  border: 1px solid #e2d5b0;
+  position: relative;
+  overflow: hidden;
+}
+.scroll-card::before,
+.scroll-card::after {
+  content: '';
+  display: block;
+  height: 5px;
+  background: repeating-linear-gradient(
+    90deg,
+    #c9a84c 0px, #c9a84c 4px, transparent 4px, transparent 10px
+  );
+}
+
+/* ── Active nav item ── */
+.nav-active {
+  background: linear-gradient(135deg, rgba(201,168,76,0.15), rgba(94,84,149,0.25));
+  border-right: 3px solid var(--gold);
+}
+
+/* ── Gold shimmer animation ── */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+.shimmer-text {
+  background: linear-gradient(90deg, #C9A84C 25%, #E8C96A 50%, #C9A84C 75%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 3s linear infinite;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fadeUp 0.5s ease forwards; }
+
+/* ── Arch shape for Life Circles ── */
+.arch {
+  border-radius: 9999px 9999px 0 0;
+}
+
+/* ── Star divider ── */
+.star-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #C9A84C;
+}
+.star-divider::before,
+.star-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #C9A84C, transparent);
+}

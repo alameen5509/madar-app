@@ -15,9 +15,12 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
     {
         // Database
+        var connectionString = config.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("DefaultConnection not configured.");
         services.AddDbContext<MadarDbContext>(options =>
-            options.UseSqlite(
-                config.GetConnectionString("DefaultConnection") ?? "Data Source=madar.db",
+            options.UseMySql(
+                connectionString,
+                ServerVersion.AutoDetect(connectionString),
                 b => b.MigrationsAssembly(typeof(MadarDbContext).Assembly.FullName)));
 
         // Identity
@@ -35,6 +38,9 @@ public static class DependencyInjection
 
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IIdentityService, IdentityService>();
+
+        // Memory cache
+        services.AddMemoryCache();
 
         // Salah Time Service (calls aladhan.com)
         services.AddHttpClient<ISalahTimeService, SalahTimeService>();
