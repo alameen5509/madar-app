@@ -1,0 +1,56 @@
+## Claude Code local config
+.claude/
+
+## .NET / C#
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+.vscode/
+
+## NuGet
+*.nupkg
+*.snupkg
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## Build outputs
+publish/
+_publish/
+
+## Runtime data
+*.log
+*.seed
+*.pid
+
+## OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+## Secrets & certs
+appsettings.Production.json
+appsettings.Development.json
+*.pfx
+*.p12
+*.key
+*.pem
+secrets.json
+.env
+.env.*
+
+## SQLite dev database
+*.db
+*.db-shm
+*.db-wal
+
+## EF Core migrations (keep if you want to track them)
+# src/Madar.Infrastructure/Persistence/Migrations/
+
+## dotnet tools manifest is kept (intentional)
+# .config/dotnet-tools.json
