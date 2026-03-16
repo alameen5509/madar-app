@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cairo, Amiri } from "next/font/google";
+import SidebarWrapper from "@/components/SidebarWrapper";
 import "./globals.css";
 
 const cairo = Cairo({
@@ -25,7 +26,13 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <body className={`${cairo.variable} ${amiri.variable} antialiased`}>
-        {children}
+        <div
+          className="flex h-screen overflow-hidden"
+          style={{ fontFamily: "var(--font-cairo, Cairo, sans-serif)" }}
+        >
+          <SidebarWrapper />
+          {children}
+        </div>
       </body>
     </html>
   );
