@@ -9,6 +9,7 @@ public enum CognitiveLoad { Low, Medium, High, Deep }
 public enum SalahBlock { PreFajr, PostFajr, Duha, PostDhuhr, PostAsr, PostMaghrib, PostIsha, Overnight }
 public enum CalculationMethod { UmmAlQura, MuslimWorldLeague, Egyptian, Karachi, NorthAmerica, Tehran, Shia }
 public enum Chronotype { EarlyBird, Intermediate, NightOwl }
+public enum ContractStatus { Draft, Active, PendingRenewal, Expired, Cancelled }
 public enum PermissionKey
 {
     Tasks_View, Tasks_Create, Tasks_Edit, Tasks_Delete, Tasks_Reassign,

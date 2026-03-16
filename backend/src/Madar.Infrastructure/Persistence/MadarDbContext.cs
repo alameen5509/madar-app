@@ -22,6 +22,7 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
     public DbSet<TaskAiLog> TaskAiLogs => Set<TaskAiLog>();
     public DbSet<DailyEnergyLog> DailyEnergyLogs => Set<DailyEnergyLog>();
     public DbSet<InboxItem> InboxItems => Set<InboxItem>();
+    public DbSet<Contract> Contracts => Set<Contract>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -108,6 +109,17 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
             inbox.HasKey(x => x.Id);
             inbox.HasOne(x => x.Owner).WithMany(x => x.InboxItems).HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
             inbox.HasOne(x => x.ConvertedTask).WithMany().HasForeignKey(x => x.ConvertedToTaskId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<Contract>(c =>
+        {
+            c.HasKey(x => x.Id);
+            c.Property(x => x.Title).HasMaxLength(400).IsRequired();
+            c.Property(x => x.ClientName).HasMaxLength(300).IsRequired();
+            c.Property(x => x.Currency).HasMaxLength(10);
+            c.Property(x => x.Value).HasPrecision(18, 2);
+            c.HasOne(x => x.Owner).WithMany(x => x.Contracts).HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
+            c.HasIndex(x => new { x.OwnerId, x.Status });
         });
     }
 }

@@ -22,6 +22,14 @@ artifacts/
 ## Build outputs
 publish/
 _publish/
+backend/publish-sc/
+backend/deploy.zip
+backend/deploy-sc.zip
+
+## External project folders
+madar-zepp.zip
+zepp-app/
+madar-wear/
 
 ## Runtime data
 *.log

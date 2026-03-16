@@ -21,4 +21,5 @@ public class ApplicationUser : IdentityUser<Guid>
     public ICollection<UserPermission> Permissions { get; set; } = [];
     public ICollection<DailyEnergyLog> EnergyLogs { get; set; } = [];
     public ICollection<InboxItem> InboxItems { get; set; } = [];
+    public ICollection<Contract> Contracts   { get; set; } = [];
 }
