@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { GeometricDivider } from "@/components/IslamicPattern";
-import { getGoals, type Goal } from "@/lib/api";
+import { getGoals, createGoal, type Goal, type CreateGoalPayload } from "@/lib/api";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -58,11 +58,7 @@ function GoalCard({ goal }: { goal: Goal }) {
             <span className="text-[#7C7A8E] text-xs">📅 {formatDate(goal.targetDate)}</span>
             {goal.status !== "Active" && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
-                {{
-                  Paused:    "موقوف",
-                  Completed: "مكتمل",
-                  Archived:  "مؤرشف",
-                }[goal.status] ?? goal.status}
+                {{ Paused: "موقوف", Completed: "مكتمل", Archived: "مؤرشف" }[goal.status] ?? goal.status}
               </span>
             )}
           </div>
@@ -85,19 +81,187 @@ function GoalCard({ goal }: { goal: Goal }) {
   );
 }
 
+// ─── New Goal Dialog ──────────────────────────────────────────────────────────
+
+const WEIGHT_OPTIONS = [
+  { value: 5, label: "بالغ الأهمية" },
+  { value: 4, label: "مهم جداً"    },
+  { value: 3, label: "متوسط"       },
+  { value: 2, label: "منخفض"       },
+  { value: 1, label: "اختياري"     },
+];
+
+function NewGoalDialog({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (g: Goal) => void;
+}) {
+  const [title, setTitle]           = useState("");
+  const [description, setDesc]      = useState("");
+  const [targetDate, setTargetDate] = useState("");
+  const [priorityWeight, setWeight] = useState<number>(3);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState("");
+  const titleRef                    = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { titleRef.current?.focus(); }, []);
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) { setError("عنوان الهدف مطلوب"); return; }
+    setLoading(true);
+    setError("");
+    try {
+      const goal = await createGoal({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        targetDate: targetDate || undefined,
+        priorityWeight,
+      });
+      onCreated(goal);
+      onClose();
+    } catch {
+      setError("حدث خطأ أثناء الإنشاء، حاول مجدداً.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className="absolute inset-0 bg-[#1A1830]/60 backdrop-blur-sm" onClick={onClose} />
+
+      <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto fade-up">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-7 pt-7 pb-4 border-b border-[#E2D5B0]">
+          <h2 className="font-bold text-[#1A1830]">هدف جديد</h2>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-[#7C7A8E] hover:bg-[#F8F6F0] transition text-sm"
+          >✕</button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="px-7 py-6 space-y-5">
+
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">
+              عنوان الهدف <span className="text-red-500">*</span>
+            </label>
+            <input
+              ref={titleRef}
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="مثال: تعلم لغة برمجية جديدة…"
+              className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6]
+                         focus:outline-none focus:border-[#5E5495] transition"
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">
+              وصف مختصر <span className="text-[#7C7A8E] font-normal">(اختياري)</span>
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDesc(e.target.value)}
+              placeholder="ما الذي تريد تحقيقه من هذا الهدف؟"
+              rows={2}
+              className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm resize-none bg-[#FDFAF6]
+                         focus:outline-none focus:border-[#5E5495] transition"
+            />
+          </div>
+
+          {/* Priority Weight */}
+          <div>
+            <label className="block text-sm font-semibold text-[#1A1830] mb-2">وزن الأولوية</label>
+            <div className="flex gap-2 flex-wrap">
+              {WEIGHT_OPTIONS.map((w) => (
+                <button
+                  key={w.value}
+                  type="button"
+                  onClick={() => setWeight(w.value)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                  style={{
+                    background: priorityWeight === w.value ? "#5E5495" : "#F8F6F0",
+                    color:      priorityWeight === w.value ? "#fff"     : "#7C7A8E",
+                    border:     `1px solid ${priorityWeight === w.value ? "#5E5495" : "#E2D5B0"}`,
+                  }}
+                >
+                  {w.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Target Date */}
+          <div>
+            <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">
+              تاريخ الاستهداف <span className="text-[#7C7A8E] font-normal">(اختياري)</span>
+            </label>
+            <input
+              type="date"
+              value={targetDate}
+              onChange={(e) => setTargetDate(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6]
+                         focus:outline-none focus:border-[#5E5495] transition"
+            />
+          </div>
+
+          {error && (
+            <p className="text-red-400 text-sm bg-red-50 border border-red-100 rounded-lg px-4 py-2.5">
+              {error}
+            </p>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-[#7C7A8E]
+                         bg-[#F8F6F0] border border-[#E2D5B0] hover:bg-[#F0EDE4] transition"
+            >
+              إلغاء
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60"
+              style={{ background: "linear-gradient(135deg, #5E5495, #C9A84C)" }}
+            >
+              {loading ? "جارٍ الإنشاء…" : "إنشاء الهدف"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function GoalsPage() {
-  const [goals, setGoals]     = useState<Goal[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState("");
+  const [goals, setGoals]           = useState<Goal[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState("");
+  const [showDialog, setShowDialog] = useState(false);
 
   const fetchGoals = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const data = await getGoals();
-      setGoals(data);
+      setGoals(await getGoals());
     } catch {
       setError("تعذّر تحميل الأهداف. تحقق من اتصالك أو سجّل دخولك من جديد.");
     } finally {
@@ -106,6 +270,10 @@ export default function GoalsPage() {
   }, []);
 
   useEffect(() => { fetchGoals(); }, [fetchGoals]);
+
+  function handleCreated(goal: Goal) {
+    setGoals((prev) => [goal, ...prev]);
+  }
 
   const active    = goals.filter((g) => g.status === "Active").length;
   const completed = goals.filter((g) => g.status === "Completed").length;
@@ -119,13 +287,12 @@ export default function GoalsPage() {
           <div>
             <h2 className="text-[#1A1830] font-bold text-lg">الأهداف</h2>
             {!loading && !error && (
-              <p className="text-[#7C7A8E] text-xs">
-                {active} نشط · {completed} مكتمل
-              </p>
+              <p className="text-[#7C7A8E] text-xs">{active} نشط · {completed} مكتمل</p>
             )}
           </div>
           <button
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white"
+            onClick={() => setShowDialog(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition"
             style={{ background: "linear-gradient(135deg, #5E5495, #C9A84C)" }}
           >
             <span>+</span><span>هدف جديد</span>
@@ -138,30 +305,29 @@ export default function GoalsPage() {
           <GeometricDivider label="أهدافي" />
           <div className="mt-4">
 
-            {/* Loading */}
             {loading && <GoalSkeleton />}
 
-            {/* Error */}
             {!loading && error && (
               <div className="text-center py-12">
                 <p className="text-red-400 text-sm mb-3">{error}</p>
-                <button
-                  onClick={fetchGoals}
-                  className="text-[#C9A84C] text-sm font-medium hover:underline"
-                >
+                <button onClick={fetchGoals} className="text-[#C9A84C] text-sm font-medium hover:underline">
                   إعادة المحاولة
                 </button>
               </div>
             )}
 
-            {/* Empty */}
             {!loading && !error && goals.length === 0 && (
               <div className="text-center py-12">
-                <p className="text-[#7C7A8E] text-sm">لا توجد أهداف حتى الآن</p>
+                <p className="text-[#7C7A8E] text-sm mb-3">لا توجد أهداف حتى الآن</p>
+                <button
+                  onClick={() => setShowDialog(true)}
+                  className="text-[#5E5495] text-sm font-medium hover:underline"
+                >
+                  + أضف أول هدف
+                </button>
               </div>
             )}
 
-            {/* Goals list */}
             {!loading && !error && goals.length > 0 && (
               <div className="space-y-3">
                 {goals.map((g) => <GoalCard key={g.id} goal={g} />)}
@@ -172,6 +338,13 @@ export default function GoalsPage() {
 
         <div className="pb-4"><GeometricDivider /></div>
       </div>
+
+      {showDialog && (
+        <NewGoalDialog
+          onClose={() => setShowDialog(false)}
+          onCreated={handleCreated}
+        />
+      )}
     </main>
   );
 }

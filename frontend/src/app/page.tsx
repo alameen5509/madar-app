@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { EightPointedStar, GeometricDivider } from "@/components/IslamicPattern";
-import { getTasks, getSalahToday, type SmartTask, type SalahTimesResponse } from "@/lib/api";
+import {
+  getTasks, getGoals, getSalahToday,
+  type SmartTask, type Goal, type SalahTimesResponse,
+} from "@/lib/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,22 +23,13 @@ interface TaskRow {
   done: boolean;
 }
 
-// ─── Static data (circles – no API yet) ───────────────────────────────────────
-
-const CIRCLES = [
-  { name: "النفس",     emoji: "🌿", color: "#5E5495", light: "#EAE8F5" },
-  { name: "الأسرة",   emoji: "🏡", color: "#C9A84C", light: "#FBF4E2" },
-  { name: "العلاقات", emoji: "🤝", color: "#3D8C8C", light: "#E0F2F2" },
-  { name: "العمل",    emoji: "💼", color: "#8C4A3D", light: "#F5E8E6" },
-];
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const PRIORITY_COLORS: Record<string, string> = {
   "عالية":  "bg-red-100 text-red-700",
   "متوسطة": "bg-yellow-100 text-yellow-700",
   "منخفضة": "bg-green-100 text-green-700",
 };
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function priorityLabel(p: number): "عالية" | "متوسطة" | "منخفضة" {
   if (p >= 4) return "عالية";
@@ -99,6 +93,20 @@ function TasksSkeleton() {
   );
 }
 
+function GoalsSkeleton() {
+  return (
+    <div className="space-y-2 px-5 py-3">
+      {[1,2,3].map((i) => (
+        <div key={i} className="flex items-center gap-3 py-2 animate-pulse">
+          <div className="flex-1 h-3 rounded bg-[#E2D5B0]" />
+          <div className="w-20 h-2 rounded-full bg-[#E2D5B0]" />
+          <div className="w-8 h-3 rounded bg-[#E2D5B0]" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -106,13 +114,17 @@ export default function Dashboard() {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
 
-  const [prayers, setPrayers]           = useState<PrayerRow[]>([]);
+  const [prayers, setPrayers]               = useState<PrayerRow[]>([]);
   const [prayersLoading, setPrayersLoading] = useState(true);
   const [prayersError, setPrayersError]     = useState(false);
 
-  const [tasks, setTasks]             = useState<TaskRow[]>([]);
+  const [tasks, setTasks]               = useState<TaskRow[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [tasksError, setTasksError]     = useState(false);
+
+  const [goals, setGoals]               = useState<Goal[]>([]);
+  const [goalsLoading, setGoalsLoading] = useState(true);
+  const [goalsError, setGoalsError]     = useState(false);
 
   const fetchPrayers = useCallback(async () => {
     setPrayersLoading(true);
@@ -140,10 +152,24 @@ export default function Dashboard() {
     }
   }, []);
 
+  const fetchGoals = useCallback(async () => {
+    setGoalsLoading(true);
+    setGoalsError(false);
+    try {
+      const data = await getGoals();
+      setGoals(data.filter((g) => g.status === "Active").slice(0, 4));
+    } catch {
+      setGoalsError(true);
+    } finally {
+      setGoalsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchPrayers();
     fetchTasks();
-  }, [fetchPrayers, fetchTasks]);
+    fetchGoals();
+  }, [fetchPrayers, fetchTasks, fetchGoals]);
 
   const highPriority = tasks.filter((t) => t.priority === "عالية" && !t.done).length;
 
@@ -210,28 +236,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Life Circles – static until /api/circles is ready */}
-        <section>
-          <GeometricDivider label="دوائر الحياة" />
-          <div className="grid grid-cols-4 gap-4 mt-3">
-            {CIRCLES.map((c, i) => (
-              <div
-                key={c.name}
-                className="fade-up rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                style={{ background: c.light, animationDelay: `${i * 80}ms` }}
-              >
-                <div
-                  className="arch w-16 h-20 mx-auto mb-3 flex items-end justify-center pb-3"
-                  style={{ background: `linear-gradient(180deg, ${c.color}22, ${c.color}55)`, border: `2px solid ${c.color}33` }}
-                >
-                  <span className="text-2xl">{c.emoji}</span>
-                </div>
-                <p className="text-center font-bold text-sm" style={{ color: c.color }}>{c.name}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
         {/* Prayer Times + Tasks */}
         <div className="grid grid-cols-5 gap-5">
 
@@ -297,7 +301,7 @@ export default function Dashboard() {
 
               {!tasksLoading && !tasksError && tasks.length > 0 && (
                 <div className="px-5 py-3 space-y-2">
-                  {tasks.map((t, i) => (
+                  {tasks.map((t) => (
                     <div
                       key={t.id}
                       className={`flex items-center gap-3 py-2.5 border-b border-[#e2d5b0]/60 last:border-0 ${t.done ? "opacity-50" : ""}`}
@@ -322,6 +326,54 @@ export default function Dashboard() {
           </section>
 
         </div>
+
+        {/* Active Goals */}
+        <section>
+          <GeometricDivider label="الأهداف النشطة" />
+          <div className="scroll-card mt-3 rounded-2xl overflow-hidden shadow-sm min-h-[80px]">
+
+            {goalsLoading && <GoalsSkeleton />}
+
+            {!goalsLoading && goalsError && (
+              <div className="text-center py-6 px-5">
+                <p className="text-red-400 text-xs mb-2">تعذّر تحميل الأهداف</p>
+                <button onClick={fetchGoals} className="text-[#C9A84C] text-xs hover:underline">
+                  إعادة المحاولة
+                </button>
+              </div>
+            )}
+
+            {!goalsLoading && !goalsError && goals.length === 0 && (
+              <div className="text-center py-6">
+                <p className="text-[#7C7A8E] text-sm">لا توجد أهداف نشطة</p>
+              </div>
+            )}
+
+            {!goalsLoading && !goalsError && goals.length > 0 && (
+              <div className="px-5 py-3 space-y-3">
+                {goals.map((g) => {
+                  const color = g.lifeCircle?.color ?? "#5E5495";
+                  return (
+                    <div key={g.id} className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-[#1A1830] truncate">{g.title}</p>
+                        <div className="mt-1 bg-[#F8F6F0] rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{ width: `${g.progressPercent}%`, background: `linear-gradient(90deg, ${color}, ${color}88)` }}
+                          />
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold flex-shrink-0" style={{ color }}>
+                        {g.progressPercent}٪
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
 
         {/* Footer */}
         <div className="pb-4">

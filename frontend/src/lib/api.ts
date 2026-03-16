@@ -204,3 +204,56 @@ export function logout(): void {
   document.cookie = 'accessToken=; path=/; max-age=0';
   window.location.href = '/login';
 }
+
+// ─── Inbox ────────────────────────────────────────────────────────────────────
+
+export interface InboxMessage {
+  id: string;
+  from: string;
+  subject: string;
+  receivedAt: string;
+  tag?: string;
+  isRead: boolean;
+}
+
+export async function getInbox(): Promise<InboxMessage[]> {
+  const { data } = await api.get<InboxMessage[]>('/api/inbox');
+  return data;
+}
+
+export async function markMessageRead(id: string): Promise<void> {
+  await api.patch(`/api/inbox/${id}/read`);
+}
+
+export async function markAllRead(): Promise<void> {
+  await api.post('/api/inbox/read-all');
+}
+
+// ─── Create Task / Goal ───────────────────────────────────────────────────────
+
+export interface CreateTaskPayload {
+  title: string;
+  description?: string;
+  userPriority?: number;
+  cognitiveLoad?: 'Low' | 'Medium' | 'High' | 'Deep';
+  dueDate?: string;
+  lifeCircleId?: string;
+}
+
+export interface CreateGoalPayload {
+  title: string;
+  description?: string;
+  targetDate?: string;
+  priorityWeight?: number;
+  lifeCircleId?: string;
+}
+
+export async function createTask(payload: CreateTaskPayload): Promise<SmartTask> {
+  const { data } = await api.post<SmartTask>('/api/tasks', payload);
+  return data;
+}
+
+export async function createGoal(payload: CreateGoalPayload): Promise<Goal> {
+  const { data } = await api.post<Goal>('/api/goals', payload);
+  return data;
+}
