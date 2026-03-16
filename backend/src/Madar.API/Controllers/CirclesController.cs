@@ -21,6 +21,11 @@ public class CirclesController : BaseController
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
+        // Seed default circles on first use if user has none
+        var hasCircles = await _db.LifeCircles.AnyAsync(lc => lc.OwnerId == userId, ct);
+        if (!hasCircles)
+            await SeedDefaultCirclesAsync(userId, ct);
+
         // Load everything in one query then project in-memory to avoid EF translation issues
         var circles = await _db.LifeCircles
             .Include(lc => lc.Goals)
@@ -75,6 +80,49 @@ public class CirclesController : BaseController
         }).ToList();
 
         return Ok(result);
+    }
+
+    /// <summary>تهيئة دوائر الحياة الافتراضية عند أول استخدام</summary>
+    private async Task SeedDefaultCirclesAsync(Guid userId, CancellationToken ct)
+    {
+        var ecosystem = await _db.Ecosystems.FirstOrDefaultAsync(e => e.OwnerId == userId, ct);
+        if (ecosystem is null)
+        {
+            ecosystem = new Ecosystem { Id = Guid.NewGuid(), Name = "شخصي", OwnerId = userId };
+            _db.Ecosystems.Add(ecosystem);
+            await _db.SaveChangesAsync(ct);
+        }
+
+        var seeds = new LifeCircle[]
+        {
+            new() { Id = Guid.NewGuid(), OwnerId = userId, EcosystemId = ecosystem.Id,
+                Name = "دائرة الأساس", Description = "البوصلة والوقود — الأدوار: عبد الله، نفسي",
+                IconKey = "🌙", ColorHex = "#C0392B", Tier = CircleTier.Base,
+                DisplayOrder = 0, IsShariaPriority = true, IsActive = true },
+            new() { Id = Guid.NewGuid(), OwnerId = userId, EcosystemId = ecosystem.Id,
+                Name = "الدائرة الأولى", Description = "الأسرة المباشرة — الأدوار: ابن، أب، زوج",
+                IconKey = "🏡", ColorHex = "#E8631A", Tier = CircleTier.First,
+                DisplayOrder = 1, IsShariaPriority = true, IsActive = true },
+            new() { Id = Guid.NewGuid(), OwnerId = userId, EcosystemId = ecosystem.Id,
+                Name = "الدائرة الثانية", Description = "صلة الأرحام — الأدوار: أخ، خال، أهل",
+                IconKey = "🤝", ColorHex = "#C9A84C", Tier = CircleTier.Second,
+                DisplayOrder = 2, IsShariaPriority = false, IsActive = true },
+            new() { Id = Guid.NewGuid(), OwnerId = userId, EcosystemId = ecosystem.Id,
+                Name = "الدائرة الثالثة", Description = "المصاهرة — الأدوار: صهر، نسيب، عديل",
+                IconKey = "🌿", ColorHex = "#4A8C3D", Tier = CircleTier.Third,
+                DisplayOrder = 3, IsShariaPriority = false, IsActive = true },
+            new() { Id = Guid.NewGuid(), OwnerId = userId, EcosystemId = ecosystem.Id,
+                Name = "الدائرة الرابعة", Description = "أهل الفضل ورعاية — الأدوار: معلم، طالب",
+                IconKey = "📚", ColorHex = "#2D6B9E", Tier = CircleTier.Fourth,
+                DisplayOrder = 4, IsShariaPriority = false, IsActive = true },
+            new() { Id = Guid.NewGuid(), OwnerId = userId, EcosystemId = ecosystem.Id,
+                Name = "الدائرة الخامسة", Description = "المجتمع والنمو",
+                IconKey = "🌍", ColorHex = "#5E5495", Tier = CircleTier.Fifth,
+                DisplayOrder = 5, IsShariaPriority = false, IsActive = true },
+        };
+
+        _db.LifeCircles.AddRange(seeds);
+        await _db.SaveChangesAsync(ct);
     }
 
     /// <summary>إنشاء دائرة حياة جديدة — يُنشئ نظام بيئي شخصي إن لم يكن موجوداً</summary>

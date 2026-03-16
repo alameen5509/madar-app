@@ -26,11 +26,16 @@ const TIER_OPTIONS = [
   { value: "Base",     label: "أساسية"  },
   { value: "First",    label: "الأولى"  },
   { value: "Second",   label: "الثانية" },
+  { value: "Third",    label: "الثالثة" },
+  { value: "Fourth",   label: "الرابعة" },
+  { value: "Fifth",    label: "الخامسة" },
   { value: "Business", label: "الأعمال" },
 ];
 
 const TIER_LABELS: Record<string, string> = {
-  Base: "أساسية", First: "الأولى", Second: "الثانية", Business: "الأعمال",
+  Base: "أساسية", First: "الأولى", Second: "الثانية",
+  Third: "الثالثة", Fourth: "الرابعة", Fifth: "الخامسة",
+  Business: "الأعمال",
 };
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
