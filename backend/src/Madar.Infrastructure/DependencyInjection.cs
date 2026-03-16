@@ -20,7 +20,7 @@ public static class DependencyInjection
         services.AddDbContext<MadarDbContext>(options =>
             options.UseMySql(
                 connectionString,
-                ServerVersion.AutoDetect(connectionString),
+                new MySqlServerVersion(new Version(8, 0, 0)),
                 b => b.MigrationsAssembly(typeof(MadarDbContext).Assembly.FullName)));
 
         // Identity

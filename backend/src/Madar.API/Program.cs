@@ -46,7 +46,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendPolicy", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "https://localhost:3000")
+        policy.WithOrigins(
+                  "http://localhost:3000",
+                  "https://localhost:3000",
+                  "https://madar-web-ten.vercel.app")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -86,7 +89,8 @@ app.UseSwaggerUI();
 
 app.UseSerilogRequestLogging();
 app.UseCors("FrontendPolicy");
-app.UseHttpsRedirection();
+// HTTPS redirection disabled on Azure (TLS termination handled by the load balancer)
+if (!app.Environment.IsProduction()) app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
