@@ -1442,16 +1442,44 @@ export default function TasksPage() {
       .catch(() => setPrayersReady(true));
   }, []);
 
-  /* load tasks */
+  /* load tasks + habits as tasks */
   const fetchTasks = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [rawTasks, circles] = await Promise.all([getTasks(), import("@/lib/api").then(m => m.getCircles())]);
+      const [rawTasks, circles, habitsRes] = await Promise.all([
+        getTasks(),
+        import("@/lib/api").then(m => m.getCircles()),
+        import("@/lib/api").then(m => m.api.get("/api/habits")).then(r => r.data as { id: string; title: string; icon: string; category: string; isIdea: boolean; streak: number; lastCompletedDate?: string; todayDone: boolean }[]).catch(() => [] as { id: string; title: string; icon: string; category: string; isIdea: boolean; streak: number; lastCompletedDate?: string; todayDone: boolean }[]),
+      ]);
       const orderMap = new Map(circles.map((c) => [c.id, c.displayOrder]));
       const rows = rawTasks.map((t) => toRow(t, orderMap));
+
+      // Add habits as task-like rows
+      const activeHabits = (habitsRes ?? []).filter((h) => !h.isIdea);
+      for (const h of activeHabits) {
+        rows.push({
+          id: `habit_${h.id}`,
+          title: `${h.icon || "🔄"} ${h.title}`,
+          circle: "عادات يومية",
+          circleColor: "#2ABFBF",
+          circleOrder: -1, // عادات أولاً
+          priority: "متوسطة",
+          done: h.todayDone,
+          isInbox: false,
+          isWork: false,
+          isRecurring: true,
+          recurrenceRule: "يومي",
+          description: h.streak > 0 ? `🔥 سلسلة: ${h.streak} يوم` : undefined,
+          isUrgent: false,
+          waitingFor: undefined,
+          dueDate: undefined,
+          hasSubtasks: false,
+          context: "habit",
+        });
+      }
+
       rows.sort((a, b) => {
-        // ملحة أولاً، ثم غير مكتملة، ثم حسب الدائرة
         if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
         if (a.done !== b.done) return a.done ? 1 : -1;
         return a.circleOrder - b.circleOrder;
@@ -1607,8 +1635,19 @@ export default function TasksPage() {
   async function toggle(id: string, currentDone: boolean) {
     if (!currentDone) {
       setShowCelebration(true);
-      // Clean up task timer
       localStorage.removeItem(`madar_task_time_${id}`);
+    }
+    // Handle habits
+    if (id.startsWith("habit_")) {
+      const habitId = id.replace("habit_", "");
+      setTasks((p) => p.map((t) => t.id === id ? { ...t, done: !t.done } : t));
+      try {
+        await api.patch(`/api/habits/${habitId}/toggle`);
+        window.dispatchEvent(new Event("madar-update"));
+      } catch {
+        setTasks((p) => p.map((t) => t.id === id ? { ...t, done: currentDone } : t));
+      }
+      return;
     }
     setTasks((p) => p.map((t) => t.id === id ? { ...t, done: !t.done } : t));
     try {
