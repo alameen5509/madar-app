@@ -240,10 +240,12 @@ function NewTaskDialog({
   const [isRecurring, setRecurring] = useState(false);
   const [recurrenceType, setRecurrenceType] = useState<"daily"|"weekly"|"monthly"|"yearly"|"custom">("daily");
   const [customInterval, setCustomInterval] = useState(2);
-  const [customUnit, setCustomUnit] = useState<"day"|"week"|"month">("day");
+  const [customUnit, setCustomUnit] = useState<"minute"|"hour"|"day"|"week"|"month">("day");
   const [isWorkTask, setIsWorkTask] = useState(true);
   const [isUrgent, setIsUrgent]     = useState(false);
   const [waitingFor, setWaitingFor] = useState("");
+  const [assignTo, setAssignTo]     = useState("");
+  const [platformUsers, setPUsers]  = useState<{id: string; fullName: string; email: string}[]>([]);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState("");
   const titleRef                    = useRef<HTMLInputElement>(null);
@@ -254,6 +256,9 @@ function NewTaskDialog({
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
+  useEffect(() => {
+    import("@/lib/api").then(m => m.api.get("/api/users")).then(r => setPUsers(r.data)).catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -278,6 +283,7 @@ function NewTaskDialog({
         isUrgent: isUrgent || undefined,
         waitingFor: waitingFor.trim() || undefined,
         taskContext: taskContext !== "Anywhere" ? taskContext : undefined,
+        assignedToEmail: assignTo || undefined,
       });
       onCreated(toRow(task));
       onClose();
@@ -372,7 +378,16 @@ function NewTaskDialog({
                 </select>
               </div>
             )}
-            <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">تاريخ الاستحقاق <span className="text-[#7C7A8E] font-normal">(اختياري)</span></label>
+            {/* Assign to user */}
+            <div className="mt-3">
+              <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">إسناد لشخص <span className="text-[#7C7A8E] font-normal">(اختياري)</span></label>
+              <select value={assignTo} onChange={(e) => setAssignTo(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition">
+                <option value="">أنا (بدون إسناد)</option>
+                {platformUsers.map((u) => <option key={u.id} value={u.email}>{u.fullName}</option>)}
+              </select>
+            </div>
+            <label className="block text-sm font-semibold text-[#1A1830] mb-1.5 mt-3">تاريخ الاستحقاق <span className="text-[#7C7A8E] font-normal">(اختياري)</span></label>
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition" />
           </div>
@@ -403,8 +418,8 @@ function NewTaskDialog({
                     <span className="text-xs text-[#7C7A8E]">كل</span>
                     <input type="number" min={1} max={365} value={customInterval} onChange={(e) => setCustomInterval(Number(e.target.value))}
                       className="w-16 px-2 py-1.5 rounded-lg border border-[#E2D5B0] text-sm text-center bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495]" />
-                    <div className="flex gap-1">
-                      {([["day","يوم"],["week","أسبوع"],["month","شهر"]] as const).map(([v, l]) => (
+                    <div className="flex gap-1 flex-wrap">
+                      {([["minute","دقيقة"],["hour","ساعة"],["day","يوم"],["week","أسبوع"],["month","شهر"]] as const).map(([v, l]) => (
                         <button key={v} type="button" onClick={() => setCustomUnit(v)}
                           className="px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all"
                           style={{ background: customUnit === v ? "#C9A84C" : "#F8F6F0", color: customUnit === v ? "#fff" : "#7C7A8E" }}>
