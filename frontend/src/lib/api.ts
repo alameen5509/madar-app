@@ -303,6 +303,18 @@ export async function createGoal(payload: CreateGoalPayload): Promise<Goal> {
   return data;
 }
 
+export async function updateGoal(
+  id: string,
+  payload: { title?: string; description?: string; targetDate?: string; priorityWeight?: number; status?: string; lifeCircleId?: string },
+): Promise<Goal> {
+  const { data } = await api.patch<Goal>(`/api/goals/${id}`, payload);
+  return data;
+}
+
+export async function deleteGoal(id: string): Promise<void> {
+  await api.delete(`/api/goals/${id}`);
+}
+
 // ─── Circle Updates ──────────────────────────────────────────────────────────
 
 export async function updateCircle(

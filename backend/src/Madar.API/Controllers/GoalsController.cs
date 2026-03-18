@@ -105,6 +105,65 @@ public class GoalsController : BaseController
             }
         });
     }
+    /// <summary>تعديل هدف / مشروع</summary>
+    [HttpPatch("{id:guid}")]
+    public async Task<IActionResult> UpdateGoal(
+        Guid id,
+        [FromBody] UpdateGoalRequest req,
+        CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var goal = await _db.Goals
+            .Include(g => g.LifeCircle)
+            .FirstOrDefaultAsync(g => g.Id == id && g.OwnerId == userId, ct);
+
+        if (goal is null) return NotFound();
+
+        if (req.Title is not null) goal.Title = req.Title;
+        if (req.Description is not null) goal.Description = req.Description;
+        if (req.TargetDate.HasValue) goal.TargetDate = req.TargetDate.Value;
+        if (req.PriorityWeight.HasValue) goal.PriorityWeight = req.PriorityWeight.Value;
+        if (req.Status is not null && Enum.TryParse<GoalStatus>(req.Status, out var status))
+            goal.Status = status;
+        if (req.LifeCircleId.HasValue && req.LifeCircleId.Value != Guid.Empty)
+            goal.LifeCircleId = req.LifeCircleId.Value;
+
+        await _db.SaveChangesAsync(ct);
+
+        await _db.Entry(goal).Reference(g => g.LifeCircle).LoadAsync(ct);
+
+        return Ok(new
+        {
+            id              = goal.Id,
+            title           = goal.Title,
+            description     = goal.Description,
+            status          = goal.Status.ToString(),
+            targetDate      = goal.TargetDate,
+            priorityWeight  = goal.PriorityWeight,
+            lifeCircle = goal.LifeCircle == null ? null : new
+            {
+                id    = goal.LifeCircle.Id,
+                name  = goal.LifeCircle.Name,
+                color = goal.LifeCircle.ColorHex ?? "#5E5495"
+            }
+        });
+    }
+
+    /// <summary>حذف هدف / مشروع</summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteGoal(Guid id, CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var goal = await _db.Goals
+            .FirstOrDefaultAsync(g => g.Id == id && g.OwnerId == userId, ct);
+
+        if (goal is null) return NotFound();
+
+        _db.Goals.Remove(goal);
+        await _db.SaveChangesAsync(ct);
+
+        return Ok(new { message = "تم حذف المشروع" });
+    }
 }
 
 public record CreateGoalRequest(
@@ -112,5 +171,14 @@ public record CreateGoalRequest(
     string? Description = null,
     DateTime? TargetDate = null,
     int? PriorityWeight = 5,
+    Guid? LifeCircleId = null
+);
+
+public record UpdateGoalRequest(
+    string? Title = null,
+    string? Description = null,
+    DateTime? TargetDate = null,
+    int? PriorityWeight = null,
+    string? Status = null,
     Guid? LifeCircleId = null
 );

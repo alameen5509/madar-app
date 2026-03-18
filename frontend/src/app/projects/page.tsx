@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { GeometricDivider } from "@/components/IslamicPattern";
 import EditTaskDialogShared from "@/components/EditTaskDialog";
-import { getGoals, getCircles, createGoal, api, type Goal, type LifeCircle } from "@/lib/api";
+import { getGoals, getCircles, createGoal, updateGoal, deleteGoal, api, type Goal, type LifeCircle } from "@/lib/api";
 
 /* ============================================================================
    TYPES & INTERFACES
@@ -22,6 +22,7 @@ interface ProjectTask {
   id: string;
   seq: number;
   title: string;
+  description?: string;
   assignee: string;
   startDate: string;
   dueDate?: string;
@@ -29,6 +30,7 @@ interface ProjectTask {
   startedAt?: string;
   priority: number;
   dependency: "sequential" | "parallel";
+  cost?: number;
 }
 
 interface ProjectMeta {
@@ -662,7 +664,48 @@ function ProjectDetailPanel({
   const [activeTab, setActiveTab] = useState<DetailTab>("tasks");
   const [meta, setMeta] = useState<ProjectMeta>(() => loadProjectMeta(goal.id));
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDesc, setNewTaskDesc] = useState("");
+  const [newTaskPriority, setNewTaskPriority] = useState(3);
+  const [newTaskDueDate, setNewTaskDueDate] = useState("");
+  const [newTaskCost, setNewTaskCost] = useState("");
+  const [newTaskAssignee, setNewTaskAssignee] = useState("انا");
+  const [showAddTaskForm, setShowAddTaskForm] = useState(false);
+  const [platformUsers, setPlatformUsers] = useState<{id: string; fullName: string; email: string}[]>([]);
   const [editingTask, setEditingTask] = useState<ProjectTask | null>(null);
+  const [editCircle, setEditCircle] = useState(goal.lifeCircle?.id ?? "");
+  const [showEditProject, setShowEditProject] = useState(false);
+  const [savingProject, setSavingProject] = useState(false);
+
+  // Load platform users for assignee dropdown
+  useEffect(() => {
+    api.get("/api/users").then(r => setPlatformUsers(r.data)).catch(() => {});
+  }, []);
+  const [showCircleEdit, setShowCircleEdit] = useState(false);
+  const [savingCircle, setSavingCircle] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleChangeCircle() {
+    if (!editCircle || editCircle === goal.lifeCircle?.id) { setShowCircleEdit(false); return; }
+    setSavingCircle(true);
+    try {
+      await updateGoal(goal.id, { lifeCircleId: editCircle });
+      onRefresh();
+      setShowCircleEdit(false);
+    } catch { /* silent */ }
+    finally { setSavingCircle(false); }
+  }
+
+  async function handleDelete() {
+    if (!confirm(`هل أنت متأكد من حذف مشروع "${goal.title}"؟`)) return;
+    setDeleting(true);
+    try {
+      await deleteGoal(goal.id);
+      if (typeof window !== "undefined") localStorage.removeItem(`project_meta_${goal.id}`);
+      onClose();
+      onRefresh();
+    } catch { alert("فشل حذف المشروع"); }
+    finally { setDeleting(false); }
+  }
 
   // Budget state
   const [budgetData, setBudgetData] = useState<BudgetData>(() => parseBudget(goal.description) ?? { total: 0, expenses: [] });
@@ -678,9 +721,14 @@ function ProjectDetailPanel({
   const priority = parsePriority(goal.description);
   const score = priority?.score ?? goal.priorityWeight * 3;
   const desc = cleanDescription(goal.description);
+  const [editTitle, setEditTitle] = useState(goal.title);
+  const [editDesc, setEditDesc] = useState(desc);
+  const [editTargetDate, setEditTargetDate] = useState(goal.targetDate?.split("T")[0] ?? "");
   const daysLeft = getDaysRemaining(goal.targetDate);
   const totalExpenses = budgetData.expenses.reduce((s, e) => s + e.amount, 0);
-  const budgetRemaining = budgetData.total - totalExpenses;
+  const tasksCost = meta.tasks.reduce((s, t) => s + (t.cost ?? 0), 0);
+  const totalSpent = totalExpenses + tasksCost;
+  const budgetRemaining = budgetData.total - totalSpent;
 
   const tabs: { key: DetailTab; label: string }[] = [
     { key: "tasks", label: "المهام" },
@@ -708,18 +756,42 @@ function ProjectDetailPanel({
     if (!newTaskTitle.trim()) return;
     const updated = { ...meta, tasks: [...meta.tasks] };
     const seq = updated.tasks.length + 1;
+    const costVal = parseFloat(newTaskCost);
     updated.tasks.push({
       id: generateId(),
       seq,
       title: newTaskTitle.trim(),
-      assignee: "انا",
+      description: newTaskDesc.trim() || undefined,
+      assignee: newTaskAssignee || "انا",
       startDate: new Date().toISOString().slice(0, 10),
+      dueDate: newTaskDueDate || undefined,
       status: "pending",
-      priority: 3,
+      priority: newTaskPriority,
       dependency: meta.mode,
+      cost: !isNaN(costVal) && costVal > 0 ? costVal : undefined,
     });
     persistMeta(updated);
-    setNewTaskTitle("");
+    setNewTaskTitle(""); setNewTaskDesc(""); setNewTaskPriority(3); setNewTaskDueDate(""); setNewTaskCost(""); setNewTaskAssignee("انا");
+    setShowAddTaskForm(false);
+  }
+
+  async function handleEditProject() {
+    if (!editTitle.trim()) return;
+    setSavingProject(true);
+    try {
+      const priorityData = parsePriority(goal.description);
+      const budgetDataCurrent = parseBudget(goal.description);
+      const teamCurrent = parseTeam(goal.description);
+      const fullDesc = buildDescription(editDesc.trim(), priorityData, budgetDataCurrent, teamCurrent);
+      await updateGoal(goal.id, {
+        title: editTitle.trim(),
+        description: fullDesc,
+        targetDate: editTargetDate || undefined,
+      });
+      onRefresh();
+      setShowEditProject(false);
+    } catch { /* silent */ }
+    finally { setSavingProject(false); }
   }
 
   function cycleTaskStatus(taskId: string) {
@@ -826,8 +898,36 @@ function ProjectDetailPanel({
                   }}>
                   {STATUS_LABEL[goal.status]}
                 </span>
-                {circle && (
-                  <span className="text-xs" style={{ color: circle.colorHex ?? "var(--muted)" }}>{circle.name}</span>
+                {/* Circle / Role with edit */}
+                {!showCircleEdit ? (
+                  <button onClick={() => setShowCircleEdit(true)}
+                    className="text-xs px-2 py-0.5 rounded-full border hover:opacity-80 transition"
+                    style={{
+                      background: circle ? `${circle.colorHex ?? "#666"}15` : "var(--card-border)",
+                      color: circle?.colorHex ?? "var(--muted)",
+                      borderColor: circle?.colorHex ?? "var(--card-border)",
+                    }}
+                    title="تغيير الدور / الوظيفة"
+                  >
+                    {circle ? circle.name : "بدون دور"} ✎
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <select value={editCircle} onChange={(e) => setEditCircle(e.target.value)}
+                      className="text-xs px-2 py-1 rounded-lg border focus:outline-none"
+                      style={{ borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" }}>
+                      <option value="">اختر الدور / الوظيفة</option>
+                      {circles.map(c => (
+                        <option key={c.id} value={c.id}>{c.iconKey ?? ""} {c.name} ({c.tier === "Business" ? "وظيفة" : "دور"})</option>
+                      ))}
+                    </select>
+                    <button onClick={handleChangeCircle} disabled={savingCircle}
+                      className="text-xs px-2 py-1 rounded-lg font-semibold text-white"
+                      style={{ background: "#3D8C5A" }}>
+                      {savingCircle ? "..." : "حفظ"}
+                    </button>
+                    <button onClick={() => setShowCircleEdit(false)} className="text-xs px-2 py-1" style={{ color: "var(--muted)" }}>✕</button>
+                  </div>
                 )}
                 {daysLeft !== null && (
                   <span className="text-xs" style={{ color: daysLeft < 0 ? "#DC2626" : "var(--muted)" }}>
@@ -837,9 +937,21 @@ function ProjectDetailPanel({
               </div>
               {desc && <p className="text-sm mt-2 leading-relaxed" style={{ color: "var(--muted)" }}>{desc}</p>}
             </div>
-            <button onClick={onClose} className="text-lg px-2 py-1 rounded-lg hover:opacity-70 transition" style={{ color: "var(--muted)" }}>
-              X
-            </button>
+            <div className="flex flex-col items-end gap-2">
+              <button onClick={onClose} className="text-lg px-2 py-1 rounded-lg hover:opacity-70 transition" style={{ color: "var(--muted)" }}>
+                X
+              </button>
+              <button onClick={() => setShowEditProject(true)}
+                className="text-xs px-3 py-1.5 rounded-lg font-semibold hover:opacity-90 transition"
+                style={{ background: "#2D6B9E20", color: "#2D6B9E", border: "1px solid #2D6B9E40" }}>
+                ✎ تعديل المشروع
+              </button>
+              <button onClick={handleDelete} disabled={deleting}
+                className="text-xs px-3 py-1.5 rounded-lg font-semibold hover:opacity-90 transition"
+                style={{ background: "#DC262620", color: "#DC2626", border: "1px solid #DC262640" }}>
+                {deleting ? "جارٍ الحذف..." : "🗑 حذف"}
+              </button>
+            </div>
           </div>
 
           {/* Tabs */}
@@ -887,22 +999,75 @@ function ProjectDetailPanel({
                 </button>
               </div>
 
-              {/* Task input */}
-              <div className="flex gap-2 mb-4">
-                <input
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") addTask(); }}
-                  placeholder="اضف مهمة جديدة..."
-                  className="flex-1 px-4 py-2.5 rounded-xl border text-sm focus:outline-none"
-                  style={{ borderColor: "var(--card-border)", background: "var(--card)", color: "var(--text)", fontSize: 15 }}
-                />
-                <button onClick={addTask}
-                  className="px-4 py-2.5 rounded-xl text-sm font-bold text-white transition hover:opacity-90"
+              {/* Add task button / form */}
+              {!showAddTaskForm ? (
+                <button onClick={() => setShowAddTaskForm(true)}
+                  className="w-full py-3 rounded-xl text-sm font-bold text-white transition hover:opacity-90 mb-4"
                   style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
-                  اضافة
+                  + إضافة مهمة
                 </button>
-              </div>
+              ) : (
+                <div className="rounded-xl border p-4 mb-4 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+                  <input value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && newTaskTitle.trim()) addTask(); }}
+                    placeholder="عنوان المهمة *" autoFocus
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none"
+                    style={{ borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" }} />
+                  <textarea value={newTaskDesc} onChange={(e) => setNewTaskDesc(e.target.value)}
+                    placeholder="وصف المهمة (اختياري)" rows={2}
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm resize-none focus:outline-none"
+                    style={{ borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" }} />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted)" }}>المنفذ</label>
+                      <select value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none"
+                        style={{ borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" }}>
+                        <option value="انا">أنا</option>
+                        {platformUsers.map(u => (
+                          <option key={u.id} value={u.fullName}>{u.fullName}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted)" }}>الأولوية</label>
+                      <select value={newTaskPriority} onChange={(e) => setNewTaskPriority(Number(e.target.value))}
+                        className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none"
+                        style={{ borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" }}>
+                        <option value={1}>1 - منخفضة</option>
+                        <option value={2}>2 - عادية</option>
+                        <option value={3}>3 - متوسطة</option>
+                        <option value={4}>4 - عالية</option>
+                        <option value={5}>5 - حرجة</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted)" }}>تاريخ التسليم</label>
+                      <input type="date" value={newTaskDueDate} onChange={(e) => setNewTaskDueDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none"
+                        style={{ borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" }} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted)" }}>التكلفة (ر.س)</label>
+                      <input type="number" value={newTaskCost} onChange={(e) => setNewTaskCost(e.target.value)}
+                        placeholder="0" min="0" step="0.01"
+                        className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none"
+                        style={{ borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" }} />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={addTask} disabled={!newTaskTitle.trim()}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-40"
+                      style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
+                      إضافة المهمة
+                    </button>
+                    <button onClick={() => setShowAddTaskForm(false)}
+                      className="px-4 py-2.5 rounded-xl text-sm" style={{ color: "var(--muted)" }}>
+                      إلغاء
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Task list */}
               {meta.tasks.map((task, idx) => {
@@ -935,17 +1100,29 @@ function ProjectDetailPanel({
                     {/* Seq number */}
                     <span className="text-xs font-bold flex-shrink-0 w-5 text-center" style={{ color: "var(--muted)" }}>{task.seq}</span>
 
-                    {/* Title */}
-                    <span
-                      className="flex-1 text-sm"
-                      style={{
-                        color: task.status === "done" ? "var(--muted)" : "var(--text)",
-                        textDecoration: task.status === "done" ? "line-through" : "none",
-                        fontSize: 15,
-                      }}
-                    >
-                      {task.title}
-                    </span>
+                    {/* Title + description */}
+                    <div className="flex-1 min-w-0">
+                      <span
+                        className="text-sm block"
+                        style={{
+                          color: task.status === "done" ? "var(--muted)" : "var(--text)",
+                          textDecoration: task.status === "done" ? "line-through" : "none",
+                          fontSize: 15,
+                        }}
+                      >
+                        {task.title}
+                      </span>
+                      {task.description && (
+                        <span className="text-xs block mt-0.5 truncate" style={{ color: "var(--muted)" }}>{task.description}</span>
+                      )}
+                    </div>
+
+                    {/* Cost */}
+                    {task.cost && task.cost > 0 && (
+                      <span className="text-xs flex-shrink-0 px-2 py-0.5 rounded font-semibold" style={{ background: "#D4AF3715", color: "#D4AF37" }}>
+                        {task.cost.toLocaleString()} ر.س
+                      </span>
+                    )}
 
                     {/* Assignee */}
                     <span className="text-xs flex-shrink-0 px-2 py-0.5 rounded" style={{ background: "var(--bg)", color: "var(--muted)" }}>
@@ -1074,17 +1251,17 @@ function ProjectDetailPanel({
                         <div
                           className="h-full rounded-full transition-all duration-500"
                           style={{
-                            width: `${Math.min(100, (totalExpenses / budgetData.total) * 100)}%`,
-                            background: totalExpenses > budgetData.total ? "#DC2626" : totalExpenses > budgetData.total * 0.8 ? "#D4AF37" : "#3D8C5A",
+                            width: `${Math.min(100, (totalSpent / budgetData.total) * 100)}%`,
+                            background: totalSpent > budgetData.total ? "#DC2626" : totalSpent > budgetData.total * 0.8 ? "#D4AF37" : "#3D8C5A",
                           }}
                         />
                       </div>
                       <span className="text-xs font-bold" style={{ color: "var(--muted)" }}>
-                        {Math.round((totalExpenses / budgetData.total) * 100)}%
+                        {Math.round((totalSpent / budgetData.total) * 100)}%
                       </span>
                     </div>
                     <div className="flex justify-between text-xs" style={{ color: "var(--muted)" }}>
-                      <span>المصروف: {totalExpenses.toLocaleString("ar-SA")} ر.س</span>
+                      <span>المصروف: {totalSpent.toLocaleString("ar-SA")} ر.س {tasksCost > 0 && `(منها ${tasksCost.toLocaleString("ar-SA")} تكاليف مهام)`}</span>
                       <span style={{ color: budgetRemaining < 0 ? "#DC2626" : "#3D8C5A" }}>
                         المتبقي: {budgetRemaining.toLocaleString("ar-SA")} ر.س
                       </span>
@@ -1211,6 +1388,47 @@ function ProjectDetailPanel({
           )}
         </div>
       </div>
+
+      {/* Edit Project Dialog */}
+      {showEditProject && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowEditProject(false)} />
+          <div className="relative z-10 rounded-2xl shadow-2xl w-full max-w-md overflow-y-auto"
+            style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+            <div className="px-6 pt-6 pb-3 border-b" style={{ borderColor: "var(--card-border)" }}>
+              <h3 className="font-bold" style={{ color: "var(--text)", fontSize: 18 }}>تعديل المشروع</h3>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold mb-1.5" style={{ color: "var(--text)" }}>اسم المشروع</label>
+                <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none"
+                  style={{ borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" }} />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1.5" style={{ color: "var(--text)" }}>الوصف</label>
+                <textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={3}
+                  className="w-full px-4 py-2.5 rounded-xl border text-sm resize-none focus:outline-none"
+                  style={{ borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" }} />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1.5" style={{ color: "var(--text)" }}>الموعد النهائي</label>
+                <input type="date" value={editTargetDate} onChange={(e) => setEditTargetDate(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none"
+                  style={{ borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" }} />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button onClick={handleEditProject} disabled={savingProject || !editTitle.trim()}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white hover:opacity-90 transition disabled:opacity-40"
+                  style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
+                  {savingProject ? "جارٍ الحفظ..." : "حفظ التعديلات"}
+                </button>
+                <button onClick={() => setShowEditProject(false)} className="px-4 py-2.5 rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Slide-in animation style */}
       <style jsx>{`
