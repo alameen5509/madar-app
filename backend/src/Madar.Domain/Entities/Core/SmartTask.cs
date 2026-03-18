@@ -35,11 +35,19 @@ public class SmartTask
     public DateTime? CompletedAt { get; set; }
     public bool WasCompletedOnTime { get; set; }
     public string? CompletionNote { get; set; }
+    // Cost & Assignment (Phase 3)
+    public decimal? Cost { get; set; }
+    public string? CostCurrency { get; set; } = "SAR";
+    public Guid? AssignedToId { get; set; }
+    public Guid? ProjectId { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public ApplicationUser Owner { get; set; } = default!;
+    public ApplicationUser? AssignedTo { get; set; }
     public LifeCircle LifeCircle { get; set; } = default!;
     public Goal? Goal { get; set; }
+    public Project? Project { get; set; }
     public SmartTask? ParentTask { get; set; }
     public ICollection<SmartTask> SubTasks { get; set; } = [];
     public ICollection<TaskTag> Tags { get; set; } = [];

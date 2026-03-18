@@ -23,6 +23,11 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
     public DbSet<DailyEnergyLog> DailyEnergyLogs => Set<DailyEnergyLog>();
     public DbSet<InboxItem> InboxItems => Set<InboxItem>();
     public DbSet<Contract> Contracts => Set<Contract>();
+    public DbSet<Habit> Habits => Set<Habit>();
+    public DbSet<Project> Projects => Set<Project>();
+    public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
+    public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
+    public DbSet<WatchLinkRequest_Entity> WatchLinkRequests => Set<WatchLinkRequest_Entity>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -89,6 +94,10 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
             t.HasMany(x => x.Tags).WithMany(x => x.Tasks).UsingEntity(j => j.ToTable("SmartTaskTags"));
             t.HasIndex(x => new { x.OwnerId, x.Status });
             t.HasIndex(x => x.AiPriorityScore);
+            t.Property(x => x.Cost).HasPrecision(18, 2);
+            t.Property(x => x.CostCurrency).HasMaxLength(10);
+            t.HasOne(x => x.AssignedTo).WithMany().HasForeignKey(x => x.AssignedToId).OnDelete(DeleteBehavior.SetNull);
+            t.HasOne(x => x.Project).WithMany(x => x.Tasks).HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.SetNull);
         });
 
         builder.Entity<TaskAiLog>(al =>
@@ -111,6 +120,13 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
             inbox.HasOne(x => x.ConvertedTask).WithMany().HasForeignKey(x => x.ConvertedToTaskId).OnDelete(DeleteBehavior.SetNull);
         });
 
+        builder.Entity<Habit>(h =>
+        {
+            h.HasKey(x => x.Id);
+            h.Property(x => x.Title).HasMaxLength(300).IsRequired();
+            h.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+        });
+
         builder.Entity<Contract>(c =>
         {
             c.HasKey(x => x.Id);
@@ -120,6 +136,39 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
             c.Property(x => x.Value).HasPrecision(18, 2);
             c.HasOne(x => x.Owner).WithMany(x => x.Contracts).HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
             c.HasIndex(x => new { x.OwnerId, x.Status });
+        });
+
+        builder.Entity<Project>(p =>
+        {
+            p.HasKey(x => x.Id);
+            p.Property(x => x.Title).HasMaxLength(400).IsRequired();
+            p.Property(x => x.Budget).HasPrecision(18, 2);
+            p.Property(x => x.Currency).HasMaxLength(10);
+            p.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<DeviceToken>(dt =>
+        {
+            dt.HasKey(x => x.Id);
+            dt.Property(x => x.Token).HasMaxLength(512).IsRequired();
+            dt.Property(x => x.Platform).HasMaxLength(20).IsRequired();
+            dt.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            dt.HasIndex(x => new { x.UserId, x.Token }).IsUnique();
+        });
+
+        builder.Entity<NotificationPreference>(np =>
+        {
+            np.HasKey(x => x.Id);
+            np.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            np.HasIndex(x => x.UserId).IsUnique();
+        });
+
+        builder.Entity<WatchLinkRequest_Entity>(wlr =>
+        {
+            wlr.HasKey(x => x.Id);
+            wlr.Property(x => x.DeviceId).HasMaxLength(200).IsRequired();
+            wlr.Property(x => x.DeviceName).HasMaxLength(200);
+            wlr.Property(x => x.Status).HasMaxLength(20);
         });
     }
 }

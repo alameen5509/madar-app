@@ -58,6 +58,22 @@ public class AuthController : BaseController
     }
 }
 
-public record RegisterRequest(string FullName, string Email, string Password, string Role);
-public record LoginRequest(string Email, string Password);
-public record RefreshTokenRequest(string AccessToken, string RefreshToken);
+public class RegisterRequest
+{
+    public string FullName { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string Password { get; set; } = "";
+    public string Role { get; set; } = "User";
+}
+
+public class LoginRequest
+{
+    public string Email { get; set; } = "";
+    public string Password { get; set; } = "";
+}
+
+public class RefreshTokenRequest
+{
+    public string AccessToken { get; set; } = "";
+    public string RefreshToken { get; set; } = "";
+}

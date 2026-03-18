@@ -4,8 +4,7 @@ import { useState, FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EightPointedStar, GeometricDivider } from "@/components/IslamicPattern";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+import { api } from "@/lib/api";
 
 // ─── Full-page Islamic background pattern ────────────────────────────────────
 function FullPagePattern() {
@@ -154,15 +153,9 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, email, password, role: "User" }),
-      });
+      const { data } = await api.post("/api/auth/register", { fullName, email, password, role: "User" });
 
-      const data = await res.json();
-
-      if (!res.ok || !data.succeeded) {
+      if (!data.succeeded) {
         setError(data.errors?.[0] ?? "حدث خطأ أثناء إنشاء الحساب");
         return;
       }

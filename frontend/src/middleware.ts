@@ -4,7 +4,7 @@ const PUBLIC_PATHS = ['/login', '/register'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const token = request.cookies.get('accessToken')?.value;
+  const token = request.cookies.get('madar_token')?.value;
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
   if (!token && !isPublic) {
@@ -12,12 +12,12 @@ export function middleware(request: NextRequest) {
   }
 
   if (token && isPublic) {
-    return NextResponse.redirect(new URL('/', request.url));
+    return NextResponse.redirect(new URL('/tasks', request.url));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon\\.ico).*)'],
+  matcher: ['/((?!_next|api|login|register|favicon\\.ico).*)'],
 };

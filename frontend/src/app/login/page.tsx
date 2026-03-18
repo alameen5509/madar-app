@@ -2,10 +2,8 @@
 
 import { useState, FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { EightPointedStar, GeometricDivider } from "@/components/IslamicPattern";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+import { api } from "@/lib/api";
 
 // ─── Full-page Islamic background pattern ────────────────────────────────────
 function FullPagePattern() {
@@ -92,7 +90,6 @@ function Field({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [error, setError]       = useState("");
@@ -104,24 +101,26 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+      const { data } = await api.post("/api/auth/login", { email, password });
 
-      const data = await res.json();
-
-      if (!res.ok || !data.succeeded) {
+      if (!data.succeeded) {
         setError(data.errors?.[0] ?? "بريد إلكتروني أو كلمة مرور غير صحيحة");
         return;
       }
 
-      localStorage.setItem("accessToken",  data.accessToken);
-      localStorage.setItem("refreshToken", data.refreshToken ?? "");
-      document.cookie = `accessToken=${data.accessToken}; path=/; SameSite=Lax; max-age=86400`;
+      const accessToken  = data.data?.accessToken  ?? data.accessToken;
+      const refreshToken = data.data?.refreshToken ?? data.refreshToken ?? "";
+      localStorage.setItem("accessToken",  accessToken);
+      localStorage.setItem("refreshToken", refreshToken);
 
-      router.push("/");
+      // Set cookie server-side so middleware can read it reliably
+      await fetch("/api/session", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ token: accessToken }),
+      });
+
+      window.location.href = "/tasks";
     } catch {
       setError("تعذّر الاتصال بالخادم، يرجى المحاولة لاحقاً");
     } finally {

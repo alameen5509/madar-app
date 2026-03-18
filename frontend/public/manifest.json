@@ -1,0 +1,18 @@
+{
+  "name": "مدار — نظام إدارة الحياة",
+  "short_name": "مدار",
+  "description": "نظام مدار الذكي لإدارة الحياة والمهام والأهداف",
+  "start_url": "/tasks",
+  "display": "standalone",
+  "background_color": "#1A1A2E",
+  "theme_color": "#2C2C54",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

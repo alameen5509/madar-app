@@ -1,111 +1,132 @@
 "use client";
 
-import { useState } from "react";
-import { GeometricDivider, EightPointedStar } from "@/components/IslamicPattern";
+import { useState, useEffect, useCallback } from "react";
+import { GeometricDivider } from "@/components/IslamicPattern";
+import { getTasks, getGoals, getCircles, type SmartTask, type Goal, type LifeCircle } from "@/lib/api";
 
-const SUGGESTIONS = [
-  "ما هي أولوياتي لهذا الأسبوع؟",
-  "حلل توازن دوائر حياتي",
-  "اقترح جدولاً لتحقيق أهدافي",
-  "ما هو أفضل وقت لإنجاز مهامي اليوم؟",
-];
+interface Insight {
+  icon: string;
+  title: string;
+  body: string;
+  type: "success" | "warning" | "info" | "idea";
+}
 
-type Message = { role: "user" | "ai"; text: string };
+function analyze(tasks: SmartTask[], goals: Goal[], circles: LifeCircle[]): Insight[] {
+  const insights: Insight[] = [];
+  const completed = tasks.filter((t) => t.status === "Completed").length;
+  const total = tasks.length;
+  const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
+  const overdue = tasks.filter((t) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "Completed");
+  const highP = tasks.filter((t) => t.userPriority >= 4 && t.status !== "Completed");
+  const urgent = tasks.filter((t) => (t.contextNote ?? "").includes("urgent") && t.status !== "Completed");
+  const activeGoals = goals.filter((g) => g.status === "Active");
+  const avgCircle = circles.length === 0 ? 0 : Math.round(circles.reduce((s, c) => s + c.progressPercent, 0) / circles.length);
+  const weakCircles = circles.filter((c) => c.progressPercent < 25).sort((a, b) => a.progressPercent - b.progressPercent);
 
-const INITIAL: Message[] = [
-  {
-    role: "ai",
-    text: "أهلاً بك في مساعد مدار الذكي ✨\nأنا هنا لمساعدتك في تحقيق التوازن بين دوائر حياتك وإنجاز أهدافك. كيف يمكنني مساعدتك اليوم؟",
-  },
-];
+  // Completion rate
+  if (pct >= 80) insights.push({ icon: "🏆", title: "إنجاز ممتاز!", body: `نسبة إنجازك ${pct}%. ما شاء الله، استمر على هذا المستوى.`, type: "success" });
+  else if (pct >= 50) insights.push({ icon: "📊", title: "أداء جيد", body: `نسبة إنجازك ${pct}%. يمكنك الوصول لأكثر بتقليل المشتتات.`, type: "info" });
+  else if (total > 0) insights.push({ icon: "⚠️", title: "تحتاج تركيز", body: `نسبة إنجازك ${pct}% فقط. ابدأ بأسهل مهمة لبناء الزخم.`, type: "warning" });
 
-export default function AiPage() {
-  const [messages, setMessages] = useState<Message[]>(INITIAL);
-  const [input, setInput] = useState("");
+  // Overdue
+  if (overdue.length > 0) insights.push({ icon: "⏰", title: `${overdue.length} مهمة متأخرة`, body: `المتأخرة: ${overdue.slice(0, 3).map((t) => t.title).join("، ")}${overdue.length > 3 ? "..." : ""}. أعد جدولتها أو ألغِ ما لا تحتاجه.`, type: "warning" });
 
-  const send = (text: string) => {
-    if (!text.trim()) return;
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", text },
-      { role: "ai", text: "جاري التحليل... سيتم ربط هذا المساعد بـ Claude API قريباً لتقديم توصيات مخصصة بناءً على بياناتك الفعلية. 🌟" },
-    ]);
-    setInput("");
-  };
+  // Urgent
+  if (urgent.length > 0) insights.push({ icon: "🔴", title: `${urgent.length} مهمة ملحة`, body: `أشخاص ينتظرون منك. ابدأ بها أولاً.`, type: "warning" });
+
+  // High priority
+  if (highP.length > 3) insights.push({ icon: "🎯", title: "أولويات كثيرة", body: `لديك ${highP.length} مهمة عالية الأولوية. ركّز على أهم 3 فقط اليوم.`, type: "idea" });
+
+  // Goals
+  if (activeGoals.length > 5) insights.push({ icon: "📋", title: "مشاريع كثيرة", body: `${activeGoals.length} مشروع نشط. فكّر في إيقاف بعضها مؤقتاً.`, type: "idea" });
+  else if (activeGoals.length === 0 && total > 0) insights.push({ icon: "💡", title: "بدون مشاريع", body: "كل مهامك مستقلة. اربطها بمشاريع لتتبع التقدم.", type: "idea" });
+
+  // Circle balance
+  if (weakCircles.length > 0) {
+    insights.push({ icon: "⚖️", title: "خلل في التوازن", body: `الأدوار الضعيفة: ${weakCircles.slice(0, 3).map((c) => `${c.name} (${c.progressPercent}%)`).join("، ")}. خصص لها وقتاً.`, type: "warning" });
+  }
+  if (avgCircle >= 60) insights.push({ icon: "🌟", title: "توازن جيد", body: `متوسط التوازن ${avgCircle}% عبر ${circles.length} دائرة. أحسنت.`, type: "success" });
+
+  // Work-life balance
+  const workTasks = tasks.filter((t) => (t.contextNote ?? "").includes("work")).length;
+  const personalTasks = total - workTasks;
+  if (workTasks > 0 && personalTasks === 0) insights.push({ icon: "🏠", title: "كل مهامك عمل", body: "لا توجد مهام شخصية. لا تنسَ نفسك وأسرتك.", type: "idea" });
+
+  // Deep work
+  const deepTasks = tasks.filter((t) => t.cognitiveLoad === "Deep" && t.status !== "Completed").length;
+  if (deepTasks > 2) insights.push({ icon: "🧠", title: "مهام عميقة", body: `${deepTasks} مهام تحتاج تركيز عميق. خصص لها أول جلسة صباحية.`, type: "info" });
+
+  // General tips
+  insights.push({ icon: "🕌", title: "نصيحة", body: "البركة في البكور. ابدأ يومك بعد صلاة الفجر.", type: "info" });
+  insights.push({ icon: "📝", title: "فرصة تطوير", body: "راجع مهامك المكتملة أسبوعياً لتعرف أنماط إنتاجيتك.", type: "idea" });
+
+  return insights;
+}
+
+const TYPE_STYLES: Record<string, { bg: string; border: string; text: string }> = {
+  success: { bg: "bg-green-50", border: "border-green-200", text: "text-green-800" },
+  warning: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-800" },
+  info:    { bg: "bg-blue-50",  border: "border-blue-200",  text: "text-blue-800"  },
+  idea:    { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-800" },
+};
+
+export default function AIPage() {
+  const [insights, setInsights] = useState<Insight[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState("");
+
+  const generateReport = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [tasks, goals, circles] = await Promise.all([getTasks(), getGoals(), getCircles()]);
+      setInsights(analyze(tasks, goals, circles));
+      setLastUpdate(new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" }));
+    } catch {}
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { generateReport(); }, [generateReport]);
 
   return (
-    <main className="flex-1 overflow-y-auto flex flex-col" style={{ background: "var(--bg)" }}>
-      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-[#E2D5B0] px-8 py-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, #C9A84C, #E8C96A)" }}>
-            <EightPointedStar size={20} color="#2A2542" />
-          </div>
+    <main className="flex-1 overflow-y-auto" style={{ background: "var(--bg)" }}>
+      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-gray-200 px-8 py-4">
+        <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-[#1A1830] font-bold text-lg leading-none">الذكاء الاصطناعي</h2>
-            <p className="text-[#7C7A8E] text-xs">مساعد مدار — مدعوم بـ Claude</p>
+            <h2 className="text-[#16213E] font-bold text-lg">التقرير الذكي</h2>
+            <p className="text-[#6B7280] text-xs">تحليل شامل وتوصيات بناءً على بياناتك {lastUpdate && `· آخر تحديث ${lastUpdate}`}</p>
           </div>
+          <button onClick={generateReport} disabled={loading}
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
+            {loading ? "جارٍ التحليل..." : "🔄 تحديث"}
+          </button>
         </div>
       </header>
 
-      <div className="flex-1 px-8 py-6 space-y-4 overflow-y-auto">
-        <GeometricDivider label="محادثة ذكية" />
+      <div className="px-8 py-6 space-y-4">
+        {loading && (
+          <div className="text-center py-16">
+            <div className="w-16 h-16 rounded-full bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-4 text-2xl animate-pulse">🤖</div>
+            <p className="text-[#6B7280] text-sm animate-pulse">يحلل بياناتك...</p>
+          </div>
+        )}
 
-        {/* Messages */}
-        <div className="space-y-3">
-          {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "user" ? "justify-start" : "justify-end"}`}>
-              <div
-                className={`max-w-[70%] rounded-2xl px-5 py-3 text-sm leading-relaxed whitespace-pre-line ${
-                  m.role === "user"
-                    ? "bg-white border border-[#E2D5B0] text-[#1A1830]"
-                    : "text-white"
-                }`}
-                style={m.role === "ai" ? { background: "linear-gradient(135deg, #2A2542, #5E5495)" } : {}}
-              >
-                {m.text}
+        {!loading && insights.map((insight, i) => {
+          const style = TYPE_STYLES[insight.type];
+          return (
+            <div key={i} className={`rounded-xl p-5 border ${style.bg} ${style.border} fade-up`} style={{ animationDelay: `${i * 80}ms` }}>
+              <div className="flex items-start gap-3">
+                <span className="text-2xl flex-shrink-0">{insight.icon}</span>
+                <div>
+                  <p className={`font-bold text-sm ${style.text}`}>{insight.title}</p>
+                  <p className={`text-xs mt-1 leading-relaxed ${style.text} opacity-80`}>{insight.body}</p>
+                </div>
               </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
 
-        {/* Quick suggestions */}
-        <div>
-          <p className="text-[#7C7A8E] text-xs mb-2">اقتراحات سريعة:</p>
-          <div className="flex flex-wrap gap-2">
-            {SUGGESTIONS.map((s) => (
-              <button
-                key={s}
-                onClick={() => send(s)}
-                className="text-xs px-3 py-1.5 rounded-full border border-[#C9A84C]/40 text-[#5E5495] hover:bg-[#C9A84C]/10 transition"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Input */}
-      <div className="px-8 py-4 border-t border-[#E2D5B0] bg-white/80 backdrop-blur">
-        <div className="flex gap-3">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && send(input)}
-            placeholder="اكتب سؤالك هنا..."
-            className="flex-1 rounded-xl border border-[#E2D5B0] px-4 py-2.5 text-sm outline-none focus:border-[#5E5495] transition bg-white"
-            dir="rtl"
-          />
-          <button
-            onClick={() => send(input)}
-            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition hover:opacity-90"
-            style={{ background: "linear-gradient(135deg, #5E5495, #C9A84C)" }}
-          >
-            إرسال
-          </button>
-        </div>
+        <div className="pb-4"><GeometricDivider /></div>
       </div>
     </main>
   );

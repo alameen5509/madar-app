@@ -188,7 +188,94 @@ public class CirclesController : BaseController
             goals            = Array.Empty<object>()
         });
     }
+    /// <summary>تعديل اسم أو وصف دائرة حياة</summary>
+    [HttpPatch("{id:guid}")]
+    public async Task<IActionResult> UpdateCircle(
+        Guid id,
+        [FromBody] UpdateCircleRequest req,
+        CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var circle = await _db.LifeCircles
+            .FirstOrDefaultAsync(c => c.Id == id && c.OwnerId == userId, ct);
+
+        if (circle is null) return NotFound();
+
+        if (req.Name is not null)        circle.Name             = req.Name.Trim();
+        if (req.Description is not null) circle.Description      = req.Description.Trim();
+        if (req.IconKey is not null)      circle.IconKey          = req.IconKey;
+        if (req.ColorHex is not null)     circle.ColorHex         = req.ColorHex;
+
+        await _db.SaveChangesAsync(ct);
+        return Ok(new { circle.Id, circle.Name, circle.Description, circle.IconKey, colorHex = circle.ColorHex ?? "#5E5495" });
+    }
+
+    /// <summary>حذف دائرة حياة (مع نقل المهام للدائرة الأولى)</summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteCircle(Guid id, CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var circle = await _db.LifeCircles
+            .FirstOrDefaultAsync(c => c.Id == id && c.OwnerId == userId, ct);
+
+        if (circle is null) return NotFound();
+
+        // Find fallback circle
+        var fallback = await _db.LifeCircles
+            .Where(c => c.OwnerId == userId && c.IsActive && c.Id != id)
+            .OrderBy(c => c.DisplayOrder)
+            .FirstOrDefaultAsync(ct);
+
+        if (fallback is not null)
+        {
+            // Move tasks to fallback
+            var tasks = await _db.SmartTasks.Where(t => t.LifeCircleId == id).ToListAsync(ct);
+            foreach (var t in tasks) t.LifeCircleId = fallback.Id;
+
+            // Move sub-circles
+            var subs = await _db.LifeCircles.Where(c => c.ParentCircleId == id).ToListAsync(ct);
+            foreach (var s in subs) s.ParentCircleId = null;
+
+            // Move goals
+            var goals = await _db.Goals.Where(g => g.LifeCircleId == id).ToListAsync(ct);
+            foreach (var g in goals) g.LifeCircleId = fallback.Id;
+        }
+
+        _db.LifeCircles.Remove(circle);
+        await _db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    /// <summary>مهام دائرة معيّنة (مباشرة، بدون هدف)</summary>
+    [HttpGet("{id:guid}/tasks")]
+    public async Task<IActionResult> GetCircleTasks(Guid id, CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var tasks = await _db.SmartTasks
+            .Where(t => t.OwnerId == userId && t.LifeCircleId == id)
+            .OrderByDescending(t => t.UserPriority)
+            .ThenBy(t => t.CreatedAt)
+            .Select(t => new
+            {
+                id           = t.Id,
+                title        = t.Title,
+                status       = t.Status.ToString(),
+                userPriority = t.UserPriority,
+                dueDate      = t.DueDate,
+            })
+            .ToListAsync(ct);
+
+        return Ok(tasks);
+    }
 }
+
+public record UpdateCircleRequest(
+    string? Name        = null,
+    string? Description = null,
+    string? IconKey     = null,
+    string? ColorHex    = null
+);
 
 public record CreateCircleRequest(
     string  Name,

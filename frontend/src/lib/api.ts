@@ -1,6 +1,13 @@
 import axios from 'axios';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://madar-api-app.azurewebsites.net';
+
+// ─── Cookie Helper ────────────────────────────────────────────────────────────
+
+function getCookieValue(name: string): string {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? match[2] : '';
+}
 
 // ─── Axios Instance ───────────────────────────────────────────────────────────
 
@@ -9,10 +16,10 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Attach JWT token from localStorage to every request
+// Attach JWT token from madar_token cookie to every request
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('accessToken');
+    const token = getCookieValue('madar_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -20,14 +27,31 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Redirect to /login on 401
+// On 401: try refresh token, else redirect to login
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401 && typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      document.cookie = 'accessToken=; path=/; max-age=0';
+      // Try refresh before giving up
+      try {
+        const storedRefresh = localStorage.getItem('refreshToken') ?? '';
+        const currentToken = getCookieValue('madar_token');
+        if (storedRefresh && currentToken) {
+          const { data } = await axios.post(`${BASE_URL}/api/auth/refresh-token`, {
+            accessToken: currentToken,
+            refreshToken: storedRefresh,
+          });
+          if (data.succeeded && data.data?.accessToken) {
+            const newToken = data.data.accessToken;
+            document.cookie = `madar_token=${newToken}; path=/; SameSite=Lax; max-age=86400`;
+            if (data.data.refreshToken) localStorage.setItem('refreshToken', data.data.refreshToken);
+            // Retry original request
+            error.config.headers.Authorization = `Bearer ${newToken}`;
+            return api.request(error.config);
+          }
+        }
+      } catch {}
+      document.cookie = 'madar_token=; path=/; max-age=0';
       window.location.href = '/login';
     }
     return Promise.reject(error);
@@ -48,10 +72,18 @@ export interface SmartTask {
   title: string;
   description?: string;
   status: 'Inbox' | 'Todo' | 'Scheduled' | 'InProgress' | 'Completed' | 'Deferred' | 'Cancelled';
-  userPriority: number;        // 1–5
-  aiPriorityScore: number;     // 0–100
+  userPriority: number;
+  aiPriorityScore: number;
   cognitiveLoad: 'Low' | 'Medium' | 'High' | 'Deep';
   dueDate?: string;
+  isRecurring?: boolean;
+  recurrenceRule?: string;
+  contextNote?: string;
+  estimatedDurationMinutes?: number;
+  actualDurationMinutes?: number;
+  completedAt?: string;
+  createdAt?: string;
+  wasCompletedOnTime?: boolean;
   lifeCircle?: { id: string; name: string; color: string; icon: string };
 }
 
@@ -150,11 +182,10 @@ export async function getSalahToday(
 // ─── Auth Functions ───────────────────────────────────────────────────────────
 
 export async function login(email: string, password: string): Promise<AuthResult> {
-  const { data } = await api.post<AuthResult>('/auth/login', { email, password });
+  const { data } = await api.post<AuthResult>('/api/auth/login', { email, password });
 
   if (data.succeeded && data.accessToken) {
-    localStorage.setItem('accessToken', data.accessToken);
-    document.cookie = `accessToken=${data.accessToken}; path=/; SameSite=Lax; max-age=86400`;
+    document.cookie = `madar_token=${data.accessToken}; path=/; SameSite=Lax; max-age=86400`;
     if (data.refreshToken) {
       localStorage.setItem('refreshToken', data.refreshToken);
     }
@@ -169,7 +200,7 @@ export async function register(
   password: string,
   role = 'User'
 ): Promise<AuthResult> {
-  const { data } = await api.post<AuthResult>('/auth/register', {
+  const { data } = await api.post<AuthResult>('/api/auth/register', {
     fullName,
     email,
     password,
@@ -180,16 +211,16 @@ export async function register(
 }
 
 export async function refreshToken(): Promise<AuthResult> {
-  const accessToken = localStorage.getItem('accessToken') ?? '';
+  const accessToken = getCookieValue('madar_token');
   const storedRefresh = localStorage.getItem('refreshToken') ?? '';
 
-  const { data } = await api.post<AuthResult>('/auth/refresh-token', {
+  const { data } = await api.post<AuthResult>('/api/auth/refresh-token', {
     accessToken,
     refreshToken: storedRefresh,
   });
 
   if (data.succeeded && data.accessToken) {
-    localStorage.setItem('accessToken', data.accessToken);
+    document.cookie = `madar_token=${data.accessToken}; path=/; SameSite=Lax; max-age=86400`;
     if (data.refreshToken) {
       localStorage.setItem('refreshToken', data.refreshToken);
     }
@@ -199,9 +230,8 @@ export async function refreshToken(): Promise<AuthResult> {
 }
 
 export function logout(): void {
-  localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');
-  document.cookie = 'accessToken=; path=/; max-age=0';
+  document.cookie = 'madar_token=; path=/; max-age=0';
   window.location.href = '/login';
 }
 
@@ -238,6 +268,21 @@ export interface CreateTaskPayload {
   cognitiveLoad?: 'Low' | 'Medium' | 'High' | 'Deep';
   dueDate?: string;
   lifeCircleId?: string;
+  goalId?: string;
+  parentTaskId?: string;
+  isRecurring?: boolean;
+  recurrenceRule?: string;
+  isWorkTask?: boolean;
+  isUrgent?: boolean;
+  waitingFor?: string;
+  taskContext?: string;
+}
+
+export interface SubTask {
+  id: string;
+  title: string;
+  status: string;
+  userPriority: number;
 }
 
 export interface CreateGoalPayload {
@@ -255,5 +300,80 @@ export async function createTask(payload: CreateTaskPayload): Promise<SmartTask>
 
 export async function createGoal(payload: CreateGoalPayload): Promise<Goal> {
   const { data } = await api.post<Goal>('/api/goals', payload);
+  return data;
+}
+
+// ─── Circle Updates ──────────────────────────────────────────────────────────
+
+export async function updateCircle(
+  id: string,
+  payload: { name?: string; description?: string; iconKey?: string; colorHex?: string },
+): Promise<{ id: string; name: string; description?: string; iconKey?: string; colorHex: string }> {
+  const { data } = await api.patch(`/api/circles/${id}`, payload);
+  return data;
+}
+
+export interface CircleTask {
+  id: string;
+  title: string;
+  status: string;
+  userPriority: number;
+  dueDate?: string;
+}
+
+export async function getCircleTasks(circleId: string): Promise<CircleTask[]> {
+  const { data } = await api.get<CircleTask[]>(`/api/circles/${circleId}/tasks`);
+  return data;
+}
+
+export async function deleteCircle(id: string): Promise<void> {
+  await api.delete(`/api/circles/${id}`);
+}
+
+export async function acceptRejectTask(id: string, accept: boolean): Promise<void> {
+  await api.patch(`/api/tasks/${id}/accept`, { accept });
+}
+
+export async function getSubTasks(taskId: string): Promise<SubTask[]> {
+  const { data } = await api.get<SubTask[]>(`/api/tasks/${taskId}/subtasks`);
+  return data;
+}
+
+export async function assignTask(
+  targetEmail: string, title: string, description?: string, userPriority?: number,
+): Promise<{ message: string }> {
+  const { data } = await api.post('/api/tasks/assign', { targetEmail, title, description, userPriority });
+  return data;
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+export async function getUsers(): Promise<{ id: string; fullName: string; email: string; isActive: boolean; lastLoginAt?: string; createdAt: string }[]> {
+  const { data } = await api.get('/api/users');
+  return data;
+}
+
+export async function getUserTasks(userId: string): Promise<{ id: string; title: string; status: string; userPriority: number; dueDate?: string; actualDuration?: number; wasOnTime?: boolean }[]> {
+  const { data } = await api.get(`/api/users/${userId}/tasks`);
+  return data;
+}
+
+export async function getUserGoals(userId: string): Promise<{ id: string; title: string; status: string; progressPercent: number }[]> {
+  const { data } = await api.get(`/api/users/${userId}/goals`);
+  return data;
+}
+
+export async function updateUser(userId: string, payload: { fullName?: string; isActive?: boolean }): Promise<void> {
+  await api.patch(`/api/users/${userId}`, payload);
+}
+
+// ─── Task Status Update ──────────────────────────────────────────────────────
+
+export async function updateTaskStatus(id: string, status: string): Promise<void> {
+  await api.patch(`/api/tasks/${id}/status`, { status });
+}
+
+export async function transferTask(taskId: string, targetEmail: string): Promise<{ message: string }> {
+  const { data } = await api.post(`/api/tasks/${taskId}/transfer`, { targetEmail });
   return data;
 }
