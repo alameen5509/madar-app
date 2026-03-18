@@ -113,14 +113,18 @@ export default function LoginPage() {
       localStorage.setItem("accessToken",  accessToken);
       localStorage.setItem("refreshToken", refreshToken);
 
-      // Set cookie directly + via server-side for middleware
+      // Set cookie for middleware auth check
       document.cookie = `madar_token=${accessToken};path=/;max-age=86400;SameSite=Lax`;
-      fetch("/api/session", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ token: accessToken }),
-      }).catch(() => {});
+      try {
+        await fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: accessToken }),
+        });
+      } catch {}
 
+      // Small delay to ensure cookie is set before redirect
+      await new Promise(r => setTimeout(r, 100));
       window.location.href = "/tasks";
     } catch {
       setError("تعذّر الاتصال بالخادم، يرجى المحاولة لاحقاً");
