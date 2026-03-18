@@ -40,17 +40,27 @@ export default function ProjectsPage() {
   const [circles, setCircles] = useState<LifeCircle[]>([]);
   const [users, setUsers] = useState<{ id: string; fullName: string; email: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [selected, setSelected] = useState<Goal | null>(null);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
       const [g, c] = await Promise.all([getGoals(), getCircles()]);
       setGoals(g);
       setCircles(c);
-    } catch {} finally { setLoading(false); }
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 401) {
+        setError("انتهت الجلسة — سجّل الدخول مرة أخرى");
+      } else {
+        setError("تعذّر تحميل المشاريع — تحقق من الاتصال");
+      }
+      console.error("Goals fetch error:", err);
+    } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -99,6 +109,15 @@ export default function ProjectsPage() {
 
       <div className="px-6 py-5">
         {loading && <p className="text-center py-12 animate-pulse" style={{ color: "var(--muted)" }}>جارٍ التحميل...</p>}
+
+        {error && (
+          <div className="text-center py-8">
+            <p className="text-sm mb-3" style={{ color: "#DC2626" }}>{error}</p>
+            <button onClick={fetchData} className="text-sm px-4 py-2 rounded-lg hover:opacity-80" style={{ background: "#D4AF3720", color: "#D4AF37" }}>
+              إعادة المحاولة
+            </button>
+          </div>
+        )}
 
         {/* Kanban View */}
         {!loading && viewMode === "kanban" && (
