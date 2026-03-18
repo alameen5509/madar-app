@@ -85,6 +85,12 @@ export interface SmartTask {
   createdAt?: string;
   wasCompletedOnTime?: boolean;
   lifeCircle?: { id: string; name: string; color: string; icon: string };
+  goal?: { id: string; title: string };
+  cost?: number;
+  costCurrency?: string;
+  assignedTo?: { id: string; fullName: string };
+  projectId?: string;
+  project?: { id: string; title: string };
 }
 
 export interface Goal {
@@ -276,6 +282,9 @@ export interface CreateTaskPayload {
   isUrgent?: boolean;
   waitingFor?: string;
   taskContext?: string;
+  cost?: number;
+  costCurrency?: string;
+  assignedToEmail?: string;
 }
 
 export interface SubTask {
@@ -313,6 +322,11 @@ export async function updateGoal(
 
 export async function deleteGoal(id: string): Promise<void> {
   await api.delete(`/api/goals/${id}`);
+}
+
+export async function getGoalTasks(goalId: string): Promise<SmartTask[]> {
+  const { data } = await api.get<SmartTask[]>(`/api/goals/${goalId}/tasks`);
+  return data;
 }
 
 // ─── Circle Updates ──────────────────────────────────────────────────────────

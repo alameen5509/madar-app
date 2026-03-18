@@ -164,6 +164,30 @@ public class GoalsController : BaseController
 
         return Ok(new { message = "تم حذف المشروع" });
     }
+
+    /// <summary>مهام مشروع / هدف محدد</summary>
+    [HttpGet("{id:guid}/tasks")]
+    public async Task<IActionResult> GetGoalTasks(Guid id, CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tasks = await _db.SmartTasks
+            .Where(t => t.GoalId == id && t.OwnerId == userId)
+            .OrderBy(t => t.UserPriority)
+            .ThenByDescending(t => t.CreatedAt)
+            .Select(t => new
+            {
+                t.Id, t.Title, t.Description,
+                status = t.Status.ToString(),
+                t.UserPriority, t.DueDate, t.CompletedAt, t.CreatedAt,
+                t.Cost, t.CostCurrency,
+                t.EstimatedDurationMinutes, t.ActualDurationMinutes,
+                assignedTo = t.AssignedTo == null ? null : new { t.AssignedTo.Id, t.AssignedTo.FullName },
+                lifeCircle = t.LifeCircle == null ? null : new { t.LifeCircle.Id, t.LifeCircle.Name },
+            })
+            .ToListAsync(ct);
+
+        return Ok(tasks);
+    }
 }
 
 public record CreateGoalRequest(

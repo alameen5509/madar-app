@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { GeometricDivider } from "@/components/IslamicPattern";
 import EditTaskDialogShared from "@/components/EditTaskDialog";
-import { getGoals, getCircles, createGoal, updateGoal, deleteGoal, api, type Goal, type LifeCircle } from "@/lib/api";
+import { getGoals, getCircles, createGoal, updateGoal, deleteGoal, getGoalTasks, createTask, api, type Goal, type LifeCircle, type SmartTask } from "@/lib/api";
 
 /* ============================================================================
    TYPES & INTERFACES
@@ -663,6 +663,8 @@ function ProjectDetailPanel({
 }) {
   const [activeTab, setActiveTab] = useState<DetailTab>("tasks");
   const [meta, setMeta] = useState<ProjectMeta>(() => loadProjectMeta(goal.id));
+  const [apiTasks, setApiTasks] = useState<SmartTask[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(true);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDesc, setNewTaskDesc] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState(3);
@@ -676,10 +678,20 @@ function ProjectDetailPanel({
   const [showEditProject, setShowEditProject] = useState(false);
   const [savingProject, setSavingProject] = useState(false);
 
-  // Load platform users for assignee dropdown
+  // Load platform users and goal tasks from API
   useEffect(() => {
     api.get("/api/users").then(r => setPlatformUsers(r.data)).catch(() => {});
+    loadGoalTasks();
   }, []);
+
+  async function loadGoalTasks() {
+    setLoadingTasks(true);
+    try {
+      const tasks = await getGoalTasks(goal.id);
+      setApiTasks(tasks);
+    } catch { /* silent */ }
+    finally { setLoadingTasks(false); }
+  }
   const [showCircleEdit, setShowCircleEdit] = useState(false);
   const [savingCircle, setSavingCircle] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -726,7 +738,7 @@ function ProjectDetailPanel({
   const [editTargetDate, setEditTargetDate] = useState(goal.targetDate?.split("T")[0] ?? "");
   const daysLeft = getDaysRemaining(goal.targetDate);
   const totalExpenses = budgetData.expenses.reduce((s, e) => s + e.amount, 0);
-  const tasksCost = meta.tasks.reduce((s, t) => s + (t.cost ?? 0), 0);
+  const tasksCost = apiTasks.reduce((s, t) => s + (t.cost ?? 0), 0);
   const totalSpent = totalExpenses + tasksCost;
   const budgetRemaining = budgetData.total - totalSpent;
 
@@ -752,27 +764,25 @@ function ProjectDetailPanel({
     } catch { /* silent */ }
   }
 
-  function addTask() {
+  async function addTask() {
     if (!newTaskTitle.trim()) return;
-    const updated = { ...meta, tasks: [...meta.tasks] };
-    const seq = updated.tasks.length + 1;
     const costVal = parseFloat(newTaskCost);
-    updated.tasks.push({
-      id: generateId(),
-      seq,
-      title: newTaskTitle.trim(),
-      description: newTaskDesc.trim() || undefined,
-      assignee: newTaskAssignee || "انا",
-      startDate: new Date().toISOString().slice(0, 10),
-      dueDate: newTaskDueDate || undefined,
-      status: "pending",
-      priority: newTaskPriority,
-      dependency: meta.mode,
-      cost: !isNaN(costVal) && costVal > 0 ? costVal : undefined,
-    });
-    persistMeta(updated);
-    setNewTaskTitle(""); setNewTaskDesc(""); setNewTaskPriority(3); setNewTaskDueDate(""); setNewTaskCost(""); setNewTaskAssignee("انا");
-    setShowAddTaskForm(false);
+    try {
+      await createTask({
+        title: newTaskTitle.trim(),
+        description: newTaskDesc.trim() || undefined,
+        userPriority: newTaskPriority,
+        dueDate: newTaskDueDate || undefined,
+        goalId: goal.id,
+        lifeCircleId: goal.lifeCircle?.id,
+        cost: !isNaN(costVal) && costVal > 0 ? costVal : undefined,
+        costCurrency: "SAR",
+        taskContext: newTaskAssignee !== "انا" ? newTaskAssignee : undefined,
+      });
+      setNewTaskTitle(""); setNewTaskDesc(""); setNewTaskPriority(3); setNewTaskDueDate(""); setNewTaskCost(""); setNewTaskAssignee("انا");
+      setShowAddTaskForm(false);
+      loadGoalTasks(); // Refresh from API
+    } catch { /* silent */ }
   }
 
   async function handleEditProject() {
@@ -982,21 +992,11 @@ function ProjectDetailPanel({
             <div className="space-y-3">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h4 className="font-bold" style={{ color: "var(--text)", fontSize: 18 }}>المهام ({meta.tasks.length})</h4>
+                  <h4 className="font-bold" style={{ color: "var(--text)", fontSize: 18 }}>المهام ({apiTasks.length})</h4>
                   <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
-                    {meta.tasks.filter(t => t.status === "done").length} مكتملة - النمط: {meta.mode === "sequential" ? "تسلسلي" : "متوازي"}
+                    {apiTasks.filter(t => t.status === "Completed").length} مكتملة من أصل {apiTasks.length}
                   </p>
                 </div>
-                <button
-                  onClick={() => {
-                    const updated = { ...meta, mode: meta.mode === "sequential" ? "parallel" as const : "sequential" as const };
-                    persistMeta(updated);
-                  }}
-                  className="text-xs px-3 py-1.5 rounded-lg border transition"
-                  style={{ borderColor: "var(--card-border)", color: "var(--muted)" }}
-                >
-                  {meta.mode === "sequential" ? "تحويل لمتوازي" : "تحويل لتسلسلي"}
-                </button>
               </div>
 
               {/* Add task button / form */}
@@ -1069,52 +1069,37 @@ function ProjectDetailPanel({
                 </div>
               )}
 
-              {/* Task list */}
-              {meta.tasks.map((task, idx) => {
-                const isBlocked = meta.mode === "sequential" && idx > 0 && meta.tasks[idx - 1].status !== "done" && task.status === "pending";
-                return (
-                  <div
-                    key={task.id}
-                    className="flex items-center gap-3 p-3 rounded-xl border transition-all"
-                    style={{
-                      background: "var(--card)",
-                      borderColor: "var(--card-border)",
-                      opacity: isBlocked ? 0.5 : 1,
-                    }}
-                  >
-                    {/* Status circle */}
-                    <button
-                      onClick={() => cycleTaskStatus(task.id)}
-                      className="w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition"
-                      style={{
-                        borderColor: TASK_STATUS_COLORS[task.status],
-                        background: task.status === "done" ? "#3D8C5A" : "transparent",
-                        color: task.status === "done" ? "#fff" : "transparent",
-                        cursor: isBlocked ? "not-allowed" : "pointer",
-                      }}
-                      disabled={isBlocked}
-                    >
-                      {task.status === "done" ? "✓" : ""}
-                    </button>
+              {/* Task list from API */}
+              {loadingTasks && <p className="text-center py-4 animate-pulse" style={{ color: "var(--muted)" }}>جارٍ التحميل...</p>}
 
-                    {/* Seq number */}
-                    <span className="text-xs font-bold flex-shrink-0 w-5 text-center" style={{ color: "var(--muted)" }}>{task.seq}</span>
+              {apiTasks.filter(t => t.status !== "Completed").map((task) => {
+                const apiStatusColors: Record<string, string> = { Todo: "#3B82F6", InProgress: "#F59E0B", Completed: "#3D8C5A", Deferred: "#8B5CF6", Inbox: "#6B7280" };
+                const apiStatusLabels: Record<string, string> = { Todo: "مخطط", InProgress: "قيد العمل", Completed: "مكتمل", Deferred: "مؤجل", Inbox: "وارد" };
+                return (
+                  <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl border transition-all"
+                    style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+                    {/* Status toggle */}
+                    <button
+                      onClick={async () => {
+                        const nextStatus = task.status === "Todo" ? "InProgress" : task.status === "InProgress" ? "Completed" : "Todo";
+                        try { await api.patch(`/api/tasks/${task.id}/status`, { status: nextStatus }); loadGoalTasks(); } catch {}
+                      }}
+                      className="w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition cursor-pointer"
+                      style={{
+                        borderColor: apiStatusColors[task.status] ?? "#9CA3AF",
+                        background: task.status === "Completed" ? "#3D8C5A" : "transparent",
+                        color: task.status === "Completed" ? "#fff" : "transparent",
+                      }}>
+                      {task.status === "Completed" ? "✓" : ""}
+                    </button>
 
                     {/* Title + description */}
                     <div className="flex-1 min-w-0">
-                      <span
-                        className="text-sm block"
-                        style={{
-                          color: task.status === "done" ? "var(--muted)" : "var(--text)",
-                          textDecoration: task.status === "done" ? "line-through" : "none",
-                          fontSize: 15,
-                        }}
-                      >
-                        {task.title}
-                      </span>
-                      {task.description && (
-                        <span className="text-xs block mt-0.5 truncate" style={{ color: "var(--muted)" }}>{task.description}</span>
-                      )}
+                      <span className="text-sm block" style={{
+                        color: task.status === "Completed" ? "var(--muted)" : "var(--text)",
+                        textDecoration: task.status === "Completed" ? "line-through" : "none", fontSize: 15,
+                      }}>{task.title}</span>
+                      {task.description && <span className="text-xs block mt-0.5 truncate" style={{ color: "var(--muted)" }}>{task.description}</span>}
                     </div>
 
                     {/* Cost */}
@@ -1124,45 +1109,36 @@ function ProjectDetailPanel({
                       </span>
                     )}
 
-                    {/* Assignee */}
-                    <span className="text-xs flex-shrink-0 px-2 py-0.5 rounded" style={{ background: "var(--bg)", color: "var(--muted)" }}>
-                      {task.assignee}
+                    {/* Priority */}
+                    <span className="text-xs flex-shrink-0 px-1.5 py-0.5 rounded font-bold" style={{ background: "var(--bg)", color: task.userPriority >= 4 ? "#DC2626" : "var(--muted)" }}>
+                      P{task.userPriority}
                     </span>
 
-                    {/* Status label */}
-                    <span className="text-xs font-semibold flex-shrink-0" style={{ color: TASK_STATUS_COLORS[task.status] }}>
-                      {TASK_STATUS_LABELS[task.status]}
+                    {/* Status */}
+                    <span className="text-xs font-semibold flex-shrink-0" style={{ color: apiStatusColors[task.status] ?? "#6B7280" }}>
+                      {apiStatusLabels[task.status] ?? task.status}
                     </span>
 
-                    {/* Elapsed time */}
-                    <span className="text-[11px] flex-shrink-0" style={{ color: "var(--muted)" }}>
-                      {getElapsedTime(task.startedAt)}
-                    </span>
-
-                    {/* Reorder buttons */}
-                    <div className="flex flex-col gap-0.5 flex-shrink-0">
-                      <button onClick={() => moveTask(idx, idx - 1)} className="text-[10px] leading-none px-1 rounded hover:opacity-70"
-                        style={{ color: "var(--muted)" }} disabled={idx === 0}>
-                        &#9650;
-                      </button>
-                      <button onClick={() => moveTask(idx, idx + 1)} className="text-[10px] leading-none px-1 rounded hover:opacity-70"
-                        style={{ color: "var(--muted)" }} disabled={idx === meta.tasks.length - 1}>
-                        &#9660;
-                      </button>
-                    </div>
-
-                    {/* Delete */}
-                    <button onClick={() => deleteTask(task.id)} className="text-xs flex-shrink-0 hover:opacity-70 transition"
-                      style={{ color: "#DC2626" }}>
-                      x
-                    </button>
+                    {/* Due date */}
+                    {task.dueDate && (
+                      <span className="text-[11px] flex-shrink-0" style={{ color: new Date(task.dueDate) < new Date() ? "#DC2626" : "var(--muted)" }}>
+                        {new Date(task.dueDate).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}
+                      </span>
+                    )}
                   </div>
                 );
               })}
 
-              {meta.tasks.length === 0 && (
+              {/* Show completed count */}
+              {apiTasks.filter(t => t.status === "Completed").length > 0 && (
+                <p className="text-xs text-center py-2" style={{ color: "var(--muted)" }}>
+                  + {apiTasks.filter(t => t.status === "Completed").length} مهمة مكتملة (مخفية)
+                </p>
+              )}
+
+              {!loadingTasks && apiTasks.length === 0 && (
                 <div className="py-8 text-center rounded-xl border-2 border-dashed" style={{ borderColor: "var(--card-border)" }}>
-                  <p style={{ color: "var(--muted)", fontSize: 14 }}>لا توجد مهام بعد - اكتب عنوان المهمة بالاعلى واضغط Enter</p>
+                  <p style={{ color: "var(--muted)", fontSize: 14 }}>لا توجد مهام بعد — أضف مهمة وستظهر هنا وفي أعمال اليوم</p>
                 </div>
               )}
             </div>
