@@ -23,6 +23,7 @@ const drawerItems = [
   { label: 'الإحصائيات', icon: '📈', route: '/(main)/energy' },
   { label: 'الإدارة المالية', icon: '💰', route: '/(main)/finance' },
   { label: 'المستخدمون', icon: '👥', route: '/(main)/users' },
+  { label: 'جهات الاتصال', icon: '📱', route: '/(main)/contacts' },
   { label: 'الذكاء الاصطناعي', icon: '🤖', route: '/(main)/ai' },
   { label: 'ربط الساعة', icon: '⌚', route: '/(main)/watch' },
   { label: 'الإعدادات', icon: '⚙️', route: '/(main)/settings' },
@@ -110,6 +111,7 @@ export default function MainLayout() {
         <Tabs.Screen name="energy" options={{ href: null, title: 'الإحصائيات' }} />
         <Tabs.Screen name="finance" options={{ href: null, title: 'الإدارة المالية' }} />
         <Tabs.Screen name="users" options={{ href: null, title: 'المستخدمون' }} />
+        <Tabs.Screen name="contacts" options={{ href: null, title: 'جهات الاتصال' }} />
         <Tabs.Screen name="ai" options={{ href: null, title: 'الذكاء الاصطناعي' }} />
         <Tabs.Screen name="watch" options={{ href: null, title: 'ربط الساعة' }} />
       </Tabs>

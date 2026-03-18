@@ -97,6 +97,15 @@ export interface InboxItem {
   createdAt: string;
 }
 
+export interface Contact {
+  id: string;
+  name: string;
+  phone: string;
+  notes?: string;
+  createdAt: string;
+  taskCount: number;
+}
+
 export interface Habit {
   id: string;
   title: string;

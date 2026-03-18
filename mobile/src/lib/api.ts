@@ -3,7 +3,7 @@ import { getAccessToken, getRefreshToken, setTokens, clearTokens } from './auth'
 import type {
   SmartTask, LifeCircle, Goal, SalahTimes, User,
   Habit, TokenResponse, Project, InboxItem,
-  NotificationPreference,
+  NotificationPreference, Contact,
 } from './types';
 
 export const API_BASE_URL = 'https://madar-api-app.azurewebsites.net';
@@ -126,12 +126,7 @@ export const circlesApi = {
   tasks: (id: string) => api.get<SmartTask[]>(`/api/circles/${id}/tasks`),
 };
 
-// ─── Goals ───────────────────────────────────────────────────
-export const goalsApi = {
-  list: () => api.get<Goal[]>('/api/goals'),
-  create: (data: { title: string; description?: string; targetDate?: string; priorityWeight?: number; lifeCircleId?: string }) =>
-    api.post('/api/goals', data),
-};
+// ─── Goals — see extended goalsApi below ─────────────────────
 
 // ─── Users ───────────────────────────────────────────────────
 export const usersApi = {
@@ -210,4 +205,29 @@ export const watchApi = {
     api.post('/api/watch-auth/reject-link', { requestId }),
 };
 
+// ─── Contacts ────────────────────────────────────────────────
+export const contactsApi = {
+  list: () => api.get<Contact[]>('/api/contacts'),
+  create: (data: { name: string; phone: string; notes?: string }) =>
+    api.post<Contact>('/api/contacts', data),
+  update: (id: string, data: { name?: string; phone?: string; notes?: string }) =>
+    api.put(`/api/contacts/${id}`, data),
+  delete: (id: string) => api.delete(`/api/contacts/${id}`),
+  import: (contacts: { name: string; phone: string }[]) =>
+    api.post<{ added: number }>('/api/contacts/import', { contacts }),
+  tasks: (id: string) => api.get(`/api/contacts/${id}/tasks`),
+};
+
+// ─── Goals (projects) ────────────────────────────────────────
+export const goalsApi = {
+  list: () => api.get<Goal[]>('/api/goals'),
+  create: (data: { title: string; description?: string; targetDate?: string; priorityWeight?: number; lifeCircleId?: string }) =>
+    api.post('/api/goals', data),
+  update: (id: string, data: { title?: string; description?: string; status?: string; lifeCircleId?: string }) =>
+    api.patch(`/api/goals/${id}`, data),
+  delete: (id: string) => api.delete(`/api/goals/${id}`),
+  tasks: (id: string) => api.get(`/api/goals/${id}/tasks`),
+};
+
+export { api };
 export default api;

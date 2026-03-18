@@ -39,6 +39,12 @@
         {
           "cameraPermission": "مطلوب لمسح رمز QR لربط الساعة"
         }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "مطلوب لاستيراد جهات الاتصال"
+        }
       ]
     ],
     "extra": {
