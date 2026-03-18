@@ -393,6 +393,48 @@ export async function updateUser(userId: string, payload: { fullName?: string; i
   await api.patch(`/api/users/${userId}`, payload);
 }
 
+// ─── Contacts ─────────────────────────────────────────────────────────────────
+
+export interface Contact {
+  id: string;
+  name: string;
+  phone: string;
+  notes?: string;
+  createdAt: string;
+  taskCount: number;
+}
+
+export async function getContacts(): Promise<Contact[]> {
+  const { data } = await api.get<Contact[]>('/api/contacts');
+  return data;
+}
+
+export async function createContact(payload: { name: string; phone: string; notes?: string }): Promise<Contact> {
+  const { data } = await api.post<Contact>('/api/contacts', payload);
+  return data;
+}
+
+export async function updateContact(id: string, payload: { name?: string; phone?: string; notes?: string }): Promise<void> {
+  await api.put(`/api/contacts/${id}`, payload);
+}
+
+export async function deleteContact(id: string): Promise<void> {
+  await api.delete(`/api/contacts/${id}`);
+}
+
+export async function importContacts(contacts: { name: string; phone: string }[]): Promise<{ added: number }> {
+  const { data } = await api.post('/api/contacts/import', { contacts });
+  return data;
+}
+
+export function formatPhoneForCall(phone: string): string {
+  return `tel:+${phone}`;
+}
+
+export function formatPhoneForWhatsApp(phone: string): string {
+  return `https://wa.me/${phone}`;
+}
+
 // ─── Task Status Update ──────────────────────────────────────────────────────
 
 export async function updateTaskStatus(id: string, status: string): Promise<void> {
