@@ -27,7 +27,8 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
-    public DbSet<Contact> Contacts => Set<Contact>();
+    // Contact table will be added after DB migration
+    // public DbSet<Contact> Contacts => Set<Contact>();
     public DbSet<WatchLinkRequest_Entity> WatchLinkRequests => Set<WatchLinkRequest_Entity>();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -99,7 +100,6 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
             t.Property(x => x.CostCurrency).HasMaxLength(10);
             t.HasOne(x => x.AssignedTo).WithMany().HasForeignKey(x => x.AssignedToId).OnDelete(DeleteBehavior.SetNull);
             t.HasOne(x => x.Project).WithMany(x => x.Tasks).HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.SetNull);
-            t.HasOne(x => x.Contact).WithMany(x => x.LinkedTasks).HasForeignKey(x => x.ContactId).OnDelete(DeleteBehavior.SetNull);
         });
 
         builder.Entity<TaskAiLog>(al =>
@@ -163,16 +163,6 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
             np.HasKey(x => x.Id);
             np.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             np.HasIndex(x => x.UserId).IsUnique();
-        });
-
-        builder.Entity<Contact>(ct =>
-        {
-            ct.HasKey(x => x.Id);
-            ct.Property(x => x.Name).HasMaxLength(200).IsRequired();
-            ct.Property(x => x.Phone).HasMaxLength(30).IsRequired();
-            ct.Property(x => x.Notes).HasMaxLength(500);
-            ct.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
-            ct.HasIndex(x => new { x.OwnerId, x.Phone }).IsUnique();
         });
 
         builder.Entity<WatchLinkRequest_Entity>(wlr =>

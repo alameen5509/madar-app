@@ -23,6 +23,8 @@ public class TasksController : BaseController
 
         var tasks = await _db.SmartTasks
             .Include(t => t.LifeCircle)
+            .Include(t => t.Goal)
+            .Include(t => t.AssignedTo)
             .Where(t => t.OwnerId == userId)
             .OrderByDescending(t => t.AiPriorityScore)
             .ThenByDescending(t => t.UserPriority)
@@ -49,6 +51,8 @@ public class TasksController : BaseController
                 costCurrency     = t.CostCurrency,
                 assignedToId     = t.AssignedToId,
                 projectId        = t.ProjectId,
+                goal = t.Goal == null ? null : new { t.Goal.Id, t.Goal.Title },
+                assignedTo = t.AssignedTo == null ? null : new { t.AssignedTo.Id, t.AssignedTo.FullName },
                 lifeCircle     = t.LifeCircle == null ? null : new
                 {
                     id    = t.LifeCircle.Id,

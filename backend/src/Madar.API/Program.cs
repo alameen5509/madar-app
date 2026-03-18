@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Madar.Application;
@@ -93,6 +94,22 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+
+// Add missing columns to SmartTasks table
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<Madar.Infrastructure.Persistence.MadarDbContext>();
+    string[] sqls = [
+        "ALTER TABLE SmartTasks ADD COLUMN Cost DECIMAL(18,2) NULL;",
+        "ALTER TABLE SmartTasks ADD COLUMN CostCurrency VARCHAR(10) NULL DEFAULT 'SAR';",
+        "ALTER TABLE SmartTasks ADD COLUMN AssignedToId CHAR(36) NULL;",
+        "ALTER TABLE SmartTasks ADD COLUMN ProjectId CHAR(36) NULL;",
+    ];
+    foreach (var sql in sqls)
+    {
+        try { db.Database.ExecuteSqlRaw(sql); } catch { /* column may exist */ }
+    }
+}
 
 app.UseSwagger();
 app.UseSwaggerUI();
