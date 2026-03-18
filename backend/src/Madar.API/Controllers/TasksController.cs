@@ -227,6 +227,12 @@ public class TasksController : BaseController
         if (req.Title is not null) task.Title = req.Title;
         if (req.Description is not null) task.Description = req.Description;
         if (req.UserPriority.HasValue) task.UserPriority = req.UserPriority.Value;
+        if (req.LifeCircleId.HasValue && req.LifeCircleId.Value != Guid.Empty)
+            task.LifeCircleId = req.LifeCircleId.Value;
+        if (req.GoalId.HasValue)
+            task.GoalId = req.GoalId.Value == Guid.Empty ? null : req.GoalId.Value;
+        if (req.DueDate.HasValue) task.DueDate = req.DueDate.Value;
+        if (req.Cost.HasValue) task.Cost = req.Cost.Value;
         if (req.TaskContext is not null)
         {
             var note = task.ContextNote ?? "";
@@ -430,4 +436,8 @@ public class UpdateTaskRequest
     public string? Description { get; set; }
     public int? UserPriority { get; set; }
     public string? TaskContext { get; set; }
+    public Guid? LifeCircleId { get; set; }
+    public Guid? GoalId { get; set; }
+    public DateTime? DueDate { get; set; }
+    public decimal? Cost { get; set; }
 }

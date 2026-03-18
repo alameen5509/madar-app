@@ -235,6 +235,8 @@ function NewTaskDialog({
     return d.toISOString().slice(0, 10);
   });
   const [goalId, setGoalId]         = useState("");
+  const [circleId, setCircleId]     = useState("");
+  const [circles, setCircles]       = useState<{id: string; name: string; iconKey?: string; tier: string}[]>([]);
   const [hasCost, setHasCost]       = useState(false);
   const [cost, setCost]             = useState("");
   const [isRecurring, setRecurring] = useState(false);
@@ -258,6 +260,7 @@ function NewTaskDialog({
   }, [onClose]);
   useEffect(() => {
     import("@/lib/api").then(m => m.api.get("/api/users")).then(r => setPUsers(r.data)).catch(() => {});
+    import("@/lib/api").then(m => m.getCircles()).then(c => setCircles(c.map(x => ({ id: x.id, name: x.name, iconKey: x.iconKey, tier: x.tier })))).catch(() => {});
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -277,6 +280,7 @@ function NewTaskDialog({
         cognitiveLoad,
         dueDate: dueDate || undefined,
         goalId: goalId || undefined,
+        lifeCircleId: circleId || undefined,
         isRecurring: isRecurring || undefined,
         recurrenceRule: rule,
         isWorkTask: isWorkTask || undefined,
@@ -367,11 +371,22 @@ function NewTaskDialog({
             </div>
           </div>
           <div>
+            {/* Circle / Job selector */}
+            {!goalId && (
+              <div className="mb-3">
+                <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">الدائرة / الوظيفة</label>
+                <select value={circleId} onChange={(e) => setCircleId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition">
+                  <option value="">اختر الدائرة أو الوظيفة</option>
+                  {circles.map((c) => <option key={c.id} value={c.id}>{c.iconKey ?? ""} {c.name} ({c.tier === "Business" ? "وظيفة" : "دور"})</option>)}
+                </select>
+              </div>
+            )}
             {/* Link to project */}
             {goals.length > 0 && (
-              <div>
-                <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">ربط بمشروع <span className="text-[#7C7A8E] font-normal">(اختياري)</span></label>
-                <select value={goalId} onChange={(e) => setGoalId(e.target.value)}
+              <div className="mb-3">
+                <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">ربط بمشروع <span className="text-[#7C7A8E] font-normal">(اختياري — يرث دائرة المشروع)</span></label>
+                <select value={goalId} onChange={(e) => { setGoalId(e.target.value); if (e.target.value) setCircleId(""); }}
                   className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition">
                   <option value="">مهمة مستقلة</option>
                   {goals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}

@@ -333,7 +333,7 @@ function ProjectDetail({ goal, circle, circles, users, onClose, onRefresh }: {
   const [deleting, setDeleting] = useState(false);
 
   // New task form
-  const [nt, setNt] = useState({ title: "", desc: "", priority: 3, dueDate: "", cost: "", assignee: "" });
+  const [nt, setNt] = useState({ title: "", desc: "", priority: 3, dueDate: "", cost: "", assignee: "", context: "Anywhere", isUrgent: false, isWork: true });
 
   useEffect(() => { loadTasks(); }, []);
 
@@ -355,11 +355,15 @@ function ProjectDetail({ goal, circle, circles, users, onClose, onRefresh }: {
         goalId: goal.id,
         lifeCircleId: goal.lifeCircle?.id,
         cost: !isNaN(costVal) && costVal > 0 ? costVal : undefined,
-        taskContext: nt.assignee && nt.assignee !== "انا" ? nt.assignee : undefined,
+        costCurrency: "SAR",
+        isWorkTask: nt.isWork || undefined,
+        isUrgent: nt.isUrgent || undefined,
+        taskContext: nt.context !== "Anywhere" ? nt.context : undefined,
       });
-      setNt({ title: "", desc: "", priority: 3, dueDate: "", cost: "", assignee: "" });
+      setNt({ title: "", desc: "", priority: 3, dueDate: "", cost: "", assignee: "", context: "Anywhere", isUrgent: false, isWork: true });
       setShowAddTask(false);
       loadTasks();
+      onRefresh(); // refresh project list too
     } catch {}
   }
 
@@ -486,10 +490,11 @@ function ProjectDetail({ goal, circle, circles, users, onClose, onRefresh }: {
             </button>
           ) : (
             <div className="rounded-xl border p-4 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+              <p className="text-xs font-semibold" style={{ color: "var(--gold)" }}>مهمة جديدة في: {goal.title}</p>
               <input value={nt.title} onChange={e => setNt({ ...nt, title: e.target.value })} placeholder="عنوان المهمة *" autoFocus
                 onKeyDown={e => { if (e.key === "Enter" && nt.title.trim()) handleAddTask(); }}
                 className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle} />
-              <textarea value={nt.desc} onChange={e => setNt({ ...nt, desc: e.target.value })} placeholder="وصف (اختياري)" rows={2}
+              <textarea value={nt.desc} onChange={e => setNt({ ...nt, desc: e.target.value })} placeholder="وصف / تفاصيل (اختياري)" rows={2}
                 className="w-full px-4 py-2.5 rounded-xl border text-sm resize-none focus:outline-none" style={inputStyle} />
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -516,6 +521,25 @@ function ProjectDetail({ goal, circle, circles, users, onClose, onRefresh }: {
                   <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted)" }}>التكلفة (ر.س)</label>
                   <input type="number" value={nt.cost} onChange={e => setNt({ ...nt, cost: e.target.value })} placeholder="0"
                     className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none" style={inputStyle} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted)" }}>بيئة العمل</label>
+                  <select value={nt.context} onChange={e => setNt({ ...nt, context: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none" style={inputStyle}>
+                    {[["Anywhere","أي مكان"],["Home","بيت"],["Office","مكتب"],["Car","سيارة"],["Online","أونلاين"],["Phone","هاتف"],["Mosque","مسجد"]].map(([v,l]) =>
+                      <option key={v} value={v}>{l}</option>
+                    )}
+                  </select>
+                </div>
+                <div className="flex items-end gap-3 pb-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={nt.isWork} onChange={e => setNt({ ...nt, isWork: e.target.checked })} className="accent-[#2D6B9E]" />
+                    <span className="text-xs" style={{ color: "var(--text)" }}>مهمة عمل</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={nt.isUrgent} onChange={e => setNt({ ...nt, isUrgent: e.target.checked })} className="accent-red-500" />
+                    <span className="text-xs" style={{ color: "#DC2626" }}>ملحة</span>
+                  </label>
                 </div>
               </div>
               <div className="flex gap-2">
