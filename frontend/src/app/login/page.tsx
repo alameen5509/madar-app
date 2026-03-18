@@ -113,12 +113,13 @@ export default function LoginPage() {
       localStorage.setItem("accessToken",  accessToken);
       localStorage.setItem("refreshToken", refreshToken);
 
-      // Set cookie server-side so middleware can read it reliably
-      await fetch("/api/session", {
+      // Set cookie directly + via server-side for middleware
+      document.cookie = `madar_token=${accessToken};path=/;max-age=86400;SameSite=Lax`;
+      fetch("/api/session", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ token: accessToken }),
-      });
+      }).catch(() => {});
 
       window.location.href = "/tasks";
     } catch {

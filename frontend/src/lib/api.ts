@@ -16,10 +16,13 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Attach JWT token from madar_token cookie to every request
+// Attach JWT token from cookie or localStorage to every request
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = getCookieValue('madar_token');
+    let token = getCookieValue('madar_token');
+    if (!token) {
+      token = localStorage.getItem('accessToken') ?? '';
+    }
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
