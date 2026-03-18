@@ -171,7 +171,7 @@ export default function RegisterPage() {
 
   return (
     <div
-      className="relative min-h-screen flex items-center justify-center overflow-hidden"
+      className="relative min-h-screen w-screen flex items-center justify-center overflow-hidden fixed inset-0 z-10"
       style={{ background: "linear-gradient(145deg, #1e1b38 0%, #2A2542 60%, #1a1730 100%)" }}
     >
       {/* Background pattern */}

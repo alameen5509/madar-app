@@ -403,9 +403,9 @@ function ProjectDetail({ goal, circle, circles, users, onClose, onRefresh }: {
   const totalCost = tasks.reduce((s, t) => s + (t.cost ?? 0), 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-end">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-2xl overflow-y-auto" style={{ background: "var(--bg)", borderRight: "1px solid var(--card-border)", animation: "slideIn .3s ease-out" }}>
+      <div className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl" style={{ background: "var(--bg)", border: "1px solid var(--card-border)", animation: "fadeUp .3s ease-out" }}>
         {/* Header */}
         <div className="sticky top-0 z-10 border-b px-6 py-4" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
           <div className="flex items-start justify-between gap-3">
@@ -612,7 +612,7 @@ function ProjectDetail({ goal, circle, circles, users, onClose, onRefresh }: {
           </div>
         )}
       </div>
-      <style jsx>{`@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
+      <style jsx>{`@keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }`}</style>
     </div>
   );
 }
