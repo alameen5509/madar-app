@@ -482,76 +482,11 @@ function ProjectDetail({ goal, circle, circles, users, onClose, onRefresh }: {
           )}
 
           {/* Add Task */}
-          {!showAddTask ? (
-            <button onClick={() => setShowAddTask(true)}
-              className="w-full py-3 rounded-xl text-sm font-bold text-white"
-              style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
-              + إضافة مهمة
-            </button>
-          ) : (
-            <div className="rounded-xl border p-4 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-              <p className="text-xs font-semibold" style={{ color: "var(--gold)" }}>مهمة جديدة في: {goal.title}</p>
-              <input value={nt.title} onChange={e => setNt({ ...nt, title: e.target.value })} placeholder="عنوان المهمة *" autoFocus
-                onKeyDown={e => { if (e.key === "Enter" && nt.title.trim()) handleAddTask(); }}
-                className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle} />
-              <textarea value={nt.desc} onChange={e => setNt({ ...nt, desc: e.target.value })} placeholder="وصف / تفاصيل (اختياري)" rows={2}
-                className="w-full px-4 py-2.5 rounded-xl border text-sm resize-none focus:outline-none" style={inputStyle} />
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted)" }}>المنفذ</label>
-                  <select value={nt.assignee} onChange={e => setNt({ ...nt, assignee: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none" style={inputStyle}>
-                    <option value="">أنا</option>
-                    {users.map(u => <option key={u.id} value={u.fullName}>{u.fullName}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted)" }}>الأولوية</label>
-                  <select value={nt.priority} onChange={e => setNt({ ...nt, priority: Number(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none" style={inputStyle}>
-                    {[1,2,3,4,5].map(p => <option key={p} value={p}>{p} - {["","منخفضة","عادية","متوسطة","عالية","حرجة"][p]}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted)" }}>تاريخ التسليم</label>
-                  <input type="date" value={nt.dueDate} onChange={e => setNt({ ...nt, dueDate: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none" style={inputStyle} />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted)" }}>التكلفة (ر.س)</label>
-                  <input type="number" value={nt.cost} onChange={e => setNt({ ...nt, cost: e.target.value })} placeholder="0"
-                    className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none" style={inputStyle} />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted)" }}>بيئة العمل</label>
-                  <select value={nt.context} onChange={e => setNt({ ...nt, context: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none" style={inputStyle}>
-                    {[["Anywhere","أي مكان"],["Home","بيت"],["Office","مكتب"],["Car","سيارة"],["Online","أونلاين"],["Phone","هاتف"],["Mosque","مسجد"]].map(([v,l]) =>
-                      <option key={v} value={v}>{l}</option>
-                    )}
-                  </select>
-                </div>
-                <div className="flex items-end gap-3 pb-1">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={nt.isWork} onChange={e => setNt({ ...nt, isWork: e.target.checked })} className="accent-[#2D6B9E]" />
-                    <span className="text-xs" style={{ color: "var(--text)" }}>مهمة عمل</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={nt.isUrgent} onChange={e => setNt({ ...nt, isUrgent: e.target.checked })} className="accent-red-500" />
-                    <span className="text-xs" style={{ color: "#DC2626" }}>ملحة</span>
-                  </label>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={handleAddTask} disabled={!nt.title.trim()}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-40"
-                  style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
-                  إضافة المهمة
-                </button>
-                <button onClick={() => setShowAddTask(false)} className="px-4 py-2.5 rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button>
-              </div>
-            </div>
-          )}
+          <a href={`/tasks?addTask=1&goalId=${goal.id}`}
+            className="block w-full py-3 rounded-xl text-sm font-bold text-white text-center"
+            style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
+            + إضافة مهمة (نموذج كامل)
+          </a>
 
           {/* Tasks */}
           {loadingTasks && <p className="text-center py-4 animate-pulse" style={{ color: "var(--muted)" }}>جارٍ تحميل المهام...</p>}

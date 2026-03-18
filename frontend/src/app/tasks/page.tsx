@@ -215,14 +215,16 @@ const LOAD_OPTIONS: { value: CreateTaskPayload["cognitiveLoad"]; label: string }
   { value: "Deep",   label: "عميق"  },
 ];
 
-function NewTaskDialog({
+export function NewTaskDialog({
   onClose,
   onCreated,
   goals,
+  defaultGoalId,
 }: {
   onClose: () => void;
   onCreated: (t: TaskRow) => void;
   goals: { id: string; title: string }[];
+  defaultGoalId?: string;
 }) {
   const [title, setTitle]           = useState("");
   const [description, setDesc]      = useState("");
@@ -234,7 +236,7 @@ function NewTaskDialog({
     d.setDate(d.getDate() + 1);
     return d.toISOString().slice(0, 10);
   });
-  const [goalId, setGoalId]         = useState("");
+  const [goalId, setGoalId]         = useState(defaultGoalId ?? "");
   const [circleId, setCircleId]     = useState("");
   const [circles, setCircles]       = useState<{id: string; name: string; iconKey?: string; tier: string}[]>([]);
   const [hasCost, setHasCost]       = useState(false);
@@ -1455,6 +1457,7 @@ export default function TasksPage() {
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
   const [subTasks, setSubTasks] = useState<Record<string, { id: string; title: string; status: string; userPriority: number }[]>>({});
   const [showDialog, setShowDialog] = useState(false);
+  const [defaultGoalId, setDefaultGoalId] = useState<string | undefined>(undefined);
   const [showBatch, setShowBatch]   = useState(false);
   const [showAssign, setShowAssign] = useState(false);
   const [showQuickFinance, setShowQuickFinance] = useState(false);
@@ -1520,6 +1523,18 @@ export default function TasksPage() {
     finally { setLoading(false); }
   }, []);
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
+
+  // Auto-open task dialog if coming from projects page
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("addTask") === "1") {
+      const gid = params.get("goalId") ?? undefined;
+      setDefaultGoalId(gid);
+      setShowDialog(true);
+      // Clean URL
+      window.history.replaceState({}, "", "/tasks");
+    }
+  }, []);
 
   /* load goals for linking */
   useEffect(() => {
@@ -2557,9 +2572,10 @@ export default function TasksPage() {
       {/* New Task Dialog */}
       {showDialog && (
         <NewTaskDialog
-          onClose={() => setShowDialog(false)}
+          onClose={() => { setShowDialog(false); setDefaultGoalId(undefined); }}
           onCreated={(t) => setTasks((p) => [t, ...p])}
           goals={goalsList}
+          defaultGoalId={defaultGoalId}
         />
       )}
 
