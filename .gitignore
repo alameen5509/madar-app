@@ -62,3 +62,6 @@ secrets.json
 
 ## dotnet tools manifest is kept (intentional)
 # .config/dotnet-tools.json
+frontend/public/mushaf.pdf
+backend/src/Madar.API/deploy*
+backend/src/deploy.zip
