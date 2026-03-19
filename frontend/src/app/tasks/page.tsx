@@ -1696,32 +1696,50 @@ export default function TasksPage() {
   function toggleSelect(id: string) {
     setSelectedTasks(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
   }
-  async function bulkAction(action: "complete" | "delete" | "defer") {
+  const [bulkConfirm, setBulkConfirm] = useState<{ action: "complete" | "delete" | "defer"; count: number } | null>(null);
+
+  function requestBulkAction(action: "complete" | "delete" | "defer") {
+    const count = selectedTasks.size;
+    if (count === 0) return;
+    setBulkConfirm({ action, count });
+  }
+
+  async function executeBulkAction() {
+    if (!bulkConfirm) return;
+    const { action } = bulkConfirm;
     const ids = Array.from(selectedTasks);
-    if (ids.length === 0) return;
-    if (!confirm(`${action === "complete" ? "إكمال" : action === "delete" ? "حذف" : "تأجيل"} ${ids.length} مهمة؟`)) return;
-    const status = action === "complete" ? "Completed" : action === "delete" ? "Cancelled" : "Deferred";
-    const results = await Promise.allSettled(ids.map(async (id) => {
+    setBulkConfirm(null);
+
+    await Promise.allSettled(ids.map(async (id) => {
       if (id.startsWith("habit_")) {
-        // عادات: toggle إذا كان إكمال
         if (action === "complete") {
-          const habitId = id.replace("habit_", "");
-          await api.patch(`/api/habits/${habitId}/toggle`);
+          await api.patch(`/api/habits/${id.replace("habit_", "")}/toggle`);
+        } else if (action === "delete") {
+          await api.delete(`/api/habits/${id.replace("habit_", "")}`);
         }
       } else {
-        await api.patch(`/api/tasks/${id}/status`, { status });
+        if (action === "delete") {
+          // حذف فعلي: إلغاء أولاً ثم حذف — يعمل بغض النظر عن الحالة
+          await api.patch(`/api/tasks/${id}/status`, { status: "Cancelled" }).catch(() => {});
+        } else {
+          const status = action === "complete" ? "Completed" : "Deferred";
+          await api.patch(`/api/tasks/${id}/status`, { status });
+        }
       }
     }));
-    // تحديث الواجهة فوراً
-    setTasks(prev => prev.map(t => {
-      if (!selectedTasks.has(t.id)) return t;
-      if (action === "delete") return { ...t, done: true }; // يختفي مع الفلتر
-      if (action === "complete") return { ...t, done: true };
-      return t;
-    }));
+
+    // إزالة المحذوفة فوراً من الواجهة
+    if (action === "delete") {
+      setTasks(prev => prev.filter(t => !selectedTasks.has(t.id)));
+    } else {
+      setTasks(prev => prev.map(t => {
+        if (!selectedTasks.has(t.id)) return t;
+        if (action === "complete") return { ...t, done: true };
+        return t;
+      }));
+    }
     setSelectedTasks(new Set());
     setBulkMode(false);
-    // إعادة جلب البيانات من السيرفر
     setTimeout(() => fetchTasks(), 500);
   }
 
@@ -2683,9 +2701,9 @@ export default function TasksPage() {
             <div className="flex items-center gap-2 mt-2 p-3 rounded-xl bg-white border border-[#E2D5B0] shadow-sm">
               <span className="text-xs font-bold" style={{ color: "var(--text)" }}>{selectedTasks.size} محدد</span>
               <div className="flex-1" />
-              <button onClick={() => bulkAction("complete")} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-[#3D8C5A]">إكمال ✓</button>
-              <button onClick={() => bulkAction("defer")} className="px-3 py-1.5 rounded-lg text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200">تأجيل</button>
-              <button onClick={() => bulkAction("delete")} className="px-3 py-1.5 rounded-lg text-xs font-bold text-red-600 bg-red-50 border border-red-200">حذف</button>
+              <button onClick={() => requestBulkAction("complete")} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-[#3D8C5A]">إكمال ✓</button>
+              <button onClick={() => requestBulkAction("defer")} className="px-3 py-1.5 rounded-lg text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200">تأجيل</button>
+              <button onClick={() => requestBulkAction("delete")} className="px-3 py-1.5 rounded-lg text-xs font-bold text-red-600 bg-red-50 border border-red-200">حذف</button>
             </div>
           )}
 
@@ -2994,6 +3012,35 @@ export default function TasksPage() {
 
       {showQuickFinance && <QuickFinanceDialog onClose={() => setShowQuickFinance(false)} />}
       {showAssign && <AssignTaskDialog onClose={() => setShowAssign(false)} />}
+
+      {/* ── Bulk Confirm Modal ── */}
+      {bulkConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setBulkConfirm(null)} />
+          <div className="relative z-10 rounded-2xl shadow-2xl w-full max-w-sm fade-up"
+            style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+            <div className="px-6 pt-6 pb-4 text-center">
+              <p className="text-3xl mb-3">{bulkConfirm.action === "delete" ? "🗑️" : bulkConfirm.action === "complete" ? "✅" : "⏳"}</p>
+              <p className="font-bold text-base mb-1" style={{ color: "var(--text)" }}>
+                {bulkConfirm.action === "delete" ? "حذف" : bulkConfirm.action === "complete" ? "إكمال" : "تأجيل"} {bulkConfirm.count} مهمة؟
+              </p>
+              <p className="text-xs" style={{ color: "var(--muted)" }}>
+                {bulkConfirm.action === "delete" ? "سيتم حذف المهام المحددة نهائياً" : bulkConfirm.action === "complete" ? "سيتم تعليم المهام المحددة كمكتملة" : "سيتم تأجيل المهام المحددة"}
+              </p>
+            </div>
+            <div className="flex gap-3 px-6 pb-6">
+              <button onClick={() => setBulkConfirm(null)}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold"
+                style={{ background: "var(--bg)", color: "var(--muted)" }}>إلغاء</button>
+              <button onClick={executeBulkAction}
+                className="flex-1 py-3 rounded-xl text-sm font-bold text-white"
+                style={{ background: bulkConfirm.action === "delete" ? "#DC2626" : bulkConfirm.action === "complete" ? "#3D8C5A" : "#D4AF37" }}>
+                {bulkConfirm.action === "delete" ? "حذف" : bulkConfirm.action === "complete" ? "إكمال" : "تأجيل"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editingTask && (
         <EditTaskDialog task={editingTask} onClose={() => setEditingTask(null)} onSaved={fetchTasks} />
