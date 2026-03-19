@@ -620,8 +620,20 @@ export default function FinancePage() {
   }, []);
 
   function sTxs(v: Transaction[]) { setTxs(v); save("mfin_tx", v); }
-  function sAccts(v: Account[]) { setAccounts(v); save("mfin_accts", v); }
-  function sPockets(v: Pocket[]) { setPockets(v); save("mfin_pockets", v); }
+  function sAccts(v: Account[] | ((prev: Account[]) => Account[])) {
+    setAccounts(prev => {
+      const next = typeof v === "function" ? v(prev) : v;
+      save("mfin_accts", next);
+      return next;
+    });
+  }
+  function sPockets(v: Pocket[] | ((prev: Pocket[]) => Pocket[])) {
+    setPockets(prev => {
+      const next = typeof v === "function" ? v(prev) : v;
+      save("mfin_pockets", next);
+      return next;
+    });
+  }
   function sSettings(v: FinSettings) { setSettings(v); save("mfin_settings", v); }
   function sDebts(v: Debt[]) { setDebts(v); save("mfin_debts", v); }
   function sDues(v: RecurringDue[]) { setDues(v); save("mfin_dues", v); }
@@ -646,6 +658,40 @@ export default function FinancePage() {
     sDues(dues.map((d) => d.id === due.id ? { ...d, lastConfirmedDate: new Date().toISOString().slice(0, 10) } : d));
   }
 
+  /** تطبيق أثر معاملة على الأرصدة (إضافة أو عكس) */
+  function applyTxEffect(t: Transaction, reverse = false) {
+    const sign = reverse ? -1 : 1;
+    const isIncome = t.type === "income";
+    const mult = isIncome ? 1 : -1;
+
+    // تحديث رصيد الحساب
+    sAccts(prev => prev.map((a) => a.id === t.accountId ? { ...a, balance: a.balance + t.amount * mult * sign } : a));
+
+    // تحديث رصيد المحفظة
+    if (isIncome) {
+      // الدخل: أضف للمحفظة + استقطاع تلقائي للديون والادخار
+      const debtPkt = pockets.find(p => p.type === "debt");
+      const savPkt = pockets.find(p => p.type === "savings");
+      const deductDebt = Math.round(t.amount * settings.debtPercent / 100);
+      const deductSav = Math.round(t.amount * settings.savingsPercent / 100);
+      const netIncome = t.amount - deductDebt - deductSav;
+
+      sPockets(prev => prev.map(p => {
+        if (p.id === t.pocketId) return { ...p, balance: p.balance + netIncome * sign };
+        if (debtPkt && p.id === debtPkt.id && deductDebt > 0) return { ...p, balance: p.balance + deductDebt * sign };
+        if (savPkt && p.id === savPkt.id && deductSav > 0) return { ...p, balance: p.balance + deductSav * sign };
+        return p;
+      }));
+    } else if (t.type === "debt_payment") {
+      // سداد دين: ينزل من محفظة الديون
+      const debtPkt = pockets.find(p => p.type === "debt");
+      const targetId = debtPkt?.id ?? t.pocketId;
+      sPockets(prev => prev.map(p => p.id === targetId ? { ...p, balance: p.balance - t.amount * sign } : p));
+    } else {
+      sPockets(prev => prev.map(p => p.id === t.pocketId ? { ...p, balance: p.balance - t.amount * sign } : p));
+    }
+  }
+
   function addTx() {
     if (!fTitle.trim() || !fAmount) return;
     let amt = 0;
@@ -666,24 +712,28 @@ export default function FinancePage() {
 
     const t: Transaction = { id: Date.now().toString(), title: fTitle.trim(), amount: amt, type: fType, category: fCat, expenseClass: fType === "expense" ? fExpCls : undefined, accountId: aid, pocketId: pid, date: fDate };
     sTxs([t, ...txs]);
-
-    // Update account balance
-    const mult = fType === "income" ? 1 : -1;
-    sAccts(accounts.map((a) => a.id === aid ? { ...a, balance: a.balance + amt * mult } : a));
-
-    // Update pocket balance
-    if (fType === "income") sPockets(pockets.map((p) => p.id === pid ? { ...p, balance: p.balance + amt } : p));
-    else if (fType === "debt_payment") {
-      sPockets(pockets.map((p) => {
-        if (p.id !== pid) return p;
-        const updated = { ...p, balance: p.balance - amt, commitments: p.commitments.map((c) => ({ ...c, paidSoFar: c.paidSoFar + amt })) };
-        return updated;
-      }));
-    } else {
-      sPockets(pockets.map((p) => p.id === pid ? { ...p, balance: p.balance - amt } : p));
-    }
+    applyTxEffect(t);
 
     setFTitle(""); setFAmount(""); setShowAdd(false);
+  }
+
+  /** حذف معاملة مع عكس أثرها من الأرصدة */
+  function deleteTx(id: string) {
+    const tx = txs.find(t => t.id === id);
+    if (!tx) return;
+    applyTxEffect(tx, true); // عكس الأثر
+    sTxs(txs.filter(t => t.id !== id));
+  }
+
+  /** تعديل معاملة: عكس القديمة ثم تطبيق الجديدة */
+  const [editTx, setEditTx] = useState<Transaction | null>(null);
+  function saveEditTx() {
+    if (!editTx) return;
+    const old = txs.find(t => t.id === editTx.id);
+    if (old) applyTxEffect(old, true);
+    applyTxEffect(editTx);
+    sTxs(txs.map(t => t.id === editTx.id ? editTx : t));
+    setEditTx(null);
   }
 
   function addAccount() {
@@ -858,7 +908,8 @@ export default function FinancePage() {
                   </div>
                   {t.expenseClass && <span className="text-[9px]">{EXP_CLS[t.expenseClass].icon}</span>}
                   <span className="text-sm font-bold" style={{ color: meta.color }}>{t.type === "income" ? "+" : "-"}{t.amount.toLocaleString()}</span>
-                  <button onClick={() => sTxs(txs.filter((x) => x.id !== t.id))} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
+                  <button onClick={() => setEditTx({ ...t })} className="text-[#6B7280] hover:text-[#D4AF37] text-xs" title="تعديل">✎</button>
+                  <button onClick={() => { if (confirm("حذف هذه المعاملة؟ سيتم عكس أثرها من الأرصدة.")) deleteTx(t.id); }} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
                 </div>
               );
             })}
@@ -870,7 +921,10 @@ export default function FinancePage() {
           <section>
             <div className="flex items-center justify-between mb-3">
               <div><p className="text-sm font-bold text-[#16213E]">الحسابات</p><p className="text-[10px] text-[#6B7280]">أين يقع المال فعلياً</p></div>
-              <button onClick={() => setShowNewAcct(true)} className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style={{ background: "#2C2C54" }}>+ حساب</button>
+              <div className="flex gap-2">
+                <button onClick={() => setShowTransfer(true)} className="text-xs px-3 py-1.5 rounded-lg font-semibold border border-gray-200 text-[#6B7280] hover:bg-gray-50">🔄 تحويل</button>
+                <button onClick={() => setShowNewAcct(true)} className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style={{ background: "#2C2C54" }}>+ حساب</button>
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {accounts.map((a) => (
@@ -1144,6 +1198,68 @@ export default function FinancePage() {
 
               <button onClick={addTx} className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
                 style={{ background: TX_TYPES.find((t) => t.key === fType)?.color ?? "#2C2C54" }}>إضافة</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Edit Transaction Dialog ═══ */}
+      {editTx && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setEditTx(null)} />
+          <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto fade-up">
+            <div className="flex items-center justify-between px-6 pt-6 pb-3 border-b border-gray-200">
+              <h3 className="font-bold text-[#16213E]">تعديل المعاملة</h3>
+              <button onClick={() => setEditTx(null)} className="text-[#6B7280] text-sm">✕</button>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              <div className="flex gap-1 flex-wrap">
+                {TX_TYPES.map((t) => (
+                  <button key={t.key} onClick={() => setEditTx({ ...editTx, type: t.key as Transaction["type"] })}
+                    className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition min-w-[50px]"
+                    style={{ background: editTx.type === t.key ? t.color : "#F3F4F6", color: editTx.type === t.key ? "#fff" : "#6B7280" }}>
+                    {t.icon} {t.label}
+                  </button>
+                ))}
+              </div>
+              <input value={editTx.title} onChange={(e) => setEditTx({ ...editTx, title: e.target.value })} placeholder="الوصف"
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+              <input type="number" value={editTx.amount} onChange={(e) => setEditTx({ ...editTx, amount: Number(e.target.value) })} placeholder="المبلغ"
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+              <div>
+                <p className="text-xs text-[#6B7280] mb-1">الحساب:</p>
+                <select value={editTx.accountId} onChange={(e) => setEditTx({ ...editTx, accountId: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]">
+                  {accounts.map((a) => <option key={a.id} value={a.id}>{a.icon} {a.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <p className="text-xs text-[#6B7280] mb-1">المحفظة:</p>
+                <select value={editTx.pocketId} onChange={(e) => setEditTx({ ...editTx, pocketId: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]">
+                  {pockets.map((p) => <option key={p.id} value={p.id}>{p.icon} {p.name}</option>)}
+                </select>
+              </div>
+              <div className="flex gap-1.5 flex-wrap">
+                {(editTx.type === "income" ? (settings.incomeCategories ?? DEF_INC_CATS) : (settings.expenseCategories ?? DEF_EXP_CATS)).map((c) => (
+                  <button key={c} onClick={() => setEditTx({ ...editTx, category: c })} className="px-2 py-1 rounded-lg text-[10px] font-medium"
+                    style={{ background: editTx.category === c ? "#2C2C54" : "#F3F4F6", color: editTx.category === c ? "#fff" : "#6B7280" }}>{c}</button>
+                ))}
+              </div>
+              {editTx.type === "expense" && (
+                <div className="flex gap-2">
+                  {(Object.entries(EXP_CLS) as [ExpenseClass, { label: string; color: string; icon: string }][]).map(([k, v]) => (
+                    <button key={k} onClick={() => setEditTx({ ...editTx, expenseClass: k })} className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold"
+                      style={{ background: editTx.expenseClass === k ? v.color : "#F3F4F6", color: editTx.expenseClass === k ? "#fff" : "#6B7280" }}>{v.icon} {v.label}</button>
+                  ))}
+                </div>
+              )}
+              <input type="date" value={editTx.date} onChange={(e) => setEditTx({ ...editTx, date: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+              <div className="flex gap-2">
+                <button onClick={() => setEditTx(null)} className="flex-1 py-2.5 rounded-xl text-sm text-[#6B7280] bg-gray-100">إلغاء</button>
+                <button onClick={saveEditTx} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "#D4AF37" }}>حفظ التعديل</button>
+              </div>
             </div>
           </div>
         </div>
