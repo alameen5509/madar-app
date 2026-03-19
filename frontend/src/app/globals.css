@@ -63,17 +63,28 @@ body {
   line-height: 1.7;
 }
 
-/* ── أحجام الخطوط: صغير=16 عادي=18 عنوان=22 ── */
-.text-xs { font-size: 16px !important; line-height: 1.5 !important; }
-.text-sm { font-size: 18px !important; line-height: 1.5 !important; }
-.text-base { font-size: 18px !important; }
-.text-lg { font-size: 22px !important; }
-.text-xl { font-size: 24px !important; }
-.text-\[10px\] { font-size: 14px !important; }
-.text-\[9px\] { font-size: 13px !important; }
-.text-\[8px\] { font-size: 13px !important; }
-.text-\[11px\] { font-size: 15px !important; }
+/* ── Mobile: prevent horizontal overflow ── */
+html, body { overflow-x: hidden; max-width: 100vw; }
+
+/* ── Mobile responsive padding ── */
+@media (max-width: 768px) {
+  .px-8 { padding-left: 1rem !important; padding-right: 1rem !important; }
+  .px-7 { padding-left: 1rem !important; padding-right: 1rem !important; }
+  .grid-cols-3 { grid-template-columns: repeat(3, 1fr) !important; }
+  .grid-cols-4 { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* ── أحجام الخطوط: عادية على الجوال، أكبر على سطح المكتب ── */
 input, textarea, select { font-size: 16px !important; }
+
+@media (min-width: 769px) {
+  .text-xs { font-size: 14px !important; }
+  .text-sm { font-size: 16px !important; }
+  .text-\[10px\] { font-size: 12px !important; }
+  .text-\[9px\] { font-size: 11px !important; }
+  .text-\[8px\] { font-size: 11px !important; }
+  .text-\[11px\] { font-size: 13px !important; }
+}
 
 /* ── Dark mode: override hardcoded whites/grays ── */
 [data-theme="dark"] .bg-white { background-color: var(--card); }
@@ -101,6 +112,13 @@ input, textarea, select { font-size: 16px !important; }
 [data-theme="dark"] .bg-green-50 { background-color: #0a1f10; }
 [data-theme="dark"] .bg-red-50 { background-color: #1f0a0a; }
 [data-theme="dark"] .bg-purple-50 { background-color: #150a1f; }
+
+/* ── Scrollable horizontal tabs on mobile ── */
+@media (max-width: 768px) {
+  .flex.gap-1 { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-wrap: nowrap !important; }
+  .flex.gap-1::-webkit-scrollbar { display: none; }
+  .flex.gap-1 > button { flex-shrink: 0 !important; }
+}
 
 /* ── Zellige / girih tile pattern for sidebar ── */
 .pattern-zellige {
