@@ -12,6 +12,20 @@ import {
    CONSTANTS
    ═══════════════════════════════════════════════════════════════════════ */
 
+function getProjectScore(desc?: string): number | null {
+  if (!desc) return null;
+  const m = desc.match(/\[rating:(\{.*?\})\]/);
+  if (!m) return null;
+  try { return JSON.parse(m[1]).score ?? null; } catch { return null; }
+}
+
+function scoreColor(s: number): string {
+  if (s > 45) return "#DC2626";
+  if (s > 30) return "#D4AF37";
+  if (s > 15) return "#3D8C5A";
+  return "#6B7280";
+}
+
 const STAGES = [
   { key: "Archived",  label: "أفكار",   color: "#8C6B3D", icon: "💡" },
   { key: "Paused",    label: "تخطيط",   color: "#5E5495", icon: "📋" },
@@ -149,8 +163,11 @@ export default function ProjectsPage() {
                           className="rounded-xl border p-3 cursor-pointer hover:shadow-md transition-all"
                           style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
                           <div className="flex items-center gap-1.5 mb-1">
-                            {g.description?.includes("[tech]") && <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ background: "#2D6B9E20", color: "#2D6B9E" }}>💻 تقني</span>}
-                            <p className="font-semibold text-sm" style={{ color: "var(--text)" }}>{g.title}</p>
+                            {(() => { const s = getProjectScore(g.description); return s !== null ? (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full font-black" style={{ background: scoreColor(s) + "18", color: scoreColor(s) }}>{s}</span>
+                            ) : null; })()}
+                            {g.description?.includes("[tech]") && <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ background: "#2D6B9E20", color: "#2D6B9E" }}>💻</span>}
+                            <p className="font-semibold text-sm truncate" style={{ color: "var(--text)" }}>{g.title}</p>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
                             {circle && (
@@ -194,7 +211,12 @@ export default function ProjectsPage() {
                   style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
                   <span className="text-lg">{stageInfo?.icon}</span>
                   <div className="flex-1">
-                    <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{g.title}</p>
+                    <div className="flex items-center gap-1.5">
+                      {(() => { const s = getProjectScore(g.description); return s !== null ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-black" style={{ background: scoreColor(s) + "18", color: scoreColor(s) }}>{s}</span>
+                      ) : null; })()}
+                      <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{g.title}</p>
+                    </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       {circle && <span className="text-[10px]" style={{ color: circle.colorHex ?? "var(--muted)" }}>{circle.name}</span>}
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
@@ -263,17 +285,26 @@ function NewProjectDialog({ circles, onClose, onCreated }: {
   const [isTech, setIsTech] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [creating, setCreating] = useState(false);
+  // Rating: 4 criteria × 5 points = score out of 60
+  const [rImportance, setRImportance] = useState(0);
+  const [rUrgency, setRUrgency] = useState(0);
+  const [rImpact, setRImpact] = useState(0);
+  const [rEffort, setREffort] = useState(0);
+  const score = (rImportance + rUrgency + rImpact + rEffort) * 3; // 0-60
+  const rated = rImportance > 0 && rUrgency > 0 && rImpact > 0 && rEffort > 0;
 
   async function handleCreate() {
-    if (!title.trim()) return;
+    if (!title.trim() || !rated) return;
     setCreating(true);
     try {
-      const fullDesc = [desc.trim(), isTech ? "[tech]" : ""].filter(Boolean).join(" ") || undefined;
+      const ratingTag = `[rating:${JSON.stringify({im:rImportance,ur:rUrgency,ip:rImpact,ef:rEffort,score})}]`;
+      const fullDesc = [desc.trim(), isTech ? "[tech]" : "", ratingTag].filter(Boolean).join(" ");
       await createGoal({
         title: title.trim(),
         description: fullDesc,
         targetDate: targetDate || undefined,
         lifeCircleId: circleId || undefined,
+        priorityWeight: Math.round(score / 12),
       });
       // Save as template if user wants
       if (typeof window !== "undefined" && title.trim()) {
@@ -344,8 +375,42 @@ function NewProjectDialog({ circles, onClose, onCreated }: {
             </label>
           </div>
 
+          {/* Rating — mandatory */}
+          <div className="rounded-xl border p-3 space-y-2" style={{ borderColor: rated ? "#3D8C5A40" : "#DC262640", background: rated ? "#3D8C5A08" : "#DC262608" }}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold" style={{ color: "var(--text)" }}>تقييم المشروع <span style={{ color: "#DC2626" }}>*</span></span>
+              <span className="text-lg font-black" style={{ color: score > 45 ? "#DC2626" : score > 30 ? "#D4AF37" : score > 15 ? "#3D8C5A" : "var(--muted)" }}>
+                {score}/60
+              </span>
+            </div>
+            {[
+              { label: "الأهمية", value: rImportance, set: setRImportance, icon: "⭐" },
+              { label: "الاستعجال", value: rUrgency, set: setRUrgency, icon: "⏰" },
+              { label: "التأثير", value: rImpact, set: setRImpact, icon: "💥" },
+              { label: "الجهد المطلوب", value: rEffort, set: setREffort, icon: "💪" },
+            ].map(r => (
+              <div key={r.label} className="flex items-center gap-2">
+                <span className="text-xs w-24 text-right" style={{ color: "var(--text)" }}>{r.icon} {r.label}</span>
+                <div className="flex gap-1 flex-1">
+                  {[1,2,3,4,5].map(n => (
+                    <button key={n} type="button" onClick={() => r.set(n)}
+                      className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all"
+                      style={{
+                        background: r.value >= n ? (n >= 4 ? "#DC2626" : n >= 3 ? "#D4AF37" : "#3D8C5A") : "var(--bg)",
+                        color: r.value >= n ? "#fff" : "var(--muted)",
+                        border: `1px solid ${r.value >= n ? "transparent" : "var(--card-border)"}`,
+                      }}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {!rated && <p className="text-[10px] text-center" style={{ color: "#DC2626" }}>يجب تقييم جميع المعايير لإنشاء المشروع</p>}
+          </div>
+
           <div className="flex gap-2 pt-1">
-            <button onClick={handleCreate} disabled={creating || !title.trim()}
+            <button onClick={handleCreate} disabled={creating || !title.trim() || !rated}
               className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-40"
               style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
               {creating ? "جارٍ الإنشاء..." : "إنشاء المشروع"}
