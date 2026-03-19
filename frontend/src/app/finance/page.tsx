@@ -747,37 +747,10 @@ export default function FinancePage() {
   }
 
   /** تطبيق أثر معاملة على الأرصدة (إضافة أو عكس) */
-  function applyTxEffect(t: Transaction, reverse = false) {
-    const sign = reverse ? -1 : 1;
-    const isIncome = t.type === "income";
-    const mult = isIncome ? 1 : -1;
-
-    // تحديث رصيد الحساب
-    sAccts(prev => prev.map((a) => a.id === t.accountId ? { ...a, balance: a.balance + t.amount * mult * sign } : a));
-
-    // تحديث رصيد المحفظة
-    if (isIncome) {
-      // الدخل: أضف للمحفظة + استقطاع تلقائي للديون والادخار
-      const debtPkt = pockets.find(p => p.type === "debt");
-      const savPkt = pockets.find(p => p.type === "savings");
-      const deductDebt = Math.round(t.amount * settings.debtPercent / 100);
-      const deductSav = Math.round(t.amount * settings.savingsPercent / 100);
-      const netIncome = t.amount - deductDebt - deductSav;
-
-      sPockets(prev => prev.map(p => {
-        if (p.id === t.pocketId) return { ...p, balance: p.balance + netIncome * sign };
-        if (debtPkt && p.id === debtPkt.id && deductDebt > 0) return { ...p, balance: p.balance + deductDebt * sign };
-        if (savPkt && p.id === savPkt.id && deductSav > 0) return { ...p, balance: p.balance + deductSav * sign };
-        return p;
-      }));
-    } else if (t.type === "debt_payment") {
-      // سداد دين: ينزل من محفظة الديون
-      const debtPkt = pockets.find(p => p.type === "debt");
-      const targetId = debtPkt?.id ?? t.pocketId;
-      sPockets(prev => prev.map(p => p.id === targetId ? { ...p, balance: p.balance - t.amount * sign } : p));
-    } else {
-      sPockets(prev => prev.map(p => p.id === t.pocketId ? { ...p, balance: p.balance - t.amount * sign } : p));
-    }
+  /** الأرصدة محسوبة من المعاملات — هذه الدالة تبقى للتوافق */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  function applyTxEffect(_t: Transaction, _reverse = false) {
+    // الأرصدة تُحسب ديناميكياً — لا حاجة لتعديلها يدوياً
   }
 
   function addTx() {
@@ -845,18 +818,41 @@ export default function FinancePage() {
     setNcTitle(""); setNcAmount(""); setNcTotal(""); setShowAddCommit(null);
   }
 
-  // Calculations
+  // ═══ الحسابات مبنية بالكامل على المعاملات ═══
+  // أرصدة الحسابات = مجموع المعاملات (الواردة - الصادرة)
+  const calcAcctBal = (acctId: string) => {
+    return txs.reduce((s, t) => {
+      if (t.accountId !== acctId) return s;
+      return s + (t.type === "income" ? t.amount : -t.amount);
+    }, accounts.find(a => a.id === acctId)?.balance ?? 0);
+  };
+  // أرصدة المحافظ = مجموع المعاملات المرتبطة
+  const calcPocketBal = (pocketId: string) => {
+    return txs.reduce((s, t) => {
+      if (t.pocketId !== pocketId) return s;
+      return s + (t.type === "income" ? t.amount : -t.amount);
+    }, 0);
+  };
+
+  // معاملات الشهر المختار
   const mTx = txs.filter((t) => t.date.startsWith(month));
   const income = mTx.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
   const expense = mTx.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
   const debtPaid = mTx.filter((t) => t.type === "debt_payment" || t.type === "installment").reduce((s, t) => s + t.amount, 0);
   const gifts = mTx.filter((t) => t.type === "gift").reduce((s, t) => s + t.amount, 0);
   const net = income - expense - debtPaid - gifts;
-  const totalAcctBal = accounts.reduce((s, a) => s + a.balance, 0);
-  const debtPocket = pockets.find((p) => p.type === "debt");
+
+  // إجمالي من كل المعاملات (وليس أرصدة مخزنة)
+  const allIncome = txs.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const allExpense = txs.filter(t => t.type !== "income").reduce((s, t) => s + t.amount, 0);
+  const totalAcctBal = allIncome - allExpense + accounts.reduce((s, a) => s + a.balance, 0);
+
   const savingsPocket = pockets.find((p) => p.type === "savings");
-  const totalDebtRemaining = pockets.filter((p) => p.type === "debt" || p.type === "installment").flatMap((p) => p.commitments).reduce((s, c) => s + (c.totalAmount ?? 0) - c.paidSoFar, 0);
+  const savingsBalance = savingsPocket ? calcPocketBal(savingsPocket.id) : 0;
+  const totalDebtRemaining = debts.reduce((s, d) => s + d.originalAmount - d.paidSoFar, 0);
   const monthlyCommits = pockets.flatMap((p) => p.commitments).reduce((s, c) => s + c.monthlyAmount, 0);
+
+  // تصنيف المصروفات
   const essExp = mTx.filter((t) => t.expenseClass === "essential").reduce((s, t) => s + t.amount, 0);
   const luxExp = mTx.filter((t) => t.expenseClass === "luxury").reduce((s, t) => s + t.amount, 0);
   const impExp = mTx.filter((t) => t.expenseClass === "improvement").reduce((s, t) => s + t.amount, 0);
@@ -947,11 +943,11 @@ export default function FinancePage() {
 
         {/* ═══ Overview ═══ */}
         {tab === "overview" && (<>
-          {/* الأرصدة الفعلية */}
+          {/* الأرصدة — محسوبة من المعاملات */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Stat label="إجمالي الحسابات" value={totalAcctBal} color="#2C2C54" />
-            <Stat label="المحافظ" value={pockets.reduce((s, p) => s + p.balance, 0)} color="#5E5495" />
-            <Stat label="محفظة الادخار" value={savingsPocket?.balance ?? 0} color="#D4AF37" />
+            <Stat label="الرصيد الكلي" value={totalAcctBal} color="#2C2C54" sub="واردة - صادرة" />
+            <Stat label="إجمالي الوارد" value={allIncome} color="#3D8C5A" sub={`${txs.filter(t=>t.type==="income").length} معاملة`} />
+            <Stat label="محفظة الادخار" value={savingsBalance} color="#D4AF37" />
             <Stat label="ديون متبقية" value={totalDebtRemaining} color="#DC2626" />
           </div>
           {/* معاملات الشهر المختار */}
@@ -1147,7 +1143,7 @@ export default function FinancePage() {
                           <p className="font-bold text-sm text-[#16213E]">{p.name}</p>
                           <span className="text-[9px] px-2 py-0.5 rounded-full bg-gray-100 text-[#6B7280]">{typeLabel}</span>
                         </div>
-                        <p className="text-lg font-black mt-1" style={{ color: p.balance >= 0 ? "#3D8C5A" : "#DC2626" }}>{p.balance.toLocaleString()} ريال</p>
+                        <p className="text-lg font-black mt-1" style={{ color: calcPocketBal(p.id) >= 0 ? "#3D8C5A" : "#DC2626" }}>{calcPocketBal(p.id).toLocaleString()} ريال</p>
                       </div>
                       <button onClick={() => sPockets(pockets.filter((x) => x.id !== p.id))} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
                     </div>
@@ -1518,7 +1514,7 @@ export default function FinancePage() {
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]">
                   <option value="">اختر</option>
                   <optgroup label="المحافظ">
-                    {pockets.map((p) => <option key={`p-${p.id}`} value={`p:${p.id}`}>{p.icon} {p.name} ({p.balance.toLocaleString()})</option>)}
+                    {pockets.map((p) => <option key={`p-${p.id}`} value={`p:${p.id}`}>{p.icon} {p.name} ({calcPocketBal(p.id).toLocaleString()})</option>)}
                   </optgroup>
                   <optgroup label="الحسابات">
                     {accounts.map((a) => <option key={`a-${a.id}`} value={`a:${a.id}`}>{a.icon} {a.name} ({a.balance.toLocaleString()})</option>)}
