@@ -2234,38 +2234,36 @@ export default function TasksPage() {
               {loading ? "جارٍ التحميل…" : `${done} من ${total} مكتملة`}
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            {/* Mood button */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setShowDialog(true)}
+              className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition"
+              style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}
+            >
+              <span>+</span><span>مهمة</span>
+            </button>
+            <button onClick={() => setShowBatch(true)}
+              className="px-3 py-2 rounded-lg text-sm font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
+              متعدد
+            </button>
+            <button onClick={() => setShowAssign(true)}
+              className="px-3 py-2 rounded-lg text-sm font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
+              📨
+            </button>
+            <button onClick={() => setShowQuickFinance(true)}
+              className="px-3 py-2 rounded-lg text-sm font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
+              💰
+            </button>
             <button
               onClick={() => setShowMoodPanel(true)}
-              className="relative px-3 py-2 rounded-xl text-sm font-semibold transition-all border"
+              className="px-3 py-2 rounded-xl text-sm font-semibold transition-all border"
               style={{
                 background: mood === "low" ? "#FEF3C7" : mood === "good" ? "#D1FAE5" : "#F8F6F0",
                 borderColor: mood === "low" ? "#F59E0B" : mood === "good" ? "#10B981" : "#E2D5B0",
                 color: mood === "low" ? "#92400E" : mood === "good" ? "#065F46" : "#7C7A8E",
               }}
             >
-              {mood === "low" ? "😔 نفسية منخفضة" : mood === "good" ? "😊 بخير" : "🧠 حالتك النفسية؟"}
-            </button>
-
-            <button onClick={() => setShowQuickFinance(true)}
-              className="px-3 py-2 rounded-lg text-sm font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
-              💰 مصروف
-            </button>
-            <button onClick={() => setShowAssign(true)}
-              className="px-3 py-2 rounded-lg text-sm font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
-              📨 لشخص
-            </button>
-            <button onClick={() => setShowBatch(true)}
-              className="px-3 py-2 rounded-lg text-sm font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
-              متعدد
-            </button>
-            <button
-              onClick={() => setShowDialog(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition"
-              style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}
-            >
-              <span>+</span><span>مهمة جديدة</span>
+              {mood === "low" ? "😔" : mood === "good" ? "😊" : "🧠"}
             </button>
           </div>
         </div>
