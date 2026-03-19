@@ -910,26 +910,31 @@ export default function FinancePage() {
           {MORE_TABS.some(t => t.key === tab) && (
             <button className="py-1.5 px-3 rounded-lg text-[11px] font-semibold" style={{ background: "#2C2C54", color: "#fff" }}>{currentTabLabel}</button>
           )}
-          <div className="relative">
-            <button onClick={() => setShowMoreTabs(!showMoreTabs)}
-              className="py-1.5 px-3 rounded-lg text-[11px] font-semibold transition"
-              style={{ background: showMoreTabs ? "#D4AF37" : "transparent", color: showMoreTabs ? "#fff" : "#6B7280" }}>
-              المزيد ▾
-            </button>
-            {showMoreTabs && (
-              <div className="absolute top-full left-0 mt-1 z-30 bg-white rounded-xl shadow-xl border border-gray-200 py-1 min-w-[120px]">
-                {MORE_TABS.map(t => (
-                  <button key={t.key} onClick={() => { setTab(t.key); setShowMoreTabs(false); }}
-                    className="w-full text-right px-4 py-2 text-xs font-medium hover:bg-gray-50 transition"
-                    style={{ color: tab === t.key ? "#2C2C54" : "#6B7280", fontWeight: tab === t.key ? 700 : 400 }}>
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <button onClick={() => setShowMoreTabs(!showMoreTabs)}
+            className="py-1.5 px-3 rounded-lg text-[11px] font-semibold transition"
+            style={{ background: showMoreTabs ? "#D4AF37" : "transparent", color: showMoreTabs ? "#fff" : "#6B7280" }}>
+            المزيد ▾
+          </button>
         </div>
       </header>
+
+      {/* More tabs dropdown — fixed overlay for mobile */}
+      {showMoreTabs && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setShowMoreTabs(false)} />
+          <div className="fixed top-24 left-4 right-4 z-50 bg-white rounded-2xl shadow-2xl border border-gray-200 p-2 fade-up" style={{ maxWidth: 300, marginInline: "auto" }}>
+            <div className="grid grid-cols-2 gap-1">
+              {MORE_TABS.map(t => (
+                <button key={t.key} onClick={() => { setTab(t.key); setShowMoreTabs(false); }}
+                  className="py-3 px-3 rounded-xl text-sm font-semibold text-right transition"
+                  style={{ background: tab === t.key ? "#2C2C54" : "#F9FAFB", color: tab === t.key ? "#fff" : "#374151" }}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Gold advice banner */}
       {goldAdvice && (
