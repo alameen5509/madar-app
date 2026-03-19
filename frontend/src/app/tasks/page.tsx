@@ -1690,6 +1690,22 @@ export default function TasksPage() {
   const [taskFilter, setTaskFilter] = useState<"all"|"pending"|"done"|"urgent"|"recurring"|"work">("pending");
   const [transferTask, setTransferTask] = useState<{ id: string; title: string } | null>(null);
   const [editingTask, setEditingTask] = useState<TaskRow | null>(null);
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [bulkMode, setBulkMode] = useState(false);
+
+  function toggleSelect(id: string) {
+    setSelectedTasks(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+  }
+  async function bulkAction(action: "complete" | "delete" | "defer") {
+    const ids = Array.from(selectedTasks);
+    if (ids.length === 0) return;
+    if (!confirm(`${action === "complete" ? "إكمال" : action === "delete" ? "حذف" : "تأجيل"} ${ids.length} مهمة؟`)) return;
+    const status = action === "complete" ? "Completed" : action === "delete" ? "Cancelled" : "Deferred";
+    await Promise.all(ids.map(id => id.startsWith("habit_") ? null : api.patch(`/api/tasks/${id}/status`, { status }).catch(() => {})));
+    setSelectedTasks(new Set());
+    setBulkMode(false);
+    fetchTasks();
+  }
 
   /* load salah */
   useEffect(() => {
@@ -2634,7 +2650,24 @@ export default function TasksPage() {
                 {f.label} {f.count > 0 && <span className="opacity-70">({f.count})</span>}
               </button>
             ))}
+            <button onClick={() => { setBulkMode(!bulkMode); setSelectedTasks(new Set()); }}
+              className="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition"
+              style={{ background: bulkMode ? "#DC2626" : "var(--card)", color: bulkMode ? "#fff" : "var(--muted)", border: `1px solid ${bulkMode ? "#DC2626" : "var(--card-border)"}` }}>
+              {bulkMode ? "✕ إلغاء" : "☑ تحديد"}
+            </button>
           </div>
+
+          {/* Bulk action bar */}
+          {bulkMode && selectedTasks.size > 0 && (
+            <div className="flex items-center gap-2 mt-2 p-3 rounded-xl bg-white border border-[#E2D5B0] shadow-sm">
+              <span className="text-xs font-bold" style={{ color: "var(--text)" }}>{selectedTasks.size} محدد</span>
+              <div className="flex-1" />
+              <button onClick={() => bulkAction("complete")} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-[#3D8C5A]">إكمال ✓</button>
+              <button onClick={() => bulkAction("defer")} className="px-3 py-1.5 rounded-lg text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200">تأجيل</button>
+              <button onClick={() => bulkAction("delete")} className="px-3 py-1.5 rounded-lg text-xs font-bold text-red-600 bg-red-50 border border-red-200">حذف</button>
+            </div>
+          )}
+
           <div className="scroll-card mt-3 rounded-2xl overflow-hidden shadow-sm min-h-[120px]">
 
             {loading && <TaskSkeleton />}
@@ -2658,16 +2691,22 @@ export default function TasksPage() {
                 {visibleTasks.map((t) => (
                   <div key={t.id}>
                     <div
-                      onClick={() => toggle(t.id, t.done)}
+                      onClick={() => bulkMode ? toggleSelect(t.id) : toggle(t.id, t.done)}
                       className={`flex items-center gap-3 py-3 border-b border-[#e2d5b0]/60 last:border-0
                                   cursor-pointer hover:bg-[#C9A84C]/5 rounded-lg px-2 transition-all
-                                  ${t.done ? "opacity-50" : ""}`}>
+                                  ${t.done ? "opacity-50" : ""} ${selectedTasks.has(t.id) ? "bg-[#5E5495]/10 border-[#5E5495]/30" : ""}`}>
+                      {bulkMode ? (
+                        <div className={`w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center transition-all ${selectedTasks.has(t.id) ? "bg-[#5E5495] border-[#5E5495]" : "border-[#C9A84C] bg-transparent"}`}>
+                          {selectedTasks.has(t.id) && <span className="text-white text-[10px]">✓</span>}
+                        </div>
+                      ) : (
                       <div className={`w-5 h-5 rounded-full flex-shrink-0 border-2 flex items-center justify-center transition-all
                                       ${t.done
                                         ? t.context === "habit" ? "bg-[#2ABFBF] border-[#2ABFBF]" : "bg-[#5E5495] border-[#5E5495]"
                                         : t.context === "habit" ? "border-[#2ABFBF] bg-transparent" : "border-[#C9A84C] bg-transparent"}`}>
                         {t.done && <span className="text-white text-[10px]">✓</span>}
                       </div>
+                      )}
                       {t.context !== "habit" && (
                         <button onClick={(e) => { e.stopPropagation(); toggleExpand(t.id); }}
                           className="text-[10px] text-[#7C7A8E] hover:text-[#5E5495] transition flex-shrink-0"

@@ -63,8 +63,14 @@ body {
   line-height: 1.7;
 }
 
-/* ── Mobile: prevent horizontal overflow ── */
+/* ── Mobile: prevent horizontal overflow + landscape support ── */
 html, body { overflow-x: hidden; max-width: 100vw; }
+
+/* ── Landscape: hide sidebar, full width ── */
+@media (orientation: landscape) and (max-height: 500px) {
+  aside { display: none !important; }
+  .fixed.top-3.right-3 { display: none !important; }
+}
 
 /* ── Mobile responsive padding ── */
 @media (max-width: 768px) {

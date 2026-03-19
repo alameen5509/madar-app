@@ -959,28 +959,50 @@ export default function FinancePage() {
           )}
         </>)}
 
-        {/* ═══ Transactions ═══ */}
-        {tab === "transactions" && (
-          <div className="space-y-1.5">
-            {mTx.length === 0 && <p className="text-[#6B7280] text-sm text-center py-8">لا توجد معاملات</p>}
-            {mTx.map((t) => {
-              const meta = TX_TYPES.find((x) => x.key === t.type) ?? TX_TYPES[0];
-              return (
-                <div key={t.id} className="flex items-center gap-3 bg-white rounded-xl px-4 py-3 border border-gray-200">
-                  <span className="text-lg">{meta.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[#16213E] truncate">{t.title}</p>
-                    <p className="text-[9px] text-[#9CA3AF]">{t.category} · {accounts.find((a) => a.id === t.accountId)?.name ?? ""} → {pockets.find((p) => p.id === t.pocketId)?.name ?? ""} · {t.date}</p>
-                  </div>
-                  {t.expenseClass && <span className="text-[9px]">{EXP_CLS[t.expenseClass].icon}</span>}
-                  <span className="text-sm font-bold" style={{ color: meta.color }}>{t.type === "income" ? "+" : "-"}{t.amount.toLocaleString()}</span>
-                  <button onClick={() => setEditTx({ ...t })} className="text-[#6B7280] hover:text-[#D4AF37] text-xs" title="تعديل">✎</button>
-                  <button onClick={() => { if (confirm("حذف هذه المعاملة؟ سيتم عكس أثرها من الأرصدة.")) deleteTx(t.id); }} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {/* ═══ Transactions — grouped by day ═══ */}
+        {tab === "transactions" && (() => {
+          const grouped = new Map<string, Transaction[]>();
+          mTx.forEach(t => { const k = t.date; grouped.set(k, [...(grouped.get(k) ?? []), t]); });
+          const days = Array.from(grouped.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+          return (
+            <div className="space-y-3">
+              {days.length === 0 && <p className="text-[#6B7280] text-sm text-center py-8">لا توجد معاملات</p>}
+              {days.map(([date, dayTxs]) => {
+                const dayTotal = dayTxs.reduce((s, t) => s + (t.type === "income" ? t.amount : -t.amount), 0);
+                const label = date === new Date().toISOString().slice(0, 10) ? "اليوم" : date === new Date(Date.now() - 86400000).toISOString().slice(0, 10) ? "أمس" : new Date(date).toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "short" });
+                return (
+                  <details key={date} open={date === new Date().toISOString().slice(0, 10) || days.length <= 3}>
+                    <summary className="flex items-center justify-between px-4 py-2.5 rounded-xl cursor-pointer hover:bg-gray-50 transition" style={{ background: "var(--bg)", border: "1px solid var(--card-border)" }}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold" style={{ color: "var(--text)" }}>{label}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-[#6B7280]">{dayTxs.length} معاملة</span>
+                      </div>
+                      <span className="text-sm font-bold" style={{ color: dayTotal >= 0 ? "#3D8C5A" : "#DC2626" }}>{dayTotal >= 0 ? "+" : ""}{dayTotal.toLocaleString()}</span>
+                    </summary>
+                    <div className="mt-1 space-y-1">
+                      {dayTxs.map(t => {
+                        const meta = TX_TYPES.find(x => x.key === t.type) ?? TX_TYPES[0];
+                        return (
+                          <div key={t.id} className="flex items-center gap-3 bg-white rounded-xl px-4 py-3 border border-gray-200">
+                            <span className="text-lg">{meta.icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-[#16213E] truncate">{t.title}</p>
+                              <p className="text-[9px] text-[#9CA3AF]">{t.category} · {accounts.find(a => a.id === t.accountId)?.name ?? ""} → {pockets.find(p => p.id === t.pocketId)?.name ?? ""}</p>
+                            </div>
+                            {t.expenseClass && <span className="text-[9px]">{EXP_CLS[t.expenseClass].icon}</span>}
+                            <span className="text-sm font-bold" style={{ color: meta.color }}>{t.type === "income" ? "+" : "-"}{t.amount.toLocaleString()}</span>
+                            <button onClick={() => setEditTx({ ...t })} className="text-[#6B7280] hover:text-[#D4AF37] text-xs">✎</button>
+                            <button onClick={() => { if (confirm("حذف؟")) deleteTx(t.id); }} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* ═══ Accounts (أين المال) ═══ */}
         {tab === "accounts" && (
