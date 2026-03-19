@@ -1371,6 +1371,52 @@ function CelebrationEffect({ onDone }: { onDone: () => void }) {
   );
 }
 
+/* ─── PWA Install Button ───────────────────────────────────────────────────── */
+
+function InstallPWAButton() {
+  const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    // Check if already installed
+    if (window.matchMedia("(display-mode: standalone)").matches) {
+      setIsInstalled(true);
+      return;
+    }
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", () => setIsInstalled(true));
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  async function handleInstall() {
+    if (!deferredPrompt) return;
+    (deferredPrompt as BeforeInstallPromptEvent).prompt();
+    const result = await (deferredPrompt as BeforeInstallPromptEvent).userChoice;
+    if (result.outcome === "accepted") setIsInstalled(true);
+    setDeferredPrompt(null);
+  }
+
+  if (isInstalled || !deferredPrompt) return null;
+
+  return (
+    <button onClick={handleInstall}
+      className="w-full py-3 rounded-xl text-sm font-bold text-white transition hover:opacity-90"
+      style={{ background: "linear-gradient(135deg, #5E5495, #C9A84C)" }}>
+      📲 تثبيت مدار كتطبيق على جوالك
+    </button>
+  );
+}
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
 /* ─── Today Summary Widget ─────────────────────────────────────────────────── */
 
 function TodaySummary() {
@@ -2309,6 +2355,9 @@ export default function TasksPage() {
               style={{ width: `${pct}%`, background: "linear-gradient(90deg, #5E5495, #C9A84C)" }} />
           </div>
         </div>
+
+        {/* PWA Install Prompt */}
+        <InstallPWAButton />
 
         {/* Today Summary — habits + quran + dues */}
         <TodaySummary />
