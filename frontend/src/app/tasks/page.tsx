@@ -734,22 +734,44 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
   // بيئة العمل لكل فترة
   const [periodContexts, setPeriodContexts] = useState<Record<string, string>>({});
 
-  // Auto-distribute tasks — context-aware
+  // Auto-distribute tasks — context-aware, starting from current/next period
   const autoPlan = (() => {
     const remaining = [...pending];
+    const now = nowMin();
     const result: { period: string; tasks: TaskRow[]; startMin: number; endMin: number; blocked: boolean }[] = [];
-    for (const period of allPeriods) {
-      if (period.blocked) { result.push({ period: period.name, tasks: [], startMin: period.startMin, endMin: period.endMin, blocked: true }); continue; }
+
+    // Sort periods: current/future first, then past (so new tasks go to upcoming periods)
+    const sortedPeriods = [...allPeriods].sort((a, b) => {
+      const aIsPast = a.endMin <= now;
+      const bIsPast = b.endMin <= now;
+      if (aIsPast !== bIsPast) return aIsPast ? 1 : -1; // future first
+      return a.startMin - b.startMin;
+    });
+
+    // First pass: distribute to future/current periods
+    const periodTasks = new Map<string, TaskRow[]>();
+    for (const period of sortedPeriods) {
+      if (period.blocked) { periodTasks.set(period.name, []); continue; }
       const slots = Math.floor(period.duration / 30);
       const pCtx = periodContexts[period.name];
       const pt: TaskRow[] = [];
-      // First fill with matching context tasks, then any
       for (let s = 0; s < slots && remaining.length > 0; s++) {
         let idx = pCtx ? remaining.findIndex(t => t.context === pCtx) : -1;
         if (idx < 0) idx = 0;
         pt.push(remaining.splice(idx, 1)[0]);
       }
-      result.push({ period: period.name, tasks: pt, startMin: period.startMin, endMin: period.endMin, blocked: false });
+      periodTasks.set(period.name, pt);
+    }
+
+    // Build result in original order
+    for (const period of allPeriods) {
+      result.push({
+        period: period.name,
+        tasks: periodTasks.get(period.name) ?? [],
+        startMin: period.startMin,
+        endMin: period.endMin,
+        blocked: period.blocked,
+      });
     }
     return result;
   })();
