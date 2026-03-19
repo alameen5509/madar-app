@@ -2595,17 +2595,27 @@ export default function TasksPage() {
                                   cursor-pointer hover:bg-[#C9A84C]/5 rounded-lg px-2 transition-all
                                   ${t.done ? "opacity-50" : ""}`}>
                       <div className={`w-5 h-5 rounded-full flex-shrink-0 border-2 flex items-center justify-center transition-all
-                                      ${t.done ? "bg-[#5E5495] border-[#5E5495]" : "border-[#C9A84C] bg-transparent"}`}>
+                                      ${t.done
+                                        ? t.context === "habit" ? "bg-[#2ABFBF] border-[#2ABFBF]" : "bg-[#5E5495] border-[#5E5495]"
+                                        : t.context === "habit" ? "border-[#2ABFBF] bg-transparent" : "border-[#C9A84C] bg-transparent"}`}>
                         {t.done && <span className="text-white text-[10px]">✓</span>}
                       </div>
-                      <button onClick={(e) => { e.stopPropagation(); toggleExpand(t.id); }}
-                        className="text-[10px] text-[#7C7A8E] hover:text-[#5E5495] transition flex-shrink-0"
-                        title="مهام فرعية">
-                        {expandedTask === t.id ? "▼" : "▶"}
-                      </button>
+                      {t.context !== "habit" && (
+                        <button onClick={(e) => { e.stopPropagation(); toggleExpand(t.id); }}
+                          className="text-[10px] text-[#7C7A8E] hover:text-[#5E5495] transition flex-shrink-0"
+                          title="مهام فرعية">
+                          {expandedTask === t.id ? "▼" : "▶"}
+                        </button>
+                      )}
                       <p className={`flex-1 text-sm ${t.done ? "line-through text-[#7C7A8E]" : "text-[#1A1830] font-medium"}`}>
                         {t.title}
                       </p>
+                      {t.context === "habit" && !t.done && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "#2ABFBF15", color: "#2ABFBF", border: "1px solid #2ABFBF30" }}>عادة</span>
+                      )}
+                      {t.context === "habit" && t.description && (
+                        <span className="text-[10px] text-orange-500 font-bold flex-shrink-0">{t.description}</span>
+                      )}
                       {t.isUrgent && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200 flex-shrink-0" title={t.waitingFor ? `ينتظر: ${t.waitingFor}` : "ملحة"}>🔴 {t.waitingFor ?? "ملحة"}</span>}
                       {t.isRecurring && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-600 border border-purple-100 flex-shrink-0">🔄</span>}
                       {t.isWork && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex-shrink-0">💼</span>}
