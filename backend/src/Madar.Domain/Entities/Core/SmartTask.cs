@@ -40,6 +40,7 @@ public class SmartTask
     public string? CostCurrency { get; set; } = "SAR";
     public Guid? AssignedToId { get; set; }
     public Guid? ProjectId { get; set; }
+    public Guid? ContactId { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
@@ -48,6 +49,7 @@ public class SmartTask
     public LifeCircle LifeCircle { get; set; } = default!;
     public Goal? Goal { get; set; }
     public Project? Project { get; set; }
+    public Contact? Contact { get; set; }
     public SmartTask? ParentTask { get; set; }
     public ICollection<SmartTask> SubTasks { get; set; } = [];
     public ICollection<TaskTag> Tags { get; set; } = [];

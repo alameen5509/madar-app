@@ -1,19 +1,21 @@
 "use client";
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 export default function ImpersonationBar() {
-  const [isImpersonating, setIsImpersonating] = useState(false);
-  const [targetName, setTargetName] = useState("");
+  const [viewingName, setViewingName] = useState("");
+  const pathname = usePathname();
 
   useEffect(() => {
     const check = () => {
-      const data = localStorage.getItem("madar_impersonation");
+      const data = localStorage.getItem("madar_viewing_user");
       if (data) {
-        const parsed = JSON.parse(data);
-        setIsImpersonating(true);
-        setTargetName(parsed.targetUserName || "");
+        try {
+          const parsed = JSON.parse(data);
+          setViewingName(parsed.name || "");
+        } catch { setViewingName(""); }
       } else {
-        setIsImpersonating(false);
+        setViewingName("");
       }
     };
     check();
@@ -21,25 +23,15 @@ export default function ImpersonationBar() {
     return () => window.removeEventListener("storage", check);
   }, []);
 
-  const stopImpersonation = () => {
-    const data = localStorage.getItem("madar_impersonation");
-    if (data) {
-      const parsed = JSON.parse(data);
-      // Restore admin tokens
-      if (parsed.adminAccessToken) {
-        localStorage.setItem("accessToken", parsed.adminAccessToken);
-        document.cookie = `madar_token=${parsed.adminAccessToken};path=/;max-age=${60 * 60 * 24}`;
-      }
-      if (parsed.adminRefreshToken) {
-        localStorage.setItem("refreshToken", parsed.adminRefreshToken);
-      }
-      localStorage.removeItem("madar_impersonation");
-      setIsImpersonating(false);
-      window.location.href = "/users";
-    }
-  };
+  // فقط أظهر الشريط في صفحات غير /accounts/[userId]
+  // (صفحة الاستعراض لديها شريطها الخاص)
+  if (!viewingName || pathname.startsWith("/accounts/")) return null;
 
-  if (!isImpersonating) return null;
+  const stopViewing = () => {
+    localStorage.removeItem("madar_viewing_user");
+    setViewingName("");
+    window.location.href = "/accounts";
+  };
 
   return (
     <div
@@ -60,9 +52,9 @@ export default function ImpersonationBar() {
         direction: "rtl",
       }}
     >
-      <span>أنت تستعرض: {targetName}</span>
+      <span>جارٍ استعراض صفحة {viewingName}</span>
       <button
-        onClick={stopImpersonation}
+        onClick={stopViewing}
         style={{
           background: "rgba(255,255,255,0.25)",
           border: "none",

@@ -57,6 +57,7 @@ const NAV_ITEMS = [
   { icon: "✦", label: "صندوق الوارد",      href: "/inbox",     badgeKey: "inbox" as const },
   { icon: "◑", label: "الإحصائيات",         href: "/energy",    badgeKey: null },
   { icon: "◇", label: "الإدارة المالية",    href: "/finance",   badgeKey: "dues" as const },
+  { icon: "🔑", label: "الحسابات",           href: "/accounts",  badgeKey: null },
   { icon: "👥", label: "المستخدمون",        href: "/users",     badgeKey: null },
   { icon: "◆", label: "الذكاء الاصطناعي",  href: "/ai",        badgeKey: null },
   { icon: "⌚", label: "ربط الساعة",         href: "/watch-login", badgeKey: null },
@@ -110,7 +111,7 @@ export default function Sidebar() {
   }, [refresh]);
 
   return (
-    <aside className="pattern-zellige relative w-64 flex-shrink-0 flex flex-col overflow-y-auto">
+    <aside className="pattern-zellige relative w-64 flex-shrink-0 flex flex-col overflow-hidden">
       <SidebarPattern />
 
       {/* Logo */}
@@ -130,7 +131,7 @@ export default function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="relative z-10 flex-1 px-3 py-4 space-y-0.5">
+      <nav className="relative z-10 flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href || (item.href === "/dashboard" && pathname === "/");
           const count = item.badgeKey ? counts[item.badgeKey] : 0;
@@ -165,7 +166,7 @@ export default function Sidebar() {
             م
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-sm font-medium truncate">محمد العمري</p>
+            <p className="text-white text-sm font-medium truncate">محمد الأمين</p>
             <p className="text-white/30 text-xs truncate">مشرف النظام</p>
           </div>
         </div>

@@ -65,3 +65,5 @@ secrets.json
 frontend/public/mushaf.pdf
 backend/src/Madar.API/deploy*
 backend/src/deploy.zip
+
+.vercel

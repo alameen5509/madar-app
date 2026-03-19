@@ -346,7 +346,12 @@ export default function StatsPage() {
   const total     = tasks.length;
   const completed = tasks.filter((t) => t.status === "Completed").length;
   const pending   = tasks.filter((t) => t.status === "Todo" || t.status === "InProgress").length;
-  const overdue   = tasks.filter((t) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "Completed").length;
+  const overdue   = tasks.filter((t) => {
+    if (t.status === "Completed") return false;
+    if (t.dueDate && new Date(t.dueDate) < new Date()) return true;
+    if (t.createdAt && Date.now() - new Date(t.createdAt).getTime() > 24 * 60 * 60 * 1000) return true;
+    return false;
+  }).length;
   const completionRate = total === 0 ? 0 : Math.round((completed / total) * 100);
   const workTasks = tasks.filter((t) => t.contextNote === "work").length;
   const personalTasks = total - workTasks;

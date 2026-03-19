@@ -85,6 +85,46 @@ public class UsersController : BaseController
         return Ok(goals);
     }
 
+    /// <summary>عادات مستخدم محدد</summary>
+    [HttpGet("{userId:guid}/habits")]
+    public async Task<IActionResult> GetUserHabits(Guid userId, CancellationToken ct)
+    {
+        var habits = await _db.Habits
+            .Where(h => h.OwnerId == userId)
+            .OrderBy(h => h.Title)
+            .Select(h => new
+            {
+                h.Id, h.Title, h.Icon, h.Category,
+                h.IsIdea, h.Streak, h.LastCompletedDate,
+                todayDone = h.LastCompletedDate != null &&
+                    h.LastCompletedDate.Value.Date == DateTime.UtcNow.Date,
+            })
+            .ToListAsync(ct);
+
+        return Ok(habits);
+    }
+
+    /// <summary>أدوار حياة مستخدم محدد</summary>
+    [HttpGet("{userId:guid}/circles")]
+    public async Task<IActionResult> GetUserCircles(Guid userId, CancellationToken ct)
+    {
+        var circles = await _db.LifeCircles
+            .Include(c => c.Goals).ThenInclude(g => g.LinkedTasks)
+            .Where(c => c.OwnerId == userId)
+            .OrderBy(c => c.DisplayOrder)
+            .Select(c => new
+            {
+                c.Id, c.Name, color = c.ColorHex, tier = c.Tier.ToString(), c.DisplayOrder,
+                totalGoals = c.Goals.Count,
+                completedGoals = c.Goals.Count(g => g.LinkedTasks.Count > 0 && g.LinkedTasks.All(t => t.Status == Domain.Enums.TaskStatus.Completed)),
+                totalTasks = c.Goals.SelectMany(g => g.LinkedTasks).Count(),
+                completedTasks = c.Goals.SelectMany(g => g.LinkedTasks).Count(t => t.Status == Domain.Enums.TaskStatus.Completed),
+            })
+            .ToListAsync(ct);
+
+        return Ok(circles);
+    }
+
     /// <summary>تعديل بيانات مستخدم</summary>
     [HttpPatch("{userId:guid}")]
     public async Task<IActionResult> UpdateUser(
@@ -100,6 +140,33 @@ public class UsersController : BaseController
 
         await _db.SaveChangesAsync(ct);
         return Ok(new { user.Id, user.FullName, user.Email, user.IsActive });
+    }
+
+    /// <summary>حذف مستخدم (للمشرف فقط)</summary>
+    [HttpDelete("{userId:guid}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> DeleteUser(Guid userId, CancellationToken ct)
+    {
+        var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        if (userId == currentUserId) return BadRequest(new { error = "لا يمكنك حذف حسابك" });
+
+        var user = await _db.Users.FindAsync(new object[] { userId }, ct);
+        if (user is null) return NotFound();
+
+        // حذف بيانات المستخدم المرتبطة
+        var tasks = _db.SmartTasks.Where(t => t.OwnerId == userId);
+        var habits = _db.Habits.Where(h => h.OwnerId == userId);
+        var goals = _db.Goals.Where(g => g.OwnerId == userId);
+        var circles = _db.LifeCircles.Where(c => c.OwnerId == userId);
+
+        _db.SmartTasks.RemoveRange(tasks);
+        _db.Habits.RemoveRange(habits);
+        _db.Goals.RemoveRange(goals);
+        _db.LifeCircles.RemoveRange(circles);
+        _db.Users.Remove(user);
+
+        await _db.SaveChangesAsync(ct);
+        return Ok(new { message = $"تم حذف حساب {user.FullName}" });
     }
 }
 

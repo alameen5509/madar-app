@@ -9,6 +9,7 @@ interface Settings {
   focusDuration: number;
   shortBreak: number;
   longBreak: number;
+  habitDuration: number;
   dailyQuranPages: number;
   dhikrReminder: boolean;
   dhikrInterval: number;
@@ -22,6 +23,7 @@ const DEFAULTS: Settings = {
   focusDuration: 25,
   shortBreak: 5,
   longBreak: 25,
+  habitDuration: 30,
   dailyQuranPages: 4,
   dhikrReminder: true,
   dhikrInterval: 60,
@@ -205,6 +207,8 @@ export default function SettingsPage() {
             <NumberField label="مدة الجلسة" value={settings.focusDuration} onChange={(v) => update("focusDuration", v)} min={5} max={60} suffix="دقيقة" />
             <NumberField label="راحة قصيرة" value={settings.shortBreak} onChange={(v) => update("shortBreak", v)} min={1} max={30} suffix="دقيقة" />
             <NumberField label="راحة طويلة" value={settings.longBreak} onChange={(v) => update("longBreak", v)} min={5} max={60} suffix="دقيقة" />
+            <NumberField label="مدة العادات" value={settings.habitDuration} onChange={(v) => update("habitDuration", v)} min={5} max={90} suffix="دقيقة" />
+            <p className="text-[10px] text-[#9CA3AF]">المدة المخصصة للعادات اليومية في أول فترة من خطة اليوم</p>
           </div>
         </section>
 

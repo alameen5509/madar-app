@@ -2,6 +2,7 @@
   "expo": {
     "name": "مدار",
     "slug": "madar",
+    "owner": "alameen22",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -24,7 +25,13 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "com.madar.app",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -49,8 +56,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "madar-mobile"
-      }
+        "projectId": "426e81c9-284b-48da-a730-4afa4eeb027c"
+      },
+      "router": {}
     }
   }
 }

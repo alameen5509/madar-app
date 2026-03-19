@@ -16,7 +16,12 @@ function analyze(tasks: SmartTask[], goals: Goal[], circles: LifeCircle[]): Insi
   const completed = tasks.filter((t) => t.status === "Completed").length;
   const total = tasks.length;
   const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
-  const overdue = tasks.filter((t) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "Completed");
+  const overdue = tasks.filter((t) => {
+    if (t.status === "Completed") return false;
+    if (t.dueDate && new Date(t.dueDate) < new Date()) return true;
+    if (t.createdAt && Date.now() - new Date(t.createdAt).getTime() > 24 * 60 * 60 * 1000) return true;
+    return false;
+  });
   const highP = tasks.filter((t) => t.userPriority >= 4 && t.status !== "Completed");
   const urgent = tasks.filter((t) => (t.contextNote ?? "").includes("urgent") && t.status !== "Completed");
   const activeGoals = goals.filter((g) => g.status === "Active");

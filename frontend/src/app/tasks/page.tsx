@@ -118,6 +118,7 @@ interface TaskRow {
   dueDate?: string;
   hasSubtasks: boolean;
   context: string;
+  createdAt?: string;
 }
 
 function toRow(t: SmartTask, circleOrderMap?: Map<string, number>): TaskRow {
@@ -139,7 +140,22 @@ function toRow(t: SmartTask, circleOrderMap?: Map<string, number>): TaskRow {
     dueDate:  t.dueDate,
     hasSubtasks: false,
     context: (t.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere",
+    createdAt: t.createdAt,
   };
+}
+
+/** المهمة متأخرة إذا مضى 24 ساعة على إنشائها ولم تكتمل */
+function isOverdue(t: TaskRow): boolean {
+  if (t.done || t.isInbox) return false;
+  // إذا فيه تاريخ استحقاق وتجاوزناه
+  if (t.dueDate && new Date(t.dueDate) < new Date()) return true;
+  // أو مضى 24 ساعة على الإنشاء
+  if (t.createdAt) {
+    const created = new Date(t.createdAt).getTime();
+    const now = Date.now();
+    if (now - created > 24 * 60 * 60 * 1000) return true;
+  }
+  return false;
 }
 
 /** الجمعة = 5, السبت = 6 */
@@ -707,8 +723,15 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
   blockedPeriods: string[];
   onBlockToggle: (name: string) => void;
 }) {
-  // ترتيب: عادات (recurring) ← أدوار (non-work) ← وظائف (work) ← ملحة في الأعلى دائماً
-  const pending = tasks.filter((t) => !t.done && !t.isInbox).sort((a, b) => {
+  // مدة العادات من الإعدادات
+  const habitDuration = (() => {
+    try { return JSON.parse(localStorage.getItem("madar_settings") ?? "{}").habitDuration ?? 30; } catch { return 30; }
+  })();
+
+  // فصل العادات عن المهام العادية
+  const allPending = tasks.filter((t) => !t.done && !t.isInbox);
+  const habitTasks = allPending.filter(t => t.context === "habit");
+  const pending = allPending.filter(t => t.context !== "habit").sort((a, b) => {
     if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
     const typeOrder = (t: TaskRow) => t.isRecurring ? 0 : t.isWork ? 2 : 1;
     return typeOrder(a) - typeOrder(b);
@@ -734,27 +757,42 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
   // بيئة العمل لكل فترة
   const [periodContexts, setPeriodContexts] = useState<Record<string, string>>({});
 
-  // Auto-distribute tasks — context-aware, starting from current/next period
+  // Auto-distribute tasks — العادات في أول فترة، ثم بقية المهام
   const autoPlan = (() => {
     const remaining = [...pending];
     const now = nowMin();
-    const result: { period: string; tasks: TaskRow[]; startMin: number; endMin: number; blocked: boolean }[] = [];
+    const result: { period: string; tasks: TaskRow[]; startMin: number; endMin: number; blocked: boolean; habitSlot: boolean }[] = [];
 
-    // Sort periods: current/future first, then past (so new tasks go to upcoming periods)
+    // Sort periods: current/future first, then past
     const sortedPeriods = [...allPeriods].sort((a, b) => {
       const aIsPast = a.endMin <= now;
       const bIsPast = b.endMin <= now;
-      if (aIsPast !== bIsPast) return aIsPast ? 1 : -1; // future first
+      if (aIsPast !== bIsPast) return aIsPast ? 1 : -1;
       return a.startMin - b.startMin;
     });
 
-    // First pass: distribute to future/current periods
+    // Find first available period for habits
+    const firstAvailable = sortedPeriods.find(p => !p.blocked);
+    const habitPeriodName = firstAvailable?.name ?? "";
+
     const periodTasks = new Map<string, TaskRow[]>();
+    const periodHabitSlot = new Map<string, boolean>();
     for (const period of sortedPeriods) {
-      if (period.blocked) { periodTasks.set(period.name, []); continue; }
-      const slots = Math.floor(period.duration / 30);
+      if (period.blocked) { periodTasks.set(period.name, []); periodHabitSlot.set(period.name, false); continue; }
+
+      // العادات تذهب لأول فترة متاحة
+      const isHabitPeriod = period.name === habitPeriodName && habitTasks.length > 0;
+      const habitSlotsMins = isHabitPeriod ? habitDuration : 0;
+      const availableMins = period.duration - habitSlotsMins;
+      const slots = Math.max(0, Math.floor(availableMins / 30));
+      periodHabitSlot.set(period.name, isHabitPeriod);
+
       const pCtx = periodContexts[period.name];
       const pt: TaskRow[] = [];
+      // أضف العادات أولاً في هذه الفترة
+      if (isHabitPeriod) {
+        pt.push(...habitTasks);
+      }
       for (let s = 0; s < slots && remaining.length > 0; s++) {
         let idx = pCtx ? remaining.findIndex(t => t.context === pCtx) : -1;
         if (idx < 0) idx = 0;
@@ -771,6 +809,7 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
         startMin: period.startMin,
         endMin: period.endMin,
         blocked: period.blocked,
+        habitSlot: periodHabitSlot.get(period.name) ?? false,
       });
     }
     return result;
@@ -827,7 +866,8 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
         <div className="px-7 py-5 space-y-4">
           {/* Legend */}
           <div className="flex gap-3 flex-wrap text-[10px]" style={{ color: "var(--muted)" }}>
-            <span>🔄 عادات</span><span>◎ أدوار</span><span>💼 وظائف</span><span>🔴 ملحة أولاً</span>
+            <span>🔄 عادات (أول فترة · {(() => { try { return JSON.parse(localStorage.getItem("madar_settings") ?? "{}").habitDuration ?? 30; } catch { return 30; } })()}د)</span>
+            <span>◎ أدوار</span><span>💼 وظائف</span><span>🔴 ملحة أولاً</span>
           </div>
 
           {prayers.length === 0 && <p className="text-center text-sm py-8" style={{ color: "var(--muted)" }}>لم يتم تحميل مواقيت الصلاة</p>}
@@ -875,7 +915,14 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
                 <div className="px-4 py-3 text-center"><p className="text-xs" style={{ color: "var(--muted)" }}>لا مهام</p></div>
               ) : (
                 <div className="px-4 py-2 space-y-1">
-                  {p.tasks.map((t, i) => (
+                  {p.habitSlot && (
+                    <div className="flex items-center gap-2 py-2 rounded-lg px-2 mb-1" style={{ background: "#2ABFBF10", borderRight: "3px solid #2ABFBF" }}>
+                      <span className="text-[10px]">🔄</span>
+                      <span className="text-sm font-semibold flex-1" style={{ color: "#2ABFBF" }}>العادات اليومية</span>
+                      <span className="text-[10px] font-semibold" style={{ color: "#2ABFBF" }}>~{habitDuration} د</span>
+                    </div>
+                  )}
+                  {p.tasks.filter(t => t.context !== "habit").map((t, i) => (
                     <div key={t.id} draggable
                       onDragStart={() => setDragTask({ taskId: t.id, fromPeriod: p.period })}
                       className="flex items-center gap-2 py-2 rounded-lg px-2 transition cursor-grab active:cursor-grabbing hover:opacity-80"
@@ -884,7 +931,7 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${P_COLORS[t.priority]}`}>{t.priority}</span>
                       {t.isRecurring && <span className="text-[10px]">🔄</span>}
                       {t.isWork && <span className="text-[10px]">💼</span>}
-                      {t.context !== "Anywhere" && <span className="text-[10px]">{ctxIcon(t.context)}</span>}
+                      {t.context !== "Anywhere" && t.context !== "habit" && <span className="text-[10px]">{ctxIcon(t.context)}</span>}
                       <span className="text-sm flex-1 truncate" style={{ color: "var(--text)" }}>{t.title}</span>
                       <span className="text-[10px]" style={{ color: "var(--muted)" }}>~30 د</span>
                     </div>
@@ -899,7 +946,7 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
               <p className="text-amber-600 text-xs">حاول تقليل فترات الراحة أو إنهاء بعض المهام</p>
             </div>
           )}
-          <p className="text-[10px] text-center" style={{ color: "var(--muted)" }}>الترتيب: عادات ← أدوار ← وظائف · كل مهمة ~30 دقيقة</p>
+          <p className="text-[10px] text-center" style={{ color: "var(--muted)" }}>العادات في أول فترة ({habitDuration}د) · بقية المهام ~30 دقيقة</p>
         </div>
       </div>
     </div>
@@ -1183,7 +1230,14 @@ function TransferTaskDialog({ taskId, taskTitle, onClose, onDone }: {
 function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   prayers: Prayer[]; tasks: TaskRow[]; blockedPeriods: string[]; onBlockToggle: (name: string) => void;
 }) {
-  const pending = tasks.filter((t) => !t.done && !t.isInbox).sort((a, b) => {
+  // مدة العادات من الإعدادات
+  const habitDuration = (() => {
+    try { return JSON.parse(localStorage.getItem("madar_settings") ?? "{}").habitDuration ?? 30; } catch { return 30; }
+  })();
+
+  const allPending = tasks.filter((t) => !t.done && !t.isInbox);
+  const habitTasks = allPending.filter(t => t.context === "habit");
+  const pending = allPending.filter(t => t.context !== "habit").sort((a, b) => {
     if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
     const typeOrder = (t: TaskRow) => t.isRecurring ? 0 : t.isWork ? 2 : 1;
     return typeOrder(a) - typeOrder(b);
@@ -1202,13 +1256,26 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     { name: "بعد منتصف الليل", startMin: 0, endMin: 2 * 60, duration: 120, blocked: !blockedPeriods.includes("بعد منتصف الليل_open") },
   ];
 
+  // العادات في أول فترة متاحة
+  const now = nowMin();
+  const firstAvailable = [...allPeriods].sort((a, b) => {
+    const aIsPast = a.endMin <= now;
+    const bIsPast = b.endMin <= now;
+    if (aIsPast !== bIsPast) return aIsPast ? 1 : -1;
+    return a.startMin - b.startMin;
+  }).find(p => !p.blocked);
+  const habitPeriodName = firstAvailable?.name ?? "";
+
   const remaining = [...pending];
   const plan = allPeriods.map((period) => {
-    if (period.blocked) return { ...period, tasks: [] as TaskRow[] };
-    const slots = Math.floor(period.duration / 30);
+    if (period.blocked) return { ...period, tasks: [] as TaskRow[], habitSlot: false };
+    const isHabitPeriod = period.name === habitPeriodName && habitTasks.length > 0;
+    const habitMins = isHabitPeriod ? habitDuration : 0;
+    const slots = Math.max(0, Math.floor((period.duration - habitMins) / 30));
     const pt: TaskRow[] = [];
+    if (isHabitPeriod) pt.push(...habitTasks);
     for (let s = 0; s < slots && remaining.length > 0; s++) pt.push(remaining.shift()!);
-    return { ...period, tasks: pt };
+    return { ...period, tasks: pt, habitSlot: isHabitPeriod };
   });
 
   function fmtTime(min: number): string {
@@ -1222,7 +1289,7 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   return (
     <div className="space-y-3 mt-3">
       <div className="flex gap-2 flex-wrap text-[11px]" style={{ color: "var(--muted)" }}>
-        <span>{pending.length} مهمة</span><span>•</span><span>🔄 عادات ← ◎ أدوار ← 💼 وظائف</span>
+        <span>{pending.length} مهمة</span><span>•</span><span>🔄 عادات ({habitDuration}د) ← ◎ أدوار ← 💼 وظائف</span>
       </div>
       {plan.map((p) => (
         <div key={p.name} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${p.blocked ? "var(--card-border)" : "var(--gold, #D4AF37)25"}`, opacity: p.blocked ? 0.5 : 1 }}>
@@ -1242,7 +1309,14 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
           </div>
           {!p.blocked && p.tasks.length > 0 && (
             <div className="px-4 py-1.5 space-y-0.5">
-              {p.tasks.map((t, i) => (
+              {p.habitSlot && (
+                <div className="flex items-center gap-2 py-1.5 px-1 rounded" style={{ background: "#2ABFBF10", borderRight: "3px solid #2ABFBF" }}>
+                  <span className="text-[10px]">🔄</span>
+                  <span className="text-sm font-semibold flex-1" style={{ color: "#2ABFBF" }}>العادات اليومية</span>
+                  <span className="text-[10px] font-semibold" style={{ color: "#2ABFBF" }}>~{habitDuration} د</span>
+                </div>
+              )}
+              {p.tasks.filter(t => t.context !== "habit").map((t, i) => (
                 <div key={t.id} className="flex items-center gap-2 py-1.5 px-1 rounded" style={{ background: i % 2 === 0 ? "transparent" : "var(--bg)" }}>
                   <span className="text-[10px] w-4" style={{ color: "var(--muted)" }}>{i + 1}</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${P_COLORS[t.priority]}`}>{t.priority}</span>
@@ -1604,9 +1678,11 @@ export default function TasksPage() {
           localStorage.setItem("madar_focus_log", JSON.stringify(log.filter((e: { ts: number }) => e.ts > cutoff)));
         } catch {}
       } else {
-        setMode("idle");
-        setTimeLeft(FOCUS_SEC);
-        setFocusTaskId(null);
+        // انتهت الراحة — أكمل على نفس المهمة تلقائياً
+        const duration = mood === "low" ? FOCUS_LOW_SEC : FOCUS_SEC;
+        setMode("focus");
+        setTimeLeft(duration);
+        // focusTaskId يبقى كما هو — نكمل نفس المهمة
       }
       return;
     }
@@ -1645,8 +1721,11 @@ export default function TasksPage() {
 
   /* ── Default task duration by context ── */
   function getDefaultDuration(context: string): number {
+    if (context === "habit") {
+      try { return (JSON.parse(localStorage.getItem("madar_settings") ?? "{}").habitDuration ?? 30) * 60; } catch { return 30 * 60; }
+    }
     const map: Record<string, number> = { Office: 45, Home: 30, Phone: 15, Online: 30, Car: 20, Anywhere: 5 };
-    return (map[context] ?? 5) * 60; // seconds — المهمة العامة 5 دقائق
+    return (map[context] ?? 5) * 60;
   }
 
   /* ── Actions ── */
@@ -2204,66 +2283,17 @@ export default function TasksPage() {
                 : nightWorkEnabled ? `عمل ليلي — ${nightWorkMins} دقيقة بعد العشاء` : "انتهى وقت العمل — بعد صلاة العشاء"}
             </p>
 
-            {/* Dual task suggestion — tech + non-tech */}
-            {pendingTasks.length > 0 ? (() => {
-              const techTasks = pendingTasks.filter(t => t.isWork);
-              const nonTechTasks = pendingTasks.filter(t => !t.isWork);
-              const techTask = techTasks[0] ?? null;
-              const nonTechTask = nonTechTasks[0] ?? null;
-              const dualTasks = [techTask, nonTechTask].filter(Boolean) as typeof pendingTasks;
-              if (dualTasks.length === 0) return null;
-
-              function TaskCard({ task, label, color, accent }: { task: typeof pendingTasks[0]; label: string; color: string; accent: string }) {
-                return (
-                  <div className="w-full rounded-xl border overflow-hidden" style={{ borderColor: accent + "40" }}>
-                    <div className="px-3 py-1.5 text-[10px] font-bold" style={{ background: accent + "15", color: accent }}>{label}</div>
-                    <div className="px-4 py-3" style={{ background: "var(--card)" }}>
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${P_COLORS[task.priority]}`}>{task.priority}</span>
-                        <span className="flex-1 text-sm font-semibold truncate" style={{ color: "var(--text)" }}>{task.title}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-[10px]" style={{ color: "var(--muted)" }}>
-                        {task.circleColor ? (
-                          <span className="px-1.5 py-0.5 rounded-full" style={{ background: `${task.circleColor}15`, color: task.circleColor }}>{task.circle}</span>
-                        ) : <span>{task.circle}</span>}
-                      </div>
-                      <button onClick={() => startFocus(task.id)}
-                        disabled={!inWorkTime || inAdhan}
-                        className="w-full mt-2 py-2 rounded-lg text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-40"
-                        style={{ background: `linear-gradient(135deg, ${accent}, ${color})` }}>
-                        ابدأ التركيز
-                      </button>
-                    </div>
-                  </div>
-                );
-              }
-
-              return (
-                <div className="w-full space-y-3">
-                  <p className="text-xs text-center" style={{ color: "var(--muted)" }}>اختر مهمتك:</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {techTask && <TaskCard task={techTask} label="💼 تقنية / عمل" color="#C9A84C" accent="#2D6B9E" />}
-                    {nonTechTask && <TaskCard task={nonTechTask} label="🌿 شخصية / أدوار" color="#C9A84C" accent="#3D8C5A" />}
-                  </div>
-                  {dualTasks.length === 1 && (
-                    <p className="text-[10px] text-center" style={{ color: "var(--muted)" }}>
-                      {techTask ? "لا توجد مهام شخصية — أضف من أدوار الحياة" : "لا توجد مهام عمل — أضف مهمة عمل"}
-                    </p>
-                  )}
-                  <button onClick={() => startFocus()}
-                    disabled={!inWorkTime || inAdhan}
-                    className="text-xs transition disabled:opacity-40 w-full text-center" style={{ color: "var(--muted)" }}>
-                    أو تركيز حر بدون مهمة
-                  </button>
-                </div>
-              );
-            })() : (
-              <button onClick={() => startFocus()}
-                disabled={!inWorkTime || inAdhan}
-                className="px-10 py-3 rounded-xl text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ background: "linear-gradient(135deg, #5E5495, #C9A84C)" }}>
-                ابدأ جلسة تركيز
-              </button>
+            {/* زر واحد لبدء جلسة التركيز */}
+            <button onClick={() => startFocus()}
+              disabled={!inWorkTime || inAdhan}
+              className="px-12 py-4 rounded-xl text-base font-bold text-white transition hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: "linear-gradient(135deg, #5E5495, #C9A84C)" }}>
+              ابدأ جلسة تركيز
+            </button>
+            {pendingTasks.length > 0 && (
+              <p className="text-[10px] text-center" style={{ color: "var(--muted)" }}>
+                {pendingTasks.length} مهمة بانتظارك — اختر مهمتك من داخل الجلسة
+              </p>
             )}
           </div>
         </div>
@@ -2287,8 +2317,8 @@ export default function TasksPage() {
         {(() => {
           const now = new Date();
           const tomorrow = new Date(now.getTime() + 86400000);
-          const overdue = baseTasks.filter(t => !t.done && t.dueDate && new Date(t.dueDate) < now);
-          const dueSoon = baseTasks.filter(t => !t.done && t.dueDate && new Date(t.dueDate) >= now && new Date(t.dueDate) <= tomorrow);
+          const overdue = baseTasks.filter(t => isOverdue(t));
+          const dueSoon = baseTasks.filter(t => !t.done && !isOverdue(t) && t.dueDate && new Date(t.dueDate) >= now && new Date(t.dueDate) <= tomorrow);
           if (overdue.length === 0 && dueSoon.length === 0) return null;
           return (
             <div className="rounded-xl p-4" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }}>
@@ -2445,9 +2475,14 @@ export default function TasksPage() {
                       {t.isUrgent && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200 flex-shrink-0" title={t.waitingFor ? `ينتظر: ${t.waitingFor}` : "ملحة"}>🔴 {t.waitingFor ?? "ملحة"}</span>}
                       {t.isRecurring && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-600 border border-purple-100 flex-shrink-0">🔄</span>}
                       {t.isWork && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex-shrink-0">💼</span>}
+                      {isOverdue(t) && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 bg-red-50 text-red-600 border border-red-200">
+                          ⏰ متأخرة
+                        </span>
+                      )}
                       {t.dueDate && (
                         <span className={`text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                          new Date(t.dueDate) < new Date() && !t.done ? "bg-red-50 text-red-600 border border-red-200" : "bg-gray-50 text-[#9CA3AF]"
+                          isOverdue(t) ? "bg-red-50 text-red-600 border border-red-200" : "bg-gray-50 text-[#9CA3AF]"
                         }`}>
                           📅 {new Date(t.dueDate).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}
                         </span>
