@@ -53,7 +53,6 @@ const NAV_ITEMS = [
   { icon: "◈", label: "الوظائف",            href: "/jobs",      badgeKey: null },
   { icon: "▣", label: "المشاريع",           href: "/projects",  badgeKey: null },
   { icon: "↻", label: "العادات",            href: "/habits",    badgeKey: "habits" as const },
-  { icon: "☽", label: "ختمة",              href: "/quran",     badgeKey: null },
   { icon: "✦", label: "صندوق الوارد",      href: "/inbox",     badgeKey: "inbox" as const },
   { icon: "◑", label: "الإحصائيات",         href: "/energy",    badgeKey: null },
   { icon: "◇", label: "الإدارة المالية",    href: "/finance",   badgeKey: "dues" as const },

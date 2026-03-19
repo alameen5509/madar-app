@@ -74,69 +74,6 @@ function CelebrationOverlay({ onDone }: { onDone: () => void }) {
 
 /* ─── Page ─────────────────────────────────────────────────────────────── */
 
-/* ─── Quran Wird Widget (مرتبط بالعادات) ──────────────────────────────── */
-
-function QuranWirdWidget() {
-  const [quran, setQuran] = useState({ done: false, percent: 0, currentQ: 0, total: 240 });
-
-  useEffect(() => {
-    function load() {
-      try {
-        const q = JSON.parse(localStorage.getItem("madar_quran2") ?? "{}");
-        const today = new Date().toDateString();
-        setQuran({
-          done: q.lastDate === today && q.todayDone,
-          percent: Math.round(((q.currentQuarter ?? 0) / 240) * 100),
-          currentQ: q.currentQuarter ?? 0,
-          total: 240,
-        });
-      } catch {}
-    }
-    load();
-    window.addEventListener("madar-update", load);
-    window.addEventListener("storage", load);
-    return () => { window.removeEventListener("madar-update", load); window.removeEventListener("storage", load); };
-  }, []);
-
-  function markDone() {
-    try {
-      const q = JSON.parse(localStorage.getItem("madar_quran2") ?? "{}");
-      const unit = q.wirdUnit ?? "quarter";
-      const quartersPerDay = unit === "quarter" ? 1 : unit === "half" ? 2 : unit === "hizb" ? 4 : 8;
-      const nextQ = Math.min((q.currentQuarter ?? 0) + quartersPerDay, 240);
-      localStorage.setItem("madar_quran2", JSON.stringify({
-        ...q, currentQuarter: nextQ, todayDone: true, lastDate: new Date().toDateString(),
-      }));
-      setQuran({ done: true, percent: Math.round((nextQ / 240) * 100), currentQ: nextQ, total: 240 });
-      window.dispatchEvent(new Event("madar-update"));
-    } catch {}
-  }
-
-  return (
-    <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex items-center gap-4">
-      <a href="/quran" className="text-3xl">☽</a>
-      <div className="flex-1">
-        <div className="flex items-center justify-between mb-1">
-          <p className="text-sm font-bold" style={{ color: "var(--text)" }}>ورد القرآن</p>
-          {quran.done ? (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 font-semibold">✅ مكتمل</span>
-          ) : (
-            <button onClick={markDone}
-              className="text-xs px-3 py-1 rounded-lg font-semibold text-white transition hover:opacity-90"
-              style={{ background: "linear-gradient(135deg, #1A1A2E, #2C2C54)" }}>
-              أتممت الورد
-            </button>
-          )}
-        </div>
-        <div className="bg-gray-100 rounded-full h-2 overflow-hidden">
-          <div className="h-full rounded-full transition-all" style={{ width: `${quran.percent}%`, background: "linear-gradient(90deg, #1A1A2E, #D4AF37)" }} />
-        </div>
-        <p className="text-[10px] mt-1" style={{ color: "var(--muted)" }}>الختمة: {quran.percent}% — {quran.currentQ}/{quran.total} ربع</p>
-      </div>
-    </div>
-  );
-}
-
 export default function HabitsPage() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [showAdd, setShowAdd] = useState(false);
@@ -426,9 +363,6 @@ export default function HabitsPage() {
             <p className="text-center text-[#3D8C5A] text-xs font-bold mt-2">🎉 أتممت كل العادات اليوم — بارك الله فيك!</p>
           )}
         </div>
-
-        {/* Quran Wird — linked to habits */}
-        <QuranWirdWidget />
 
         {/* Add form */}
         {showAdd && (

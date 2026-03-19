@@ -1509,12 +1509,10 @@ interface BeforeInstallPromptEvent extends Event {
 
 function TodaySummary() {
   const [habits, setHabitsLocal] = useState<{ total: number; done: number }>({ total: 0, done: 0 });
-  const [quran, setQuran] = useState<{ done: boolean; percent: number }>({ done: false, percent: 0 });
   const [dues, setDues] = useState<number>(0);
 
   useEffect(() => {
     function load() {
-      // Habits
       try {
         const h = JSON.parse(localStorage.getItem("madar_habits") ?? "[]");
         const lastDate = localStorage.getItem("madar_habits_date");
@@ -1523,13 +1521,6 @@ function TodaySummary() {
         const done = active.filter((x: { todayDone: boolean }) => lastDate === today && x.todayDone).length;
         setHabitsLocal({ total: active.length, done });
       } catch {}
-      // Quran
-      try {
-        const q = JSON.parse(localStorage.getItem("madar_quran2") ?? "{}");
-        const today = new Date().toDateString();
-        setQuran({ done: q.lastDate === today && q.todayDone, percent: Math.round(((q.currentQuarter ?? 0) / 240) * 100) });
-      } catch {}
-      // Dues
       try {
         const d = JSON.parse(localStorage.getItem("mfin_dues") ?? "[]");
         const now = new Date();
@@ -1547,10 +1538,9 @@ function TodaySummary() {
   }, []);
 
   const habPct = habits.total > 0 ? Math.round((habits.done / habits.total) * 100) : 0;
-  const allGood = habPct === 100 && quran.done && dues === 0;
 
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-2 gap-3">
       <a href="/habits" className="bg-white rounded-xl p-3 border border-[#E2D5B0] shadow-sm hover:shadow-md transition text-center">
         <p className="text-[10px] text-[#7C7A8E]">العادات</p>
         <p className="text-lg font-black" style={{ color: habPct === 100 ? "#3D8C5A" : "#5E5495" }}>{habits.done}/{habits.total}</p>
@@ -1558,21 +1548,11 @@ function TodaySummary() {
           <div className="h-full rounded-full" style={{ width: `${habPct}%`, background: habPct === 100 ? "#3D8C5A" : "#5E5495" }} />
         </div>
       </a>
-      <a href="/quran" className="bg-white rounded-xl p-3 border border-[#E2D5B0] shadow-sm hover:shadow-md transition text-center">
-        <p className="text-[10px] text-[#7C7A8E]">الورد</p>
-        <p className="text-lg font-black" style={{ color: quran.done ? "#3D8C5A" : "#D4AF37" }}>{quran.done ? "✓" : `${quran.percent}%`}</p>
-        <p className="text-[9px] text-[#9CA3AF]">{quran.done ? "مكتمل" : "لم يكتمل"}</p>
-      </a>
       <a href="/finance" className="bg-white rounded-xl p-3 border border-[#E2D5B0] shadow-sm hover:shadow-md transition text-center">
         <p className="text-[10px] text-[#7C7A8E]">مستحقات</p>
         <p className="text-lg font-black" style={{ color: dues === 0 ? "#3D8C5A" : "#DC2626" }}>{dues === 0 ? "✓" : dues}</p>
         <p className="text-[9px] text-[#9CA3AF]">{dues === 0 ? "لا مستحقات" : "تنتظر تأكيد"}</p>
       </a>
-      {allGood && (
-        <div className="col-span-3 text-center py-1">
-          <p className="text-[10px] text-[#3D8C5A] font-bold">🎉 أنجزت كل شيء اليوم!</p>
-        </div>
-      )}
     </div>
   );
 }
