@@ -1701,10 +1701,28 @@ export default function TasksPage() {
     if (ids.length === 0) return;
     if (!confirm(`${action === "complete" ? "إكمال" : action === "delete" ? "حذف" : "تأجيل"} ${ids.length} مهمة؟`)) return;
     const status = action === "complete" ? "Completed" : action === "delete" ? "Cancelled" : "Deferred";
-    await Promise.all(ids.map(id => id.startsWith("habit_") ? null : api.patch(`/api/tasks/${id}/status`, { status }).catch(() => {})));
+    const results = await Promise.allSettled(ids.map(async (id) => {
+      if (id.startsWith("habit_")) {
+        // عادات: toggle إذا كان إكمال
+        if (action === "complete") {
+          const habitId = id.replace("habit_", "");
+          await api.patch(`/api/habits/${habitId}/toggle`);
+        }
+      } else {
+        await api.patch(`/api/tasks/${id}/status`, { status });
+      }
+    }));
+    // تحديث الواجهة فوراً
+    setTasks(prev => prev.map(t => {
+      if (!selectedTasks.has(t.id)) return t;
+      if (action === "delete") return { ...t, done: true }; // يختفي مع الفلتر
+      if (action === "complete") return { ...t, done: true };
+      return t;
+    }));
     setSelectedTasks(new Set());
     setBulkMode(false);
-    fetchTasks();
+    // إعادة جلب البيانات من السيرفر
+    setTimeout(() => fetchTasks(), 500);
   }
 
   /* load salah */
@@ -1933,7 +1951,10 @@ export default function TasksPage() {
       const habitId = id.replace("habit_", "");
       setTasks((p) => p.map((t) => t.id === id ? { ...t, done: !t.done } : t));
       try {
-        await api.patch(`/api/habits/${habitId}/toggle`);
+        const res = await api.patch(`/api/habits/${habitId}/toggle`);
+        // تحديث الحالة من الاستجابة الفعلية
+        const data = res.data as { todayDone?: boolean; streak?: number };
+        setTasks((p) => p.map((t) => t.id === id ? { ...t, done: data.todayDone ?? !currentDone, description: data.streak && data.streak > 0 ? `🔥 سلسلة: ${data.streak} يوم` : undefined } : t));
         window.dispatchEvent(new Event("madar-update"));
       } catch {
         setTasks((p) => p.map((t) => t.id === id ? { ...t, done: currentDone } : t));

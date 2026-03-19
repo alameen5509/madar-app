@@ -636,6 +636,16 @@ export default function FinancePage() {
   const [showAddCommit, setShowAddCommit] = useState<string | null>(null);
   const [editAcctId, setEditAcctId] = useState<string | null>(null);
   const [editAcctBal, setEditAcctBal] = useState("");
+  // Goal modals
+  const [showGoalForm, setShowGoalForm] = useState(false);
+  const [gfTitle, setGfTitle] = useState(""); const [gfDeadline, setGfDeadline] = useState(""); const [gfAmount, setGfAmount] = useState("");
+  const [showSaveForm, setShowSaveForm] = useState<string | null>(null);
+  const [sfAmount, setSfAmount] = useState("");
+  const [showItemForm, setShowItemForm] = useState<string | null>(null);
+  const [ifName, setIfName] = useState(""); const [ifCost, setIfCost] = useState("");
+  const [showMoreTabs, setShowMoreTabs] = useState(false);
+  // Gold alert
+  const [goldAdvice, setGoldAdvice] = useState<string | null>(null);
   const [showTransfer, setShowTransfer]   = useState(false);
   const [trFrom, setTrFrom] = useState(""); const [trTo, setTrTo] = useState(""); const [trAmt, setTrAmt] = useState("");
   const [ncTitle, setNcTitle] = useState(""); const [ncAmount, setNcAmount] = useState(""); const [ncTotal, setNcTotal] = useState(""); const [ncDay, setNcDay] = useState("1");
@@ -650,28 +660,49 @@ export default function FinancePage() {
     setDues(load("mfin_dues", []));
     setZakatData(load("mfin_zakat", { hawalDate: "", goldGrams: 0, goldPurchases: [] }));
     setFinGoals(load("mfin_goals", []));
-    // جلب سعر الذهب من مصادر متعددة
+    // جلب سعر الذهب — يتحدث يومياً
     (async () => {
+      const lastFetch = load<string>("mfin_gold_date", "");
+      const today = new Date().toISOString().slice(0, 10);
+      const cached = load<number>("mfin_gold_price", 0);
+
+      // إذا جلبنا اليوم استخدم الكاش
+      if (lastFetch === today && cached > 0) {
+        setGoldPrice(cached);
+        checkGoldAdvice(cached);
+        return;
+      }
+
+      let price = 0;
       try {
-        // محاولة 1: سعر الذهب بالدولار ثم تحويل لريال
-        const r = await fetch("https://api.metalpriceapi.com/v1/latest?api_key=demo&base=XAU&currencies=SAR").catch(() => null);
-        if (r?.ok) {
-          const d = await r.json();
-          if (d.rates?.SAR) { setGoldPrice(Math.round(d.rates.SAR / 31.1035)); return; } // troy oz to gram
-        }
-      } catch {}
-      try {
-        // محاولة 2: سعر الأونصة بالدولار × سعر الدولار/ريال ÷ 31.1 جرام
         const r = await fetch("https://data-asg.goldprice.org/dbXRates/SAR");
-        if (r?.ok) {
-          const d = await r.json();
-          if (d.items?.[0]?.xauPrice) { setGoldPrice(Math.round(d.items[0].xauPrice / 31.1035)); return; }
-        }
+        if (r?.ok) { const d = await r.json(); if (d.items?.[0]?.xauPrice) price = Math.round(d.items[0].xauPrice / 31.1035); }
       } catch {}
-      // القيمة المحفوظة محلياً أو تقريبية
-      const saved = load("mfin_gold_price", 0);
-      setGoldPrice(saved || 552); // سعر تقريبي حالي
+      if (!price) {
+        try {
+          // fallback: سعر الأونصة بالدولار × 3.75 ÷ 31.1
+          const r = await fetch("https://api.coindesk.com/v1/bpi/currentprice/XAU.json");
+          if (r?.ok) { const d = await r.json(); if (d.bpi?.XAU?.rate_float) price = Math.round((1 / d.bpi.XAU.rate_float) * 3.75 * 31.1035); }
+        } catch {}
+      }
+      if (price > 0) {
+        setGoldPrice(price);
+        save("mfin_gold_date", today);
+        checkGoldAdvice(price);
+      } else {
+        setGoldPrice(cached || 552);
+      }
     })();
+
+    function checkGoldAdvice(currentPrice: number) {
+      const zk = load<ZakatData>("mfin_zakat", { hawalDate: "", goldGrams: 0, goldPurchases: [] });
+      const buys = zk.goldPurchases.filter((p: GoldPurchase) => p.grams > 0);
+      if (buys.length === 0) return;
+      const avgBuy = Math.round(buys.reduce((s: number, p: GoldPurchase) => s + p.pricePerGram * p.grams, 0) / buys.reduce((s: number, p: GoldPurchase) => s + p.grams, 0));
+      const diff = ((currentPrice - avgBuy) / avgBuy) * 100;
+      if (diff <= -5) setGoldAdvice(`🪙 فرصة شراء! سعر الذهب (${currentPrice} ريال) انخفض ${Math.abs(Math.round(diff))}% عن متوسط شرائك (${avgBuy} ريال)`);
+      else if (diff >= 10) setGoldAdvice(`📈 سعر الذهب ارتفع ${Math.round(diff)}% عن متوسط شرائك — قد تكون فرصة بيع`);
+    }
   }, []);
 
   function sTxs(v: Transaction[]) { setTxs(v); save("mfin_tx", v); }
@@ -832,11 +863,13 @@ export default function FinancePage() {
   const expByCat = new Map<string, number>();
   mTx.filter((t) => t.type === "expense").forEach((t) => expByCat.set(t.category, (expByCat.get(t.category) ?? 0) + t.amount));
 
-  const TABS = [
+  const MAIN_TABS = [
     { key: "overview",     label: "ملخص" },
     { key: "transactions", label: "معاملات" },
-    { key: "accounts",     label: "حسابات" },
     { key: "pockets",      label: "محافظ" },
+  ] as const;
+  const MORE_TABS = [
+    { key: "accounts",     label: "حسابات" },
     { key: "dues",         label: "مستحقات" },
     { key: "debts",        label: "ديون" },
     { key: "goals",        label: "أهداف" },
@@ -844,6 +877,8 @@ export default function FinancePage() {
     { key: "zakat",        label: "زكاة" },
     { key: "settings",     label: "إعدادات" },
   ] as const;
+  const ALL_TABS = [...MAIN_TABS, ...MORE_TABS];
+  const currentTabLabel = ALL_TABS.find(t => t.key === tab)?.label ?? "ملخص";
 
   // المستحقات المقبلة (خلال 7 أيام)
   const today = new Date();
@@ -870,13 +905,43 @@ export default function FinancePage() {
             <button onClick={() => setShowAdd(true)} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>+ معاملة</button>
           </div>
         </div>
-        <div className="flex gap-1">
-          {TABS.map((t) => (
+        <div className="flex gap-1 items-center">
+          {MAIN_TABS.map((t) => (
             <button key={t.key} onClick={() => setTab(t.key)} className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition"
               style={{ background: tab === t.key ? "#2C2C54" : "transparent", color: tab === t.key ? "#fff" : "#6B7280" }}>{t.label}</button>
           ))}
+          {/* أيقونة التبويب النشط من المزيد */}
+          {MORE_TABS.some(t => t.key === tab) && (
+            <button className="py-1.5 px-3 rounded-lg text-[11px] font-semibold" style={{ background: "#2C2C54", color: "#fff" }}>{currentTabLabel}</button>
+          )}
+          <div className="relative">
+            <button onClick={() => setShowMoreTabs(!showMoreTabs)}
+              className="py-1.5 px-3 rounded-lg text-[11px] font-semibold transition"
+              style={{ background: showMoreTabs ? "#D4AF37" : "transparent", color: showMoreTabs ? "#fff" : "#6B7280" }}>
+              المزيد ▾
+            </button>
+            {showMoreTabs && (
+              <div className="absolute top-full left-0 mt-1 z-30 bg-white rounded-xl shadow-xl border border-gray-200 py-1 min-w-[120px]">
+                {MORE_TABS.map(t => (
+                  <button key={t.key} onClick={() => { setTab(t.key); setShowMoreTabs(false); }}
+                    className="w-full text-right px-4 py-2 text-xs font-medium hover:bg-gray-50 transition"
+                    style={{ color: tab === t.key ? "#2C2C54" : "#6B7280", fontWeight: tab === t.key ? 700 : 400 }}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </header>
+
+      {/* Gold advice banner */}
+      {goldAdvice && (
+        <div className="mx-8 mt-3 p-3 rounded-xl flex items-center gap-3" style={{ background: "#D4AF3715", border: "1px solid #D4AF3730" }}>
+          <p className="text-xs font-semibold flex-1" style={{ color: "#92400E" }}>{goldAdvice}</p>
+          <button onClick={() => setGoldAdvice(null)} className="text-[#9CA3AF] text-xs">✕</button>
+        </div>
+      )}
 
       <div className="px-8 py-6 space-y-5">
 
@@ -1182,13 +1247,29 @@ export default function FinancePage() {
           <section className="space-y-5">
             <div className="flex items-center justify-between">
               <div><p className="text-sm font-bold text-[#16213E]">الأهداف المالية</p><p className="text-[10px] text-[#6B7280]">حدد هدفك وتفاصيل تكلفته</p></div>
-              <button onClick={() => {
-                const title = prompt("اسم الهدف (مثال: سيارة، زواج، سفر)"); if (!title) return;
-                const deadline = prompt("تاريخ التنفيذ (YYYY-MM-DD)") || "";
-                const g: FinGoal = { id: Date.now().toString(), title, description: "", targetAmount: 0, savedSoFar: 0, deadline, items: [] };
-                sFinGoals([g, ...finGoals]);
-              }} className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style={{ background: "#2C2C54" }}>+ هدف جديد</button>
+              <button onClick={() => setShowGoalForm(true)} className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style={{ background: "#2C2C54" }}>+ هدف جديد</button>
             </div>
+
+            {/* نموذج إضافة هدف */}
+            {showGoalForm && (
+              <div className="bg-white rounded-xl p-5 border border-[#D4AF37] shadow-sm fade-up space-y-3">
+                <p className="font-bold text-sm text-[#16213E]">هدف مالي جديد</p>
+                <input value={gfTitle} onChange={e => setGfTitle(e.target.value)} placeholder="اسم الهدف (سيارة، زواج، سفر…)"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                <input type="number" value={gfAmount} onChange={e => setGfAmount(e.target.value)} placeholder="المبلغ المستهدف (اختياري إذا فيه بنود)"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                <input type="date" value={gfDeadline} onChange={e => setGfDeadline(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                <div className="flex gap-2">
+                  <button onClick={() => setShowGoalForm(false)} className="flex-1 py-2.5 rounded-xl text-sm text-[#6B7280] bg-gray-100">إلغاء</button>
+                  <button onClick={() => {
+                    if (!gfTitle.trim()) return;
+                    sFinGoals([{ id: Date.now().toString(), title: gfTitle.trim(), description: "", targetAmount: Number(gfAmount) || 0, savedSoFar: 0, deadline: gfDeadline, items: [] }, ...finGoals]);
+                    setGfTitle(""); setGfAmount(""); setGfDeadline(""); setShowGoalForm(false);
+                  }} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>إضافة</button>
+                </div>
+              </div>
+            )}
             {finGoals.length === 0 && <p className="text-center text-[#9CA3AF] text-xs py-8">لا توجد أهداف مالية — أضف هدفك الأول</p>}
             {finGoals.map(g => {
               const totalItems = g.items.reduce((s, i) => s + i.cost, 0);
@@ -1202,19 +1283,7 @@ export default function FinancePage() {
                     <div className="flex items-center justify-between mb-2">
                       <p className="font-bold text-sm text-[#16213E]">{g.title}</p>
                       <div className="flex gap-1">
-                        <button onClick={() => {
-                          const amt = prompt("كم ادّخرت لهذا الهدف؟");
-                          if (!amt) return;
-                          const a = Number(amt);
-                          sFinGoals(finGoals.map(x => x.id === g.id ? { ...x, savedSoFar: x.savedSoFar + a } : x));
-                          // إضافة كمصروف ادخار
-                          const aid = accounts[0]?.id || "";
-                          const savPkt = pockets.find(p => p.type === "savings");
-                          if (savPkt) {
-                            const t: Transaction = { id: Date.now().toString(), title: `ادخار: ${g.title}`, amount: a, type: "expense", category: "ادخار", accountId: aid, pocketId: savPkt.id, date: new Date().toISOString().slice(0, 10) };
-                            sTxs([t, ...txs]);
-                          }
-                        }} className="text-[10px] px-2 py-1 rounded-lg bg-[#3D8C5A] text-white font-bold">+ ادخار</button>
+                        <button onClick={() => { setShowSaveForm(g.id); setSfAmount(""); }} className="text-[10px] px-2 py-1 rounded-lg bg-[#3D8C5A] text-white font-bold">+ ادخار</button>
                         <button onClick={() => sFinGoals(finGoals.filter(x => x.id !== g.id))} className="text-[#9CA3AF] hover:text-red-400 text-xs px-1">✕</button>
                       </div>
                     </div>
@@ -1231,17 +1300,44 @@ export default function FinancePage() {
                       {daysLeft !== null && <span>{daysLeft === 0 ? "حان الموعد!" : `${daysLeft} يوم متبقي`}{monthlyNeeded > 0 ? ` · ${monthlyNeeded.toLocaleString()} ريال/شهر` : ""}</span>}
                     </div>
                   </div>
+                  {/* نموذج ادخار */}
+                  {showSaveForm === g.id && (
+                    <div className="px-5 pb-3 flex gap-2 items-center fade-up">
+                      <input type="number" value={sfAmount} onChange={e => setSfAmount(e.target.value)} placeholder="المبلغ"
+                        className="flex-1 px-3 py-2 rounded-lg border border-[#3D8C5A] text-sm focus:outline-none" autoFocus />
+                      <button onClick={() => {
+                        const a = Number(sfAmount); if (!a) return;
+                        sFinGoals(finGoals.map(x => x.id === g.id ? { ...x, savedSoFar: x.savedSoFar + a } : x));
+                        const aid = accounts[0]?.id || "";
+                        const savPkt = pockets.find(p => p.type === "savings");
+                        if (savPkt) { sTxs([{ id: Date.now().toString(), title: `ادخار: ${g.title}`, amount: a, type: "expense", category: "ادخار", accountId: aid, pocketId: savPkt.id, date: new Date().toISOString().slice(0, 10) } as Transaction, ...txs]); }
+                        setShowSaveForm(null); setSfAmount("");
+                      }} className="px-3 py-2 rounded-lg text-xs font-bold text-white bg-[#3D8C5A]">حفظ</button>
+                      <button onClick={() => setShowSaveForm(null)} className="px-2 py-2 rounded-lg text-xs text-[#6B7280] bg-gray-100">✕</button>
+                    </div>
+                  )}
+
                   {/* تفاصيل البنود */}
                   <div className="border-t border-gray-100 px-5 py-3 bg-gray-50/50">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[11px] font-semibold text-[#16213E]">تفاصيل التكلفة</p>
-                      <button onClick={() => {
-                        const name = prompt("اسم البند (مثال: دفعة أولى، تأمين، رسوم)"); if (!name) return;
-                        const cost = prompt("التكلفة"); if (!cost) return;
-                        sFinGoals(finGoals.map(x => x.id === g.id ? { ...x, items: [...x.items, { name, cost: Number(cost) || 0 }] } : x));
-                      }} className="text-[10px] text-[#D4AF37] hover:underline">+ بند</button>
+                      <button onClick={() => { setShowItemForm(g.id); setIfName(""); setIfCost(""); }} className="text-[10px] text-[#D4AF37] hover:underline">+ بند</button>
                     </div>
-                    {g.items.length === 0 && <p className="text-[10px] text-[#9CA3AF]">أضف بنود التكلفة لحساب المبلغ تلقائياً</p>}
+                    {showItemForm === g.id && (
+                      <div className="flex gap-2 items-center mb-2 fade-up">
+                        <input value={ifName} onChange={e => setIfName(e.target.value)} placeholder="اسم البند"
+                          className="flex-1 px-2 py-1.5 rounded-lg border border-[#D4AF37] text-xs focus:outline-none" autoFocus />
+                        <input type="number" value={ifCost} onChange={e => setIfCost(e.target.value)} placeholder="التكلفة"
+                          className="w-24 px-2 py-1.5 rounded-lg border border-[#D4AF37] text-xs focus:outline-none" />
+                        <button onClick={() => {
+                          if (!ifName.trim() || !ifCost) return;
+                          sFinGoals(finGoals.map(x => x.id === g.id ? { ...x, items: [...x.items, { name: ifName.trim(), cost: Number(ifCost) || 0 }] } : x));
+                          setShowItemForm(null); setIfName(""); setIfCost("");
+                        }} className="px-2 py-1.5 rounded-lg text-[10px] font-bold text-white" style={{ background: "#D4AF37" }}>+</button>
+                        <button onClick={() => setShowItemForm(null)} className="text-[10px] text-[#6B7280]">✕</button>
+                      </div>
+                    )}
+                    {g.items.length === 0 && !showItemForm && <p className="text-[10px] text-[#9CA3AF]">أضف بنود التكلفة لحساب المبلغ تلقائياً</p>}
                     {g.items.map((item, i) => (
                       <div key={i} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-0">
                         <span className="text-xs text-[#16213E]">{item.name}</span>
@@ -1275,23 +1371,25 @@ export default function FinancePage() {
             : 0;
           const goldProfit = avgBuyPrice > 0 ? Math.round(((goldPrice || 310) - avgBuyPrice) * zakatData.goldGrams) : 0;
 
-          function addGoldTx(isSell: boolean) {
-            const grams = prompt(isSell ? "كم جرام تبيع؟" : "كم جرام تشتري؟"); if (!grams) return;
-            const price = prompt("سعر الجرام (ريال)؟"); if (!price) return;
-            const notes = prompt("ملاحظات (اختياري)") || "";
-            const g = Number(grams); const p = Number(price);
+          const [goldForm, setGoldForm] = useState<"buy"|"sell"|null>(null);
+          const [gfGrams, setGfGrams] = useState(""); const [gfPrice, setGfPrice] = useState(""); const [gfNotes, setGfNotes] = useState("");
+
+          function submitGoldTx() {
+            const g = Number(gfGrams); const p = Number(gfPrice);
             if (!g || !p) return;
+            const isSell = goldForm === "sell";
             const purchase: GoldPurchase = {
               id: Date.now().toString(), grams: isSell ? -g : g, pricePerGram: p,
-              totalCost: Math.round(g * p), date: new Date().toISOString().slice(0, 10), notes: (isSell ? "بيع" : "شراء") + (notes ? ` · ${notes}` : ""),
+              totalCost: Math.round(g * p), date: new Date().toISOString().slice(0, 10), notes: (isSell ? "بيع" : "شراء") + (gfNotes ? ` · ${gfNotes}` : ""),
             };
             sZakat({ ...zakatData, goldGrams: zakatData.goldGrams + (isSell ? -g : g), goldPurchases: [purchase, ...zakatData.goldPurchases] });
+            setGoldForm(null); setGfGrams(""); setGfPrice(""); setGfNotes("");
           }
 
           return (
             <section className="space-y-5">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Stat label="سعر الجرام الآن" value={goldPrice || 310} color="#D4AF37" sub="ريال / 24 قيراط" />
+                <Stat label="سعر الجرام الآن" value={goldPrice || 552} color="#D4AF37" sub="ريال / 24 قيراط" />
                 <Stat label="إجمالي الذهب" value={zakatData.goldGrams} color="#D4AF37" sub="جرام" />
                 <Stat label="القيمة الحالية" value={goldValue} color="#D4AF37" sub="ريال" />
                 <Stat label={goldProfit >= 0 ? "الربح" : "الخسارة"} value={Math.abs(goldProfit)} color={goldProfit >= 0 ? "#3D8C5A" : "#DC2626"} sub="ريال" />
@@ -1311,9 +1409,27 @@ export default function FinancePage() {
               </div>
 
               <div className="flex gap-2">
-                <button onClick={() => addGoldTx(false)} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "#3D8C5A" }}>🪙 شراء ذهب</button>
-                <button onClick={() => addGoldTx(true)} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "#DC2626" }}>💰 بيع ذهب</button>
+                <button onClick={() => { setGoldForm("buy"); setGfPrice(String(goldPrice || "")); }} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "#3D8C5A" }}>🪙 شراء ذهب</button>
+                <button onClick={() => { setGoldForm("sell"); setGfPrice(String(goldPrice || "")); }} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "#DC2626" }}>💰 بيع ذهب</button>
               </div>
+
+              {goldForm && (
+                <div className="bg-white rounded-xl p-5 border shadow-sm fade-up space-y-3" style={{ borderColor: goldForm === "buy" ? "#3D8C5A" : "#DC2626" }}>
+                  <p className="font-bold text-sm" style={{ color: goldForm === "buy" ? "#3D8C5A" : "#DC2626" }}>{goldForm === "buy" ? "🪙 شراء ذهب" : "💰 بيع ذهب"}</p>
+                  <input type="number" value={gfGrams} onChange={e => setGfGrams(e.target.value)} placeholder="عدد الجرامات"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" autoFocus />
+                  <input type="number" value={gfPrice} onChange={e => setGfPrice(e.target.value)} placeholder="سعر الجرام (ريال)"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                  {gfGrams && gfPrice && <p className="text-xs text-[#6B7280]">الإجمالي: <b className="text-[#D4AF37]">{(Number(gfGrams) * Number(gfPrice)).toLocaleString()} ريال</b></p>}
+                  <input value={gfNotes} onChange={e => setGfNotes(e.target.value)} placeholder="ملاحظات (اختياري)"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                  <div className="flex gap-2">
+                    <button onClick={() => setGoldForm(null)} className="flex-1 py-2.5 rounded-xl text-sm text-[#6B7280] bg-gray-100">إلغاء</button>
+                    <button onClick={submitGoldTx} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white"
+                      style={{ background: goldForm === "buy" ? "#3D8C5A" : "#DC2626" }}>تأكيد</button>
+                  </div>
+                </div>
+              )}
 
               <GeometricDivider label="سجل العمليات" />
               {zakatData.goldPurchases.length === 0 && <p className="text-center text-[#9CA3AF] text-xs py-4">لا توجد عمليات</p>}
