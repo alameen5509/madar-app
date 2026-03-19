@@ -498,6 +498,176 @@ export default function StatsPage() {
         <GeometricDivider label="تحليل المهام المتقدم" />
         <TaskAnalysisReport tasks={tasks} />
 
+        {/* ── Streak Heatmap — المهام والعادات ── */}
+        <GeometricDivider label="خريطة الإنجاز (آخر 4 أشهر)" />
+        {(() => {
+          // Build completion map from tasks
+          const dayMap = new Map<string, number>();
+          tasks.filter(t => t.completedAt).forEach(t => {
+            const d = t.completedAt!.slice(0, 10);
+            dayMap.set(d, (dayMap.get(d) ?? 0) + 1);
+          });
+          // Add habits from focus log
+          try {
+            const log = JSON.parse(localStorage.getItem("madar_focus_log") ?? "[]");
+            log.forEach((e: { date: string }) => dayMap.set(e.date, (dayMap.get(e.date) ?? 0) + 1));
+          } catch {}
+
+          // Generate last 120 days
+          const days: { date: string; count: number; dayOfWeek: number }[] = [];
+          for (let i = 119; i >= 0; i--) {
+            const d = new Date(Date.now() - i * 86400000);
+            const ds = d.toISOString().slice(0, 10);
+            days.push({ date: ds, count: dayMap.get(ds) ?? 0, dayOfWeek: d.getDay() });
+          }
+          const maxCount = Math.max(...days.map(d => d.count), 1);
+
+          // Best streak
+          let bestStreak = 0, currentStreak = 0, bestStart = "", bestEnd = "";
+          let csStart = "";
+          for (const d of days) {
+            if (d.count > 0) {
+              if (currentStreak === 0) csStart = d.date;
+              currentStreak++;
+              if (currentStreak > bestStreak) { bestStreak = currentStreak; bestStart = csStart; bestEnd = d.date; }
+            } else { currentStreak = 0; }
+          }
+
+          // Current streak (from today backwards)
+          let nowStreak = 0;
+          for (let i = days.length - 1; i >= 0; i--) {
+            if (days[i].count > 0) nowStreak++; else break;
+          }
+
+          // Weeks for grid
+          const weeks: typeof days[] = [];
+          let week: typeof days = [];
+          for (const d of days) {
+            week.push(d);
+            if (d.dayOfWeek === 6) { weeks.push(week); week = []; }
+          }
+          if (week.length > 0) weeks.push(week);
+
+          const dayLabels = ["أحد", "", "ثلا", "", "خمي", "", "سبت"];
+
+          function getColor(count: number): string {
+            if (count === 0) return "var(--card-border, #E5E7EB)";
+            const intensity = Math.min(1, count / maxCount);
+            if (intensity < 0.25) return "#9B8FD450";
+            if (intensity < 0.5) return "#9B8FD480";
+            if (intensity < 0.75) return "#5E5495";
+            return "#D4AF37";
+          }
+
+          return (
+            <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-4">
+              {/* Streak stats */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="text-center p-3 rounded-xl bg-purple-50">
+                  <p className="text-2xl font-black text-[#5E5495]">{nowStreak}</p>
+                  <p className="text-[10px] text-[#5E5495]">🔥 سلسلة حالية</p>
+                </div>
+                <div className="text-center p-3 rounded-xl bg-amber-50">
+                  <p className="text-2xl font-black text-[#D4AF37]">{bestStreak}</p>
+                  <p className="text-[10px] text-[#D4AF37]">أفضل سلسلة</p>
+                </div>
+                <div className="text-center p-3 rounded-xl bg-green-50">
+                  <p className="text-2xl font-black text-[#3D8C5A]">{days.filter(d => d.count > 0).length}</p>
+                  <p className="text-[10px] text-[#3D8C5A]">أيام نشطة / 120</p>
+                </div>
+              </div>
+              {bestStreak > 1 && bestStart && (
+                <p className="text-[10px] text-center" style={{ color: "var(--muted)" }}>
+                  أفضل سلسلة: {bestStreak} يوم ({new Date(bestStart).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })} — {new Date(bestEnd).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })})
+                </p>
+              )}
+
+              {/* Heatmap grid */}
+              <div className="overflow-x-auto">
+                <div className="flex gap-0.5" style={{ direction: "ltr", minWidth: "fit-content" }}>
+                  {/* Day labels */}
+                  <div className="flex flex-col gap-0.5 mr-1">
+                    {dayLabels.map((l, i) => (
+                      <div key={i} className="h-3 flex items-center">
+                        <span className="text-[8px]" style={{ color: "var(--muted)" }}>{l}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {weeks.map((w, wi) => (
+                    <div key={wi} className="flex flex-col gap-0.5">
+                      {Array.from({ length: 7 }, (_, di) => {
+                        const d = w.find(x => x.dayOfWeek === di);
+                        if (!d) return <div key={di} className="w-3 h-3" />;
+                        return (
+                          <div key={di} className="w-3 h-3 rounded-sm transition-all" title={`${d.date}: ${d.count} إنجاز`}
+                            style={{ background: getColor(d.count) }} />
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Legend */}
+              <div className="flex items-center justify-center gap-1 mt-2">
+                <span className="text-[8px]" style={{ color: "var(--muted)" }}>أقل</span>
+                {[0, 1, 2, 3, 4].map(i => (
+                  <div key={i} className="w-3 h-3 rounded-sm" style={{ background: getColor(i === 0 ? 0 : (i / 4) * maxCount) }} />
+                ))}
+                <span className="text-[8px]" style={{ color: "var(--muted)" }}>أكثر</span>
+              </div>
+
+              {/* Month labels */}
+              <div className="flex justify-between px-4">
+                {(() => {
+                  const months: string[] = [];
+                  for (let i = 3; i >= 0; i--) {
+                    const d = new Date(); d.setMonth(d.getMonth() - i);
+                    months.push(d.toLocaleDateString("ar-SA", { month: "short" }));
+                  }
+                  return months.map((m, i) => <span key={i} className="text-[9px]" style={{ color: "var(--muted)" }}>{m}</span>);
+                })()}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── Frequency by Day of Week ── */}
+        <GeometricDivider label="تردد الإنجاز حسب اليوم" />
+        {(() => {
+          const dayNames = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+          const dayCounts = new Array(7).fill(0);
+          tasks.filter(t => t.completedAt).forEach(t => {
+            dayCounts[new Date(t.completedAt!).getDay()]++;
+          });
+          try {
+            const log = JSON.parse(localStorage.getItem("madar_focus_log") ?? "[]");
+            log.forEach((e: { ts: number }) => dayCounts[new Date(e.ts).getDay()]++);
+          } catch {}
+          const maxDay = Math.max(...dayCounts, 1);
+          const bestDayIdx = dayCounts.indexOf(Math.max(...dayCounts));
+
+          return (
+            <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-3">
+              {dayNames.map((name, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="text-xs w-14 text-left" style={{ color: i === bestDayIdx ? "#D4AF37" : "var(--muted)", fontWeight: i === bestDayIdx ? 700 : 400 }}>{name}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{
+                      width: `${Math.round((dayCounts[i] / maxDay) * 100)}%`,
+                      background: i === bestDayIdx ? "#D4AF37" : "#5E5495",
+                    }} />
+                  </div>
+                  <span className="text-xs font-bold w-8 text-left" style={{ color: i === bestDayIdx ? "#D4AF37" : "#5E5495" }}>{dayCounts[i]}</span>
+                </div>
+              ))}
+              <p className="text-[10px] text-center" style={{ color: "var(--muted)" }}>
+                أكثر يوم إنتاجية: <span className="font-bold" style={{ color: "#D4AF37" }}>{dayNames[bestDayIdx]}</span> ({dayCounts[bestDayIdx]} إنجاز)
+              </p>
+            </div>
+          );
+        })()}
+
         <div className="pb-4"><GeometricDivider /></div>
       </div>
     </main>
