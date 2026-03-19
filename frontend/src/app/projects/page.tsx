@@ -148,7 +148,10 @@ export default function ProjectsPage() {
                           onClick={() => setSelected(g)}
                           className="rounded-xl border p-3 cursor-pointer hover:shadow-md transition-all"
                           style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-                          <p className="font-semibold text-sm mb-1" style={{ color: "var(--text)" }}>{g.title}</p>
+                          <div className="flex items-center gap-1.5 mb-1">
+                            {g.description?.includes("[tech]") && <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ background: "#2D6B9E20", color: "#2D6B9E" }}>💻 تقني</span>}
+                            <p className="font-semibold text-sm" style={{ color: "var(--text)" }}>{g.title}</p>
+                          </div>
                           <div className="flex items-center gap-2 flex-wrap">
                             {circle && (
                               <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: `${circle.colorHex ?? "#666"}15`, color: circle.colorHex ?? "var(--muted)" }}>
@@ -257,18 +260,26 @@ function NewProjectDialog({ circles, onClose, onCreated }: {
   const [desc, setDesc] = useState("");
   const [circleId, setCircleId] = useState("");
   const [targetDate, setTargetDate] = useState("");
+  const [isTech, setIsTech] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [creating, setCreating] = useState(false);
 
   async function handleCreate() {
     if (!title.trim()) return;
     setCreating(true);
     try {
+      const fullDesc = [desc.trim(), isTech ? "[tech]" : ""].filter(Boolean).join(" ") || undefined;
       await createGoal({
         title: title.trim(),
-        description: desc.trim() || undefined,
+        description: fullDesc,
         targetDate: targetDate || undefined,
         lifeCircleId: circleId || undefined,
       });
+      // Save as template if user wants
+      if (typeof window !== "undefined" && title.trim()) {
+        const templates = JSON.parse(localStorage.getItem("madar_project_templates") ?? "[]");
+        // Don't auto-save, templates are saved manually
+      }
       onCreated();
       onClose();
     } catch {} finally { setCreating(false); }
@@ -283,6 +294,31 @@ function NewProjectDialog({ circles, onClose, onCreated }: {
           <button onClick={onClose} style={{ color: "var(--muted)" }}>✕</button>
         </div>
         <div className="px-6 py-5 space-y-4">
+          {/* Templates */}
+          <div>
+            <button onClick={() => setShowTemplates(!showTemplates)}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg border transition"
+              style={{ borderColor: "var(--card-border)", color: "#D4AF37" }}>
+              {showTemplates ? "✕ إغلاق القوالب" : "📋 استخدام قالب"}
+            </button>
+            {showTemplates && (() => {
+              const templates: {name: string; desc: string; isTech: boolean}[] = JSON.parse(
+                typeof window !== "undefined" ? localStorage.getItem("madar_project_templates") ?? "[]" : "[]"
+              );
+              return templates.length > 0 ? (
+                <div className="mt-2 space-y-1">
+                  {templates.map((t, i) => (
+                    <button key={i} onClick={() => { setTitle(t.name); setDesc(t.desc); setIsTech(t.isTech); setShowTemplates(false); }}
+                      className="w-full text-right px-3 py-2 rounded-lg text-sm border transition hover:border-[#D4AF37]"
+                      style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }}>
+                      {t.isTech ? "💻" : "📁"} {t.name}
+                    </button>
+                  ))}
+                </div>
+              ) : <p className="text-xs mt-2" style={{ color: "var(--muted)" }}>لا توجد قوالب — أنشئ مشروعاً واحفظه كقالب</p>;
+            })()}
+          </div>
+
           <input value={title} onChange={e => setTitle(e.target.value)} placeholder="اسم المشروع *" autoFocus
             className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle} />
           <textarea value={desc} onChange={e => setDesc(e.target.value)} placeholder="وصف (اختياري)" rows={2}
@@ -294,11 +330,37 @@ function NewProjectDialog({ circles, onClose, onCreated }: {
           </select>
           <input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)}
             className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle} />
+
+          {/* Tech toggle */}
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer flex-1">
+              <div onClick={() => setIsTech(!isTech)}
+                className="relative w-10 h-5 rounded-full transition-all flex-shrink-0"
+                style={{ background: isTech ? "#2D6B9E" : "var(--card-border)" }}>
+                <div className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all"
+                  style={{ right: isTech ? "0.125rem" : "1.25rem" }} />
+              </div>
+              <span className="text-sm" style={{ color: "var(--text)" }}>💻 مشروع تقني</span>
+            </label>
+          </div>
+
           <div className="flex gap-2 pt-1">
             <button onClick={handleCreate} disabled={creating || !title.trim()}
               className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-40"
               style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
               {creating ? "جارٍ الإنشاء..." : "إنشاء المشروع"}
+            </button>
+            <button onClick={() => {
+              if (!title.trim()) return;
+              const templates = JSON.parse(localStorage.getItem("madar_project_templates") ?? "[]");
+              templates.push({ name: title.trim(), desc: desc.trim(), isTech });
+              localStorage.setItem("madar_project_templates", JSON.stringify(templates));
+              alert("تم حفظ القالب ✓");
+            }}
+              disabled={!title.trim()}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold border disabled:opacity-40"
+              style={{ borderColor: "#D4AF37", color: "#D4AF37" }}>
+              حفظ كقالب
             </button>
             <button onClick={onClose} className="px-4 py-2.5 rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button>
           </div>

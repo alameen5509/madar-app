@@ -130,7 +130,7 @@ function toRow(t: SmartTask, circleOrderMap?: Map<string, number>): TaskRow {
     priority: priorityLabel(t.userPriority),
     done:     t.status === "Completed",
     isInbox:  t.status === "Inbox",
-    isWork:   t.contextNote === "work",
+    isWork:   !!(t.contextNote?.includes("work")),
     isRecurring: t.isRecurring ?? false,
     recurrenceRule: t.recurrenceRule,
     description: t.description,
