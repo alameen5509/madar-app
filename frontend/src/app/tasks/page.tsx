@@ -1830,11 +1830,12 @@ export default function TasksPage() {
             <div className="flex gap-2 w-full">
               {focusTask && (
                 <button onClick={() => {
+                  const wasWork = focusTask.isWork;
                   toggle(focusTask.id, false);
                   localStorage.removeItem(`madar_task_time_${focusTask.id}`);
-                  // انتقل للمهمة التالية ما دامت الجلسة مستمرة
-                  const currentIdx = pendingTasks.findIndex(t => t.id === focusTask.id);
-                  const nextTask = pendingTasks.filter(t => t.id !== focusTask.id)[0];
+                  // اختر المهمة التالية من نفس النوع (تقنية بدل تقنية)
+                  const sameType = pendingTasks.filter(t => t.id !== focusTask.id && t.isWork === wasWork);
+                  const nextTask = sameType[0] ?? pendingTasks.filter(t => t.id !== focusTask.id)[0];
                   if (nextTask && timeLeft > 0) {
                     setFocusTaskId(nextTask.id);
                     const saved = Number(localStorage.getItem(`madar_task_time_${nextTask.id}`) ?? "0");
@@ -1848,6 +1849,24 @@ export default function TasksPage() {
                   className="flex-1 py-3 rounded-xl text-sm font-bold transition hover:opacity-90"
                   style={{ background: "linear-gradient(135deg, #C9A84C, #E8C96A)", color: "#1A1830" }}>
                   أنجزتها ✓
+                </button>
+              )}
+              {focusTask && (
+                <button onClick={() => {
+                  // تبديل لمهمة من النوع الآخر (تقنية ↔ شخصية)
+                  localStorage.setItem(`madar_task_time_${focusTask.id}`, String(taskElapsed));
+                  const otherType = pendingTasks.filter(t => t.id !== focusTask.id && t.isWork !== focusTask.isWork);
+                  const switchTo = otherType[0];
+                  if (switchTo) {
+                    setFocusTaskId(switchTo.id);
+                    const saved = Number(localStorage.getItem(`madar_task_time_${switchTo.id}`) ?? "0");
+                    setTaskElapsed(saved);
+                  }
+                }}
+                  disabled={!pendingTasks.some(t => t.id !== focusTask.id && t.isWork !== focusTask.isWork)}
+                  className="py-3 px-4 rounded-xl text-sm font-bold border transition hover:opacity-90 disabled:opacity-30"
+                  style={{ borderColor: "#2ABFBF40", color: "#2ABFBF" }}>
+                  ↔ تبديل
                 </button>
               )}
               {focusTask && (
@@ -2163,38 +2182,52 @@ export default function TasksPage() {
                 : nightWorkEnabled ? `عمل ليلي — ${nightWorkMins} دقيقة بعد العشاء` : "انتهى وقت العمل — بعد صلاة العشاء"}
             </p>
 
-            {/* Next task suggestion — one at a time */}
+            {/* Dual task suggestion — tech + non-tech */}
             {pendingTasks.length > 0 ? (() => {
-              const skipCount = typeof window !== "undefined" ? Number(sessionStorage.getItem("madar_skip") ?? "0") : 0;
-              const nextTask = pendingTasks[skipCount % pendingTasks.length];
+              const techTasks = pendingTasks.filter(t => t.isWork);
+              const nonTechTasks = pendingTasks.filter(t => !t.isWork);
+              const techTask = techTasks[0] ?? null;
+              const nonTechTask = nonTechTasks[0] ?? null;
+              const dualTasks = [techTask, nonTechTask].filter(Boolean) as typeof pendingTasks;
+              if (dualTasks.length === 0) return null;
+
+              function TaskCard({ task, label, color, accent }: { task: typeof pendingTasks[0]; label: string; color: string; accent: string }) {
+                return (
+                  <div className="w-full rounded-xl border overflow-hidden" style={{ borderColor: accent + "40" }}>
+                    <div className="px-3 py-1.5 text-[10px] font-bold" style={{ background: accent + "15", color: accent }}>{label}</div>
+                    <div className="px-4 py-3" style={{ background: "var(--card)" }}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${P_COLORS[task.priority]}`}>{task.priority}</span>
+                        <span className="flex-1 text-sm font-semibold truncate" style={{ color: "var(--text)" }}>{task.title}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px]" style={{ color: "var(--muted)" }}>
+                        {task.circleColor ? (
+                          <span className="px-1.5 py-0.5 rounded-full" style={{ background: `${task.circleColor}15`, color: task.circleColor }}>{task.circle}</span>
+                        ) : <span>{task.circle}</span>}
+                      </div>
+                      <button onClick={() => startFocus(task.id)}
+                        disabled={!inWorkTime || inAdhan}
+                        className="w-full mt-2 py-2 rounded-lg text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-40"
+                        style={{ background: `linear-gradient(135deg, ${accent}, ${color})` }}>
+                        ابدأ التركيز
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div className="w-full space-y-3">
-                  <p className="text-xs text-center" style={{ color: "var(--muted)" }}>المهمة التالية:</p>
-                  <div className="w-full px-5 py-4 rounded-xl border border-[#E2D5B0]" style={{ background: "var(--card)" }}>
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${P_COLORS[nextTask.priority]}`}>{nextTask.priority}</span>
-                      <span className="flex-1 text-base font-semibold" style={{ color: "var(--text)" }}>{nextTask.title}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs" style={{ color: "var(--muted)" }}>
-                      {nextTask.circleColor ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px]" style={{ background: `${nextTask.circleColor}15`, color: nextTask.circleColor }}>{nextTask.circle}</span>
-                      ) : <span>{nextTask.circle}</span>}
-                      {nextTask.context !== "Anywhere" && <span>{TASK_CONTEXTS.find(c=>c.key===nextTask.context)?.icon} {TASK_CONTEXTS.find(c=>c.key===nextTask.context)?.label}</span>}
-                    </div>
+                  <p className="text-xs text-center" style={{ color: "var(--muted)" }}>اختر مهمتك:</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {techTask && <TaskCard task={techTask} label="💼 تقنية / عمل" color="#C9A84C" accent="#2D6B9E" />}
+                    {nonTechTask && <TaskCard task={nonTechTask} label="🌿 شخصية / أدوار" color="#C9A84C" accent="#3D8C5A" />}
                   </div>
-                  <div className="flex gap-2 w-full">
-                    <button onClick={() => startFocus(nextTask.id)}
-                      disabled={!inWorkTime || inAdhan}
-                      className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-40"
-                      style={{ background: "linear-gradient(135deg, #5E5495, #C9A84C)" }}>
-                      ابدأ التركيز
-                    </button>
-                    <button onClick={() => { sessionStorage.setItem("madar_skip", String(skipCount + 1)); setSessionCount(s => s); }}
-                      className="px-5 py-3 rounded-xl text-sm font-semibold border border-[#E2D5B0] transition hover:bg-[#5E5495]/5"
-                      style={{ color: "var(--muted)" }}>
-                      تخطي ←
-                    </button>
-                  </div>
+                  {dualTasks.length === 1 && (
+                    <p className="text-[10px] text-center" style={{ color: "var(--muted)" }}>
+                      {techTask ? "لا توجد مهام شخصية — أضف من أدوار الحياة" : "لا توجد مهام عمل — أضف مهمة عمل"}
+                    </p>
+                  )}
                   <button onClick={() => startFocus()}
                     disabled={!inWorkTime || inAdhan}
                     className="text-xs transition disabled:opacity-40 w-full text-center" style={{ color: "var(--muted)" }}>
