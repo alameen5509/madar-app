@@ -58,6 +58,27 @@ export default function ProjectsPage() {
   const [showNew, setShowNew] = useState(false);
   const [selected, setSelected] = useState<Goal | null>(null);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  function toggleProjectSelect(id: string) {
+    setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+  }
+
+  async function bulkProjectAction(action: "Active" | "Paused" | "Completed" | "Archived" | "delete") {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const label = action === "delete" ? "حذف" : STATUS_LABEL[action] ?? action;
+    if (!confirm(`${label} ${ids.length} مشروع؟`)) return;
+    if (action === "delete") {
+      await Promise.all(ids.map(id => deleteGoal(id).catch(() => {})));
+    } else {
+      await Promise.all(ids.map(id => updateGoal(id, { status: action }).catch(() => {})));
+    }
+    setSelectedIds(new Set());
+    setBulkMode(false);
+    fetchData();
+  }
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -112,6 +133,11 @@ export default function ProjectsPage() {
                 </button>
               ))}
             </div>
+            <button onClick={() => { setBulkMode(!bulkMode); setSelectedIds(new Set()); }}
+              className="px-3 py-2 rounded-xl text-sm font-semibold transition"
+              style={{ background: bulkMode ? "#DC2626" : "var(--bg)", color: bulkMode ? "#fff" : "var(--muted)", border: `1px solid ${bulkMode ? "#DC2626" : "var(--card-border)"}` }}>
+              {bulkMode ? "✕ إلغاء" : "☑ تحديد"}
+            </button>
             <button onClick={() => setShowNew(true)}
               className="px-5 py-2 rounded-xl text-sm font-bold text-white hover:opacity-90 transition"
               style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
@@ -119,6 +145,21 @@ export default function ProjectsPage() {
             </button>
           </div>
         </div>
+        {/* Bulk action bar */}
+        {bulkMode && selectedIds.size > 0 && (
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <span className="text-xs font-bold" style={{ color: "var(--text)" }}>{selectedIds.size} محدد</span>
+            <div className="flex-1" />
+            {STAGES.map(s => (
+              <button key={s.key} onClick={() => bulkProjectAction(s.key as "Active")}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: s.color }}>
+                {s.icon} {s.label}
+              </button>
+            ))}
+            <button onClick={() => bulkProjectAction("delete")}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold text-red-600 bg-red-50 border border-red-200">حذف</button>
+          </div>
+        )}
       </header>
 
       <div className="px-6 py-5">
@@ -157,11 +198,11 @@ export default function ProjectsPage() {
                     {stageGoals.map(g => {
                       const circle = g.lifeCircle ? circleMap.get(g.lifeCircle.id) : undefined;
                       return (
-                        <div key={g.id} draggable
-                          onDragStart={e => { e.dataTransfer.setData("text/plain", g.id); e.dataTransfer.effectAllowed = "move"; }}
-                          onClick={() => setSelected(g)}
-                          className="rounded-xl border p-3 cursor-pointer hover:shadow-md transition-all"
-                          style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+                        <div key={g.id} draggable={!bulkMode}
+                          onDragStart={e => { if (!bulkMode) { e.dataTransfer.setData("text/plain", g.id); e.dataTransfer.effectAllowed = "move"; } }}
+                          onClick={() => bulkMode ? toggleProjectSelect(g.id) : setSelected(g)}
+                          className={`rounded-xl border p-3 cursor-pointer hover:shadow-md transition-all ${selectedIds.has(g.id) ? "ring-2 ring-[#5E5495]" : ""}`}
+                          style={{ background: "var(--card)", borderColor: selectedIds.has(g.id) ? "#5E5495" : "var(--card-border)" }}>
                           <div className="flex items-center gap-1.5 mb-1">
                             {(() => { const s = getProjectScore(g.description); return s !== null ? (
                               <span className="text-[10px] px-1.5 py-0.5 rounded-full font-black" style={{ background: scoreColor(s) + "18", color: scoreColor(s) }}>{s}</span>
@@ -206,9 +247,14 @@ export default function ProjectsPage() {
               const circle = g.lifeCircle ? circleMap.get(g.lifeCircle.id) : undefined;
               const stageInfo = STAGES.find(s => s.key === g.status);
               return (
-                <div key={g.id} onClick={() => setSelected(g)}
-                  className="flex items-center gap-4 px-5 py-4 rounded-xl border cursor-pointer hover:border-[#D4AF37] transition"
-                  style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+                <div key={g.id} onClick={() => bulkMode ? toggleProjectSelect(g.id) : setSelected(g)}
+                  className={`flex items-center gap-4 px-5 py-4 rounded-xl border cursor-pointer hover:border-[#D4AF37] transition ${selectedIds.has(g.id) ? "ring-2 ring-[#5E5495]" : ""}`}
+                  style={{ background: "var(--card)", borderColor: selectedIds.has(g.id) ? "#5E5495" : "var(--card-border)" }}>
+                  {bulkMode && (
+                    <div className={`w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center ${selectedIds.has(g.id) ? "bg-[#5E5495] border-[#5E5495]" : "border-[#D4AF37] bg-transparent"}`}>
+                      {selectedIds.has(g.id) && <span className="text-white text-[10px]">✓</span>}
+                    </div>
+                  )}
                   <span className="text-lg">{stageInfo?.icon}</span>
                   <div className="flex-1">
                     <div className="flex items-center gap-1.5">
