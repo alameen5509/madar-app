@@ -605,6 +605,8 @@ export default function FinancePage() {
   const [showNewPocket, setShowNewPocket] = useState(false);
   const [npName, setNpName] = useState(""); const [npIcon, setNpIcon] = useState("👤"); const [npType, setNpType] = useState<Pocket["type"]>("personal");
   const [showAddCommit, setShowAddCommit] = useState<string | null>(null);
+  const [editAcctId, setEditAcctId] = useState<string | null>(null);
+  const [editAcctBal, setEditAcctBal] = useState("");
   const [showTransfer, setShowTransfer]   = useState(false);
   const [trFrom, setTrFrom] = useState(""); const [trTo, setTrTo] = useState(""); const [trAmt, setTrAmt] = useState("");
   const [ncTitle, setNcTitle] = useState(""); const [ncAmount, setNcAmount] = useState(""); const [ncTotal, setNcTotal] = useState(""); const [ncDay, setNcDay] = useState("1");
@@ -928,13 +930,31 @@ export default function FinancePage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {accounts.map((a) => (
-                <div key={a.id} className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm flex items-center gap-4">
-                  <span className="text-3xl">{a.icon}</span>
-                  <div className="flex-1">
-                    <p className="font-bold text-sm text-[#16213E]">{a.name}</p>
-                    <p className="text-xl font-black mt-1" style={{ color: a.balance >= 0 ? "#3D8C5A" : "#DC2626" }}>{a.balance.toLocaleString()} <span className="text-[10px] text-[#9CA3AF]">ريال</span></p>
+                <div key={a.id} className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <span className="text-3xl">{a.icon}</span>
+                    <div className="flex-1">
+                      <p className="font-bold text-sm text-[#16213E]">{a.name}</p>
+                      {editAcctId === a.id ? (
+                        <div className="flex items-center gap-2 mt-1">
+                          <input type="number" value={editAcctBal} onChange={(e) => setEditAcctBal(e.target.value)}
+                            className="w-28 px-2 py-1 rounded-lg border border-[#D4AF37] text-sm font-bold focus:outline-none" autoFocus
+                            onKeyDown={(e) => { if (e.key === "Enter") { sAccts(accounts.map(x => x.id === a.id ? { ...x, balance: Number(editAcctBal) || 0 } : x)); setEditAcctId(null); } }} />
+                          <button onClick={() => { sAccts(accounts.map(x => x.id === a.id ? { ...x, balance: Number(editAcctBal) || 0 } : x)); setEditAcctId(null); }}
+                            className="text-[10px] px-2 py-1 rounded-lg bg-[#3D8C5A] text-white font-bold">حفظ</button>
+                          <button onClick={() => setEditAcctId(null)} className="text-[10px] px-2 py-1 rounded-lg bg-gray-100 text-[#6B7280]">✕</button>
+                        </div>
+                      ) : (
+                        <p className="text-xl font-black mt-1 cursor-pointer hover:opacity-70 transition"
+                          onClick={() => { setEditAcctId(a.id); setEditAcctBal(String(a.balance)); }}
+                          title="انقر لتعديل الرصيد"
+                          style={{ color: a.balance >= 0 ? "#3D8C5A" : "#DC2626" }}>
+                          {a.balance.toLocaleString()} <span className="text-[10px] text-[#9CA3AF]">ريال ✎</span>
+                        </p>
+                      )}
+                    </div>
+                    <button onClick={() => sAccts(accounts.filter((x) => x.id !== a.id))} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
                   </div>
-                  <button onClick={() => sAccts(accounts.filter((x) => x.id !== a.id))} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
                 </div>
               ))}
             </div>
