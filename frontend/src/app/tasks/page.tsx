@@ -1021,6 +1021,7 @@ function EditTaskDialog({ task, onClose, onSaved }: {
   const [isWork, setIsWork] = useState(task.isWork);
   const [isUrgent, setIsUrgent] = useState(task.isUrgent);
   const [isRecurring, setIsRecurring] = useState(task.isRecurring);
+  const [assignEmail, setAssignEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -1028,17 +1029,24 @@ function EditTaskDialog({ task, onClose, onSaved }: {
     if (!title.trim()) return;
     setLoading(true); setError("");
     try {
-      await api.patch(`/api/tasks/${task.id}/status`, { status: "Cancelled" });
-      await api.post("/api/tasks", {
-        title: title.trim(),
-        description: desc.trim() || undefined,
-        userPriority: priority,
-        dueDate: dueDate || undefined,
-        taskContext: context !== "Anywhere" ? context : undefined,
-        isWorkTask: isWork || undefined,
-        isUrgent: isUrgent || undefined,
-        isRecurring: isRecurring || undefined,
-      });
+      // إذا فيه تعيين لشخص، حوّل المهمة
+      if (assignEmail.trim()) {
+        const { assignTask } = await import("@/lib/api");
+        await assignTask(assignEmail.trim(), title.trim());
+        await api.patch(`/api/tasks/${task.id}/status`, { status: "Cancelled" });
+      } else {
+        await api.patch(`/api/tasks/${task.id}/status`, { status: "Cancelled" });
+        await api.post("/api/tasks", {
+          title: title.trim(),
+          description: desc.trim() || undefined,
+          userPriority: priority,
+          dueDate: dueDate || undefined,
+          taskContext: context !== "Anywhere" ? context : undefined,
+          isWorkTask: isWork || undefined,
+          isUrgent: isUrgent || undefined,
+          isRecurring: isRecurring || undefined,
+        });
+      }
       onSaved();
       onClose();
     } catch { setError("فشل الحفظ"); }
@@ -1123,6 +1131,15 @@ function EditTaskDialog({ task, onClose, onSaved }: {
               {task.circle}
             </span>
           </div>
+          {/* تعيين لشخص (اختياري) */}
+          <div>
+            <label className="block text-sm font-semibold mb-1.5" style={{ color: "var(--text)" }}>تعيين لشخص <span className="text-[10px] font-normal" style={{ color: "var(--muted)" }}>(اختياري)</span></label>
+            <input type="email" value={assignEmail} onChange={(e) => setAssignEmail(e.target.value)}
+              placeholder="البريد الإلكتروني للشخص"
+              className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
+              style={{ background: "var(--bg)", border: "1px solid var(--card-border)", color: "var(--text)" }} />
+            {assignEmail && <p className="text-[10px] mt-1" style={{ color: "#D4AF37" }}>سيتم إرسال المهمة للشخص وإلغاؤها من قائمتك</p>}
+          </div>
           {error && <p className="text-red-400 text-xs">{error}</p>}
           <div className="flex gap-3">
             <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
@@ -1130,7 +1147,7 @@ function EditTaskDialog({ task, onClose, onSaved }: {
             <button onClick={save} disabled={loading}
               className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-60"
               style={{ background: "linear-gradient(135deg, #5E5495, #C9A84C)" }}>
-              {loading ? "جارٍ الحفظ…" : "حفظ التعديلات"}
+              {loading ? "جارٍ الحفظ…" : assignEmail ? "تعيين وحفظ" : "حفظ التعديلات"}
             </button>
           </div>
           <button onClick={async () => {
@@ -2246,15 +2263,10 @@ export default function TasksPage() {
               className="px-3 py-2 rounded-lg text-sm font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
               متعدد
             </button>
-            <button onClick={() => setShowAssign(true)}
-              className="px-3 py-2 rounded-lg text-sm font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
-              📨
-            </button>
             <button onClick={() => setShowQuickFinance(true)}
               className="px-3 py-2 rounded-lg text-sm font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
               💰
-            </button>
-            <button
+            </button>            <button
               onClick={() => setShowMoodPanel(true)}
               className="px-3 py-2 rounded-xl text-sm font-semibold transition-all border"
               style={{
@@ -2290,21 +2302,25 @@ export default function TasksPage() {
               })()}
             </div>
             <div className="grid grid-cols-6" style={{ direction: "rtl" }}>
-              {prayers.map((p) => {
-                const passed = nowMinState > p.adhan;
-                const isNext = !passed && !prayers.slice(0, prayers.indexOf(p)).some((x) => nowMinState <= x.adhan);
-                const h = Math.floor(p.adhan / 60);
-                const m = p.adhan % 60;
-                const timeStr = `${h > 12 ? h - 12 : h}:${String(m).padStart(2, "0")} ${h >= 12 ? "م" : "ص"}`;
-                return (
-                  <div key={p.name} className="text-center py-3" style={{ background: isNext ? "var(--gold, #D4AF37)10" : "transparent", borderLeft: "1px solid var(--card-border)" }}>
-                    <p className="text-[10px] font-bold" style={{ color: passed ? "var(--muted)" : isNext ? "var(--gold)" : "var(--text)" }}>{p.name}</p>
-                    <p className="text-xs font-black tabular-nums" style={{ color: passed ? "var(--muted)" : isNext ? "var(--gold)" : "var(--primary)" }}>{timeStr}</p>
-                    {passed && <p className="text-[8px]" style={{ color: "var(--muted)" }}>✓</p>}
-                    {isNext && <p className="text-[8px]" style={{ color: "var(--gold)" }}>التالية</p>}
-                  </div>
-                );
-              })}
+              {(() => {
+                const now = nowMinState;
+                const nextIdx = prayers.findIndex((p) => p.adhan > now);
+                return prayers.map((p, i) => {
+                  const passed = now > p.adhan;
+                  const isNext = i === nextIdx;
+                  const h = Math.floor(p.adhan / 60);
+                  const m = p.adhan % 60;
+                  const timeStr = `${h > 12 ? h - 12 : h}:${String(m).padStart(2, "0")} ${h >= 12 ? "م" : "ص"}`;
+                  return (
+                    <div key={p.name} className="text-center py-3" style={{ background: isNext ? "var(--gold, #D4AF37)10" : "transparent", borderLeft: "1px solid var(--card-border)" }}>
+                      <p className="text-[10px] font-bold" style={{ color: passed ? "var(--muted)" : isNext ? "var(--gold)" : "var(--text)" }}>{p.name}</p>
+                      <p className="text-xs font-black tabular-nums" style={{ color: passed ? "var(--muted)" : isNext ? "var(--gold)" : "var(--primary)" }}>{timeStr}</p>
+                      {passed && <p className="text-[8px]" style={{ color: "var(--muted)" }}>✓</p>}
+                      {isNext && <p className="text-[8px]" style={{ color: "var(--gold)" }}>التالية</p>}
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         )}
