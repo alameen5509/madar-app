@@ -1230,7 +1230,6 @@ function TransferTaskDialog({ taskId, taskTitle, onClose, onDone }: {
 function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   prayers: Prayer[]; tasks: TaskRow[]; blockedPeriods: string[]; onBlockToggle: (name: string) => void;
 }) {
-  // مدة العادات من الإعدادات
   const habitDuration = (() => {
     try { return JSON.parse(localStorage.getItem("madar_settings") ?? "{}").habitDuration ?? 30; } catch { return 30; }
   })();
@@ -1240,7 +1239,8 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   const pending = allPending.filter(t => t.context !== "habit").sort((a, b) => {
     if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
     const typeOrder = (t: TaskRow) => t.isRecurring ? 0 : t.isWork ? 2 : 1;
-    return typeOrder(a) - typeOrder(b);
+    if (typeOrder(a) !== typeOrder(b)) return typeOrder(a) - typeOrder(b);
+    return a.circleOrder - b.circleOrder;
   });
 
   const periods = prayers.length >= 2 ? prayers.slice(0, -1).map((p, i) => {
@@ -1248,7 +1248,6 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     return { name: p.name, startMin: p.start, endMin: next.adhan, duration: next.adhan - p.start, blocked: blockedPeriods.includes(p.name) };
   }).filter(p => p.duration > 0) : [];
 
-  // فترات ليلية
   const ishaEnd = prayers.length > 0 ? prayers[prayers.length - 1].start : 21 * 60;
   const allPeriods = [
     ...periods,
@@ -1256,27 +1255,76 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     { name: "بعد منتصف الليل", startMin: 0, endMin: 2 * 60, duration: 120, blocked: !blockedPeriods.includes("بعد منتصف الليل_open") },
   ];
 
-  // العادات في أول فترة متاحة
   const now = nowMin();
-  const firstAvailable = [...allPeriods].sort((a, b) => {
+  // بيئة كل فترة (يمكن تخصيصها)
+  const [periodContexts, setPeriodContexts] = useState<Record<string, string>>({});
+
+  // ترتيب الفترات: الحالية/المستقبلية أولاً
+  const sortedPeriods = [...allPeriods].sort((a, b) => {
     const aIsPast = a.endMin <= now;
     const bIsPast = b.endMin <= now;
     if (aIsPast !== bIsPast) return aIsPast ? 1 : -1;
     return a.startMin - b.startMin;
-  }).find(p => !p.blocked);
+  });
+
+  const firstAvailable = sortedPeriods.find(p => !p.blocked);
   const habitPeriodName = firstAvailable?.name ?? "";
 
+  // توزيع: فترات مستقبلية فقط، مع مراعاة البيئة
   const remaining = [...pending];
-  const plan = allPeriods.map((period) => {
-    if (period.blocked) return { ...period, tasks: [] as TaskRow[], habitSlot: false };
+  const periodTasksMap = new Map<string, TaskRow[]>();
+  const periodHabitMap = new Map<string, boolean>();
+
+  for (const period of sortedPeriods) {
+    if (period.blocked) { periodTasksMap.set(period.name, []); periodHabitMap.set(period.name, false); continue; }
+
+    const isPast = period.endMin <= now;
     const isHabitPeriod = period.name === habitPeriodName && habitTasks.length > 0;
     const habitMins = isHabitPeriod ? habitDuration : 0;
     const slots = Math.max(0, Math.floor((period.duration - habitMins) / 30));
+    periodHabitMap.set(period.name, isHabitPeriod);
+
     const pt: TaskRow[] = [];
     if (isHabitPeriod) pt.push(...habitTasks);
-    for (let s = 0; s < slots && remaining.length > 0; s++) pt.push(remaining.shift()!);
-    return { ...period, tasks: pt, habitSlot: isHabitPeriod };
-  });
+
+    if (!isPast) {
+      const pCtx = periodContexts[period.name];
+      for (let s = 0; s < slots && remaining.length > 0; s++) {
+        let idx = pCtx ? remaining.findIndex(t => t.context === pCtx) : -1;
+        if (idx < 0) idx = 0;
+        pt.push(remaining.splice(idx, 1)[0]);
+      }
+    }
+    periodTasksMap.set(period.name, pt);
+  }
+
+  // Stateful plan for drag & drop
+  const initialPlan = allPeriods.map(p => ({
+    ...p, tasks: periodTasksMap.get(p.name) ?? [], habitSlot: periodHabitMap.get(p.name) ?? false,
+  }));
+  const [plan, setPlan] = useState(initialPlan);
+  const [dragTask, setDragTask] = useState<{ taskId: string; fromPeriod: string } | null>(null);
+
+  // Re-compute when blockedPeriods/contexts change
+  useEffect(() => { setPlan(initialPlan); }, [blockedPeriods.join(","), JSON.stringify(periodContexts)]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleDrop(toPeriod: string) {
+    if (!dragTask || dragTask.fromPeriod === toPeriod) { setDragTask(null); return; }
+    setPlan(prev => {
+      const next = prev.map(p => ({ ...p, tasks: [...p.tasks] }));
+      const from = next.find(p => p.name === dragTask.fromPeriod);
+      const to = next.find(p => p.name === toPeriod);
+      if (!from || !to) return prev;
+      const taskIndex = from.tasks.findIndex(t => t.id === dragTask.taskId);
+      if (taskIndex < 0) return prev;
+      const [task] = from.tasks.splice(taskIndex, 1);
+      to.tasks.push(task);
+      return next;
+    });
+    setDragTask(null);
+  }
+
+  const ctxIcon = (c: string) => TASK_CONTEXTS.find(x => x.key === c)?.icon ?? "";
 
   function fmtTime(min: number): string {
     const h = Math.floor(min / 60);
@@ -1289,23 +1337,41 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   return (
     <div className="space-y-3 mt-3">
       <div className="flex gap-2 flex-wrap text-[11px]" style={{ color: "var(--muted)" }}>
-        <span>{pending.length} مهمة</span><span>•</span><span>🔄 عادات ({habitDuration}د) ← ◎ أدوار ← 💼 وظائف</span>
+        <span>{pending.length} مهمة</span><span>•</span><span>الفترات الماضية فارغة</span><span>•</span><span>اسحب المهام بين الفترات</span>
       </div>
-      {plan.map((p) => (
-        <div key={p.name} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${p.blocked ? "var(--card-border)" : "var(--gold, #D4AF37)25"}`, opacity: p.blocked ? 0.5 : 1 }}>
+      {plan.map((p) => {
+        const isPast = p.endMin <= now && p.name !== "بعد منتصف الليل";
+        return (
+        <div key={p.name} className="rounded-xl overflow-hidden"
+          onDragOver={(e) => { if (!p.blocked && !isPast) { e.preventDefault(); e.currentTarget.style.borderColor = "var(--gold, #D4AF37)"; } }}
+          onDragLeave={(e) => { e.currentTarget.style.borderColor = p.blocked ? "var(--card-border)" : "var(--gold, #D4AF37)25"; }}
+          onDrop={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "var(--gold, #D4AF37)25"; handleDrop(p.name); }}
+          style={{ border: `1px solid ${p.blocked ? "var(--card-border)" : "var(--gold, #D4AF37)25"}`, opacity: p.blocked || isPast ? 0.4 : 1 }}>
           <div className="flex items-center justify-between px-4 py-2" style={{ background: "var(--bg)" }}>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold" style={{ color: "var(--gold)" }}>🕌 {p.name}</span>
+              <span className="text-sm font-bold" style={{ color: isPast ? "var(--muted)" : "var(--gold)" }}>🕌 {p.name}</span>
               <span className="text-xs" style={{ color: "var(--muted)" }}>{fmtTime(p.startMin)} — {fmtTime(p.endMin)}</span>
+              {isPast && <span className="text-[9px] text-[#9CA3AF]">(انتهت)</span>}
             </div>
-            <button onClick={() => {
-              if (p.name === "بعد العشاء" || p.name === "بعد منتصف الليل") onBlockToggle(p.name + "_open");
-              else onBlockToggle(p.name);
-            }}
-              className="text-[11px] px-2 py-1 rounded-lg font-semibold"
-              style={{ background: p.blocked ? "#DC262610" : "var(--bg)", color: p.blocked ? "#DC2626" : "var(--muted)", border: `1px solid ${p.blocked ? "#DC262620" : "var(--card-border)"}` }}>
-              {p.blocked ? "موقوفة" : "إيقاف"}
-            </button>
+            <div className="flex items-center gap-1">
+              {!p.blocked && !isPast && (
+                <select value={periodContexts[p.name] ?? ""}
+                  onChange={(e) => setPeriodContexts(prev => ({ ...prev, [p.name]: e.target.value }))}
+                  className="text-[10px] px-1.5 py-0.5 rounded-lg border focus:outline-none"
+                  style={{ background: "var(--bg)", color: "var(--muted)", borderColor: "var(--card-border)" }}>
+                  <option value="">كل البيئات</option>
+                  {TASK_CONTEXTS.map(c => <option key={c.key} value={c.key}>{c.icon} {c.label}</option>)}
+                </select>
+              )}
+              <button onClick={() => {
+                if (p.name === "بعد العشاء" || p.name === "بعد منتصف الليل") onBlockToggle(p.name + "_open");
+                else onBlockToggle(p.name);
+              }}
+                className="text-[11px] px-2 py-1 rounded-lg font-semibold"
+                style={{ background: p.blocked ? "#DC262610" : "var(--bg)", color: p.blocked ? "#DC2626" : "var(--muted)", border: `1px solid ${p.blocked ? "#DC262620" : "var(--card-border)"}` }}>
+                {p.blocked ? "موقوفة" : "إيقاف"}
+              </button>
+            </div>
           </div>
           {!p.blocked && p.tasks.length > 0 && (
             <div className="px-4 py-1.5 space-y-0.5">
@@ -1317,21 +1383,26 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
                 </div>
               )}
               {p.tasks.filter(t => t.context !== "habit").map((t, i) => (
-                <div key={t.id} className="flex items-center gap-2 py-1.5 px-1 rounded" style={{ background: i % 2 === 0 ? "transparent" : "var(--bg)" }}>
+                <div key={t.id} draggable
+                  onDragStart={() => setDragTask({ taskId: t.id, fromPeriod: p.name })}
+                  className="flex items-center gap-2 py-1.5 px-1 rounded cursor-grab active:cursor-grabbing hover:opacity-80 transition"
+                  style={{ background: i % 2 === 0 ? "transparent" : "var(--bg)" }}>
                   <span className="text-[10px] w-4" style={{ color: "var(--muted)" }}>{i + 1}</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${P_COLORS[t.priority]}`}>{t.priority}</span>
                   {t.isRecurring && <span className="text-[10px]">🔄</span>}
                   {t.isWork && <span className="text-[10px]">💼</span>}
+                  {t.context !== "Anywhere" && t.context !== "habit" && <span className="text-[10px]">{ctxIcon(t.context)}</span>}
                   <span className="text-sm flex-1 truncate" style={{ color: "var(--text)" }}>{t.title}</span>
                 </div>
               ))}
             </div>
           )}
-          {!p.blocked && p.tasks.length === 0 && (
+          {!p.blocked && !isPast && p.tasks.length === 0 && (
             <p className="px-4 py-2 text-xs" style={{ color: "var(--muted)" }}>—</p>
           )}
         </div>
-      ))}
+        );
+      })}
       {remaining.length > 0 && (
         <div className="rounded-xl p-3" style={{ background: "#FEF3C7", border: "1px solid #F59E0B30" }}>
           <p className="text-amber-800 text-sm font-semibold">{remaining.length} مهمة لم تتسع</p>
