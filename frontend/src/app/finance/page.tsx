@@ -824,7 +824,7 @@ export default function FinancePage() {
     return txs.reduce((s, t) => {
       if (t.accountId !== acctId) return s;
       return s + (t.type === "income" ? t.amount : -t.amount);
-    }, accounts.find(a => a.id === acctId)?.balance ?? 0);
+    }, 0);
   };
   // أرصدة المحافظ = مجموع المعاملات المرتبطة
   const calcPocketBal = (pocketId: string) => {
@@ -842,10 +842,10 @@ export default function FinancePage() {
   const gifts = mTx.filter((t) => t.type === "gift").reduce((s, t) => s + t.amount, 0);
   const net = income - expense - debtPaid - gifts;
 
-  // إجمالي من كل المعاملات (وليس أرصدة مخزنة)
+  // الرصيد الكلي = مجموع الوارد - مجموع الصادر (من المعاملات فقط)
   const allIncome = txs.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
   const allExpense = txs.filter(t => t.type !== "income").reduce((s, t) => s + t.amount, 0);
-  const totalAcctBal = allIncome - allExpense + accounts.reduce((s, a) => s + a.balance, 0);
+  const totalAcctBal = allIncome - allExpense;
 
   const savingsPocket = pockets.find((p) => p.type === "savings");
   const savingsBalance = savingsPocket ? calcPocketBal(savingsPocket.id) : 0;
