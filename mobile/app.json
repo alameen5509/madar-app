@@ -52,7 +52,8 @@
         {
           "contactsPermission": "مطلوب لاستيراد جهات الاتصال"
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {
