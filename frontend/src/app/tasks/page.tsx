@@ -2329,7 +2329,7 @@ export default function TasksPage() {
       {showCelebration && <CelebrationEffect onDone={() => setShowCelebration(false)} />}
 
       {/* Header */}
-      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-[#E2D5B0] px-8 py-4">
+      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-[#E2D5B0] px-8 py-4 pr-16 md:pr-8">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-[#5E5495] text-xs font-semibold mb-0.5">{hijriDate}</p>

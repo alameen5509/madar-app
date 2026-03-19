@@ -17,7 +17,7 @@ export default function SidebarWrapper() {
       {/* Mobile hamburger */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed top-3 right-3 z-50 w-10 h-10 rounded-xl flex items-center justify-center text-white md:hidden"
+        className="fixed top-3 right-3 z-[60] w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg md:hidden"
         style={{ background: "#1A1A2E" }}
       >
         ☰

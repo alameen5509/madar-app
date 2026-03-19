@@ -824,18 +824,24 @@ export default function FinancePage() {
 
         {/* ═══ Overview ═══ */}
         {tab === "overview" && (<>
+          {/* الأرصدة الفعلية */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Stat label="الدخل" value={income} color="#3D8C5A" />
-            <Stat label="المصروفات" value={expense} color="#DC2626" />
+            <Stat label="إجمالي الحسابات" value={totalAcctBal} color="#2C2C54" />
+            <Stat label="المحافظ" value={pockets.reduce((s, p) => s + p.balance, 0)} color="#5E5495" />
+            <Stat label="محفظة الادخار" value={savingsPocket?.balance ?? 0} color="#D4AF37" />
+            <Stat label="ديون متبقية" value={totalDebtRemaining} color="#DC2626" />
+          </div>
+          {/* معاملات الشهر المختار */}
+          <GeometricDivider label={`معاملات ${month}`} />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Stat label="الدخل" value={income} color="#3D8C5A" sub={`${mTx.filter(t=>t.type==="income").length} معاملة`} />
+            <Stat label="المصروفات" value={expense} color="#DC2626" sub={`${mTx.filter(t=>t.type==="expense").length} معاملة`} />
             <Stat label="سداد ديون" value={debtPaid} color="#0F3460" />
             <Stat label="الصافي" value={net} color={net >= 0 ? "#3D8C5A" : "#DC2626"} />
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Stat label="إجمالي الحسابات" value={totalAcctBal} color="#2C2C54" />
-            <Stat label="محفظة الادخار" value={savingsPocket?.balance ?? 0} color="#D4AF37" />
-            <Stat label="ديون متبقية" value={totalDebtRemaining} color="#DC2626" />
-            <Stat label="التزامات شهرية" value={monthlyCommits} color="#8C4A3D" />
-          </div>
+          {mTx.length === 0 && (
+            <p className="text-center text-[10px] text-[#9CA3AF] py-2">لا توجد معاملات في هذا الشهر — الأرقام أعلاه تعكس الأرصدة الفعلية</p>
+          )}
 
           {/* Upcoming dues */}
           {upcomingDues.length > 0 && (
