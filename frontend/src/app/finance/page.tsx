@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { GeometricDivider } from "@/components/IslamicPattern";
+import { api } from "@/lib/api";
 
 /* ═══ Types ═══════════════════════════════════════════════════════════════ */
 
@@ -650,7 +651,62 @@ export default function FinancePage() {
   const [trFrom, setTrFrom] = useState(""); const [trTo, setTrTo] = useState(""); const [trAmt, setTrAmt] = useState("");
   const [ncTitle, setNcTitle] = useState(""); const [ncAmount, setNcAmount] = useState(""); const [ncTotal, setNcTotal] = useState(""); const [ncDay, setNcDay] = useState("1");
 
-  useEffect(() => {
+  const [dataLoading, setDataLoading] = useState(true);
+
+  // ═══ تحميل البيانات من API (مع fallback لـ localStorage) ═══
+  const loadFinanceData = useCallback(async () => {
+    setDataLoading(true);
+    try {
+      const { data } = await api.get("/api/finance/snapshot");
+
+      // إذا الـ API فارغ وعندنا بيانات محلية → رحّلها
+      const localTxs = load<Transaction[]>("mfin_tx", []);
+      if ((!data.transactions || data.transactions.length === 0) && localTxs.length > 0) {
+        // ترحيل تلقائي من localStorage
+        try {
+          await api.post("/api/finance/sync", {
+            accounts: load("mfin_accts", DEF_ACCOUNTS).map((a: Account) => ({ id: a.id, name: a.name, icon: a.icon, balance: a.balance })),
+            pockets: load("mfin_pockets", DEF_POCKETS).map((p: Pocket) => ({ id: p.id, name: p.name, icon: p.icon, type: p.type, commitments: p.commitments })),
+            transactions: localTxs.map((t: Transaction) => ({ title: t.title, amount: t.amount, type: t.type, category: t.category, expenseClass: t.expenseClass, accountId: t.accountId, pocketId: t.pocketId, date: t.date })),
+            debts: load("mfin_debts", []),
+            dues: load<RecurringDue[]>("mfin_dues", []).map((d) => ({ title: d.title, amount: d.amount, type: d.type, frequency: d.frequency, dueDay: d.dueDay, dueMonth: d.dueMonth, accountId: d.accountId, pocketId: d.pocketId, category: d.category, isActive: d.isActive })),
+            goals: load<FinGoal[]>("mfin_goals", []).map((g) => ({ title: g.title, description: g.description, targetAmount: g.targetAmount, savedSoFar: g.savedSoFar, deadline: g.deadline, items: g.items })),
+            zakat: load("mfin_zakat", null),
+            settings: load("mfin_settings", null),
+          });
+          // امسح localStorage المالي بعد الترحيل
+          ["mfin_tx", "mfin_accts", "mfin_pockets", "mfin_settings", "mfin_debts", "mfin_dues", "mfin_goals", "mfin_zakat"].forEach(k => localStorage.removeItem(k));
+          // أعد جلب البيانات من API
+          const { data: fresh } = await api.get("/api/finance/snapshot");
+          applySnapshot(fresh);
+        } catch { applyLocalStorage(); }
+      } else if (data.transactions?.length > 0 || data.accounts?.length > 0) {
+        applySnapshot(data);
+        // امسح localStorage القديم
+        ["mfin_tx", "mfin_accts", "mfin_pockets", "mfin_settings", "mfin_debts", "mfin_dues", "mfin_goals", "mfin_zakat"].forEach(k => localStorage.removeItem(k));
+      } else {
+        applyLocalStorage();
+      }
+    } catch {
+      // API فشل — استخدم localStorage
+      applyLocalStorage();
+    }
+    setDataLoading(false);
+  }, []);
+
+  function applySnapshot(data: Record<string, unknown>) {
+    const d = data as { accounts?: Account[]; pockets?: Pocket[]; transactions?: Transaction[]; debts?: Debt[]; dues?: RecurringDue[]; goals?: FinGoal[]; zakat?: ZakatData; settings?: FinSettings };
+    setAccounts(d.accounts ?? DEF_ACCOUNTS);
+    setPockets((d.pockets ?? DEF_POCKETS).map(p => ({ ...p, commitments: p.commitments ?? [] })));
+    setTxs(d.transactions ?? []);
+    setDebts(d.debts ?? []);
+    setDues(d.dues ?? []);
+    setFinGoals((d.goals ?? []).map(g => ({ ...g, items: g.items ?? [] })));
+    setZakatData(d.zakat ?? { hawalDate: "", goldGrams: 0, goldPurchases: [] });
+    if (d.settings) setSettings({ ...d.settings, expenseCategories: d.settings.expenseCategories ?? DEF_EXP_CATS, incomeCategories: d.settings.incomeCategories ?? DEF_INC_CATS });
+  }
+
+  function applyLocalStorage() {
     setTxs(load("mfin_tx", []));
     setAccounts(load("mfin_accts", DEF_ACCOUNTS));
     setPockets(load("mfin_pockets", DEF_POCKETS));
@@ -660,152 +716,146 @@ export default function FinancePage() {
     setDues(load("mfin_dues", []));
     setZakatData(load("mfin_zakat", { hawalDate: "", goldGrams: 0, goldPurchases: [] }));
     setFinGoals(load("mfin_goals", []));
-    // جلب سعر الذهب — يتحدث يومياً
+  }
+
+  useEffect(() => { loadFinanceData(); }, [loadFinanceData]);
+
+  // جلب سعر الذهب يومياً
+  useEffect(() => {
     (async () => {
       const lastFetch = load<string>("mfin_gold_date", "");
       const today = new Date().toISOString().slice(0, 10);
       const cached = load<number>("mfin_gold_price", 0);
-
-      // إذا جلبنا اليوم استخدم الكاش
-      if (lastFetch === today && cached > 0) {
-        setGoldPrice(cached);
-        checkGoldAdvice(cached);
-        return;
-      }
-
+      if (lastFetch === today && cached > 0) { setGoldPrice(cached); return; }
       let price = 0;
-      try {
-        const r = await fetch("https://data-asg.goldprice.org/dbXRates/SAR");
-        if (r?.ok) { const d = await r.json(); if (d.items?.[0]?.xauPrice) price = Math.round(d.items[0].xauPrice / 31.1035); }
-      } catch {}
-      if (!price) {
-        try {
-          // fallback: سعر الأونصة بالدولار × 3.75 ÷ 31.1
-          const r = await fetch("https://api.coindesk.com/v1/bpi/currentprice/XAU.json");
-          if (r?.ok) { const d = await r.json(); if (d.bpi?.XAU?.rate_float) price = Math.round((1 / d.bpi.XAU.rate_float) * 3.75 * 31.1035); }
-        } catch {}
-      }
-      if (price > 0) {
-        setGoldPrice(price);
-        save("mfin_gold_date", today);
-        checkGoldAdvice(price);
-      } else {
-        setGoldPrice(cached || 552);
-      }
+      try { const r = await fetch("https://data-asg.goldprice.org/dbXRates/SAR"); if (r?.ok) { const d = await r.json(); if (d.items?.[0]?.xauPrice) price = Math.round(d.items[0].xauPrice / 31.1035); } } catch {}
+      if (!price) { try { const r = await fetch("https://api.coindesk.com/v1/bpi/currentprice/XAU.json"); if (r?.ok) { const d = await r.json(); if (d.bpi?.XAU?.rate_float) price = Math.round((1 / d.bpi.XAU.rate_float) * 3.75 * 31.1035); } } catch {} }
+      if (price > 0) { setGoldPrice(price); save("mfin_gold_date", today); } else { setGoldPrice(cached || 552); }
     })();
-
-    function checkGoldAdvice(currentPrice: number) {
-      const zk = load<ZakatData>("mfin_zakat", { hawalDate: "", goldGrams: 0, goldPurchases: [] });
-      const buys = zk.goldPurchases.filter((p: GoldPurchase) => p.grams > 0);
-      if (buys.length === 0) return;
-      const avgBuy = Math.round(buys.reduce((s: number, p: GoldPurchase) => s + p.pricePerGram * p.grams, 0) / buys.reduce((s: number, p: GoldPurchase) => s + p.grams, 0));
-      const diff = ((currentPrice - avgBuy) / avgBuy) * 100;
-      if (diff <= -5) setGoldAdvice(`🪙 فرصة شراء! سعر الذهب (${currentPrice} ريال) انخفض ${Math.abs(Math.round(diff))}% عن متوسط شرائك (${avgBuy} ريال)`);
-      else if (diff >= 10) setGoldAdvice(`📈 سعر الذهب ارتفع ${Math.round(diff)}% عن متوسط شرائك — قد تكون فرصة بيع`);
-    }
   }, []);
 
-  function sTxs(v: Transaction[]) { setTxs(v); save("mfin_tx", v); }
+  // ═══ Setters — تحديث State + API (fire-and-forget) ═══
+  function sTxs(v: Transaction[]) { setTxs(v); }
   function sAccts(v: Account[] | ((prev: Account[]) => Account[])) {
-    setAccounts(prev => {
-      const next = typeof v === "function" ? v(prev) : v;
-      save("mfin_accts", next);
-      return next;
-    });
+    setAccounts(prev => typeof v === "function" ? v(prev) : v);
   }
   function sPockets(v: Pocket[] | ((prev: Pocket[]) => Pocket[])) {
-    setPockets(prev => {
-      const next = typeof v === "function" ? v(prev) : v;
-      save("mfin_pockets", next);
-      return next;
-    });
+    setPockets(prev => typeof v === "function" ? v(prev) : v);
   }
-  function sSettings(v: FinSettings) { setSettings(v); save("mfin_settings", v); }
-  function sDebts(v: Debt[]) { setDebts(v); save("mfin_debts", v); }
-  function sDues(v: RecurringDue[]) { setDues(v); save("mfin_dues", v); }
-  function sZakat(v: ZakatData) { setZakatData(v); save("mfin_zakat", v); }
-  function sFinGoals(v: FinGoal[]) { setFinGoals(v); save("mfin_goals", v); }
+  function sSettings(v: FinSettings) {
+    setSettings(v);
+    api.put("/api/finance/settings", { debtPercent: v.debtPercent, savingsPercent: v.savingsPercent, expenseCategories: v.expenseCategories, incomeCategories: v.incomeCategories }).catch(() => {});
+  }
+  function sDebts(v: Debt[]) {
+    // اكتشف الفرق وأرسل للـ API
+    const added = v.filter(d => !debts.some(x => x.id === d.id));
+    const removed = debts.filter(d => !v.some(x => x.id === d.id));
+    const updated = v.filter(d => { const old = debts.find(x => x.id === d.id); return old && JSON.stringify(old) !== JSON.stringify(d); });
+    added.forEach(d => api.post("/api/finance/debts", d).then(({ data }) => { /* update id */ }).catch(() => {}));
+    removed.forEach(d => api.delete(`/api/finance/debts/${d.id}`).catch(() => {}));
+    updated.forEach(d => api.put(`/api/finance/debts/${d.id}`, d).catch(() => {}));
+    setDebts(v);
+  }
+  function sDues(v: RecurringDue[]) {
+    const added = v.filter(d => !dues.some(x => x.id === d.id));
+    const removed = dues.filter(d => !v.some(x => x.id === d.id));
+    added.forEach(d => api.post("/api/finance/dues", d).catch(() => {}));
+    removed.forEach(d => api.delete(`/api/finance/dues/${d.id}`).catch(() => {}));
+    setDues(v);
+  }
+  function sZakat(v: ZakatData) {
+    setZakatData(v);
+    api.put("/api/finance/zakat", { hawalDate: v.hawalDate, goldGrams: v.goldGrams }).catch(() => {});
+  }
+  function sFinGoals(v: FinGoal[]) { setFinGoals(v); }
 
-  /** تأكيد استلام/دفع مستحق وتحويله لمعاملة فعلية */
-  function confirmDue(due: RecurringDue) {
+  /** تأكيد استلام/دفع مستحق */
+  async function confirmDue(due: RecurringDue) {
     const isIncome = due.type === "salary" || due.type === "expected_income";
     const aid = due.accountId || accounts[0]?.id || "";
     const pid = due.pocketId || pockets[0]?.id || "";
-    const t: Transaction = {
-      id: Date.now().toString(), title: due.title, amount: due.amount,
-      type: isIncome ? "income" : "expense",
-      category: due.category ?? (isIncome ? "راتب" : "فواتير"),
-      accountId: aid, pocketId: pid,
-      date: new Date().toISOString().slice(0, 10),
-    };
-    sTxs([t, ...txs]);
-    const mult = isIncome ? 1 : -1;
-    sAccts(accounts.map((a) => a.id === aid ? { ...a, balance: a.balance + due.amount * mult } : a));
-    if (isIncome) sPockets(pockets.map((p) => p.id === pid ? { ...p, balance: p.balance + due.amount } : p));
-    else sPockets(pockets.map((p) => p.id === pid ? { ...p, balance: p.balance - due.amount } : p));
-    sDues(dues.map((d) => d.id === due.id ? { ...d, lastConfirmedDate: new Date().toISOString().slice(0, 10) } : d));
+    // أنشئ معاملة عبر API
+    try {
+      const { data: newTx } = await api.post("/api/finance/transactions", {
+        title: due.title, amount: due.amount, type: isIncome ? "Income" : "Expense",
+        category: due.category ?? (isIncome ? "راتب" : "فواتير"), accountId: aid || null, pocketId: pid || null,
+        date: new Date().toISOString().slice(0, 10),
+      });
+      setTxs(prev => [newTx, ...prev]);
+      // حدّث تاريخ التأكيد
+      await api.put(`/api/finance/dues/${due.id}`, { title: due.title, amount: due.amount, type: due.type, frequency: due.frequency, dueDay: due.dueDay, lastConfirmedDate: new Date().toISOString().slice(0, 10) }).catch(() => {});
+      setDues(prev => prev.map(d => d.id === due.id ? { ...d, lastConfirmedDate: new Date().toISOString().slice(0, 10) } : d));
+    } catch { /* fallback — just update locally */ }
   }
 
-  /** تطبيق أثر معاملة على الأرصدة (إضافة أو عكس) */
-  /** الأرصدة محسوبة من المعاملات — هذه الدالة تبقى للتوافق */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  function applyTxEffect(_t: Transaction, _reverse = false) {
-    // الأرصدة تُحسب ديناميكياً — لا حاجة لتعديلها يدوياً
-  }
+  function applyTxEffect(_t: Transaction, _reverse = false) { }
 
-  function addTx() {
+  async function addTx() {
     if (!fTitle.trim() || !fAmount) return;
     let amt = 0;
     try { amt = Function('"use strict"; return (' + fAmount + ')')(); } catch { amt = Number(fAmount); }
     if (!amt || !isFinite(amt)) return;
     amt = Math.round(amt * 100) / 100;
 
-    const aid = fAcct || accounts[0]?.id || "";
-    const pid = fPocket || pockets[0]?.id || "";
+    const aid = fAcct || accounts[0]?.id || null;
+    const pid = fPocket || pockets[0]?.id || null;
 
-    if (fType === "expense" && fExpCls === "improvement") {
-      const week = new Date(); week.setDate(week.getDate() + 7);
-      const t: Transaction = { id: Date.now().toString(), title: fTitle.trim(), amount: amt, type: fType, category: fCat, expenseClass: "improvement", accountId: aid, pocketId: pid, date: fDate, approvedAt: week.toISOString().slice(0,10) };
-      sTxs([t, ...txs]); setFTitle(""); setFAmount(""); setShowAdd(false);
-      alert(`مصروف تحسيني — متاح بعد ${week.toLocaleDateString("ar-SA")}`);
-      return;
+    try {
+      const { data: newTx } = await api.post("/api/finance/transactions", {
+        title: fTitle.trim(), amount: amt, type: fType, category: fCat,
+        expenseClass: fType === "expense" ? fExpCls : null,
+        accountId: aid, pocketId: pid, date: fDate,
+      });
+      setTxs(prev => [newTx, ...prev]);
+    } catch {
+      // fallback — أضف محلياً
+      setTxs(prev => [{ id: Date.now().toString(), title: fTitle.trim(), amount: amt, type: fType, category: fCat, expenseClass: fType === "expense" ? fExpCls : undefined, accountId: aid ?? "", pocketId: pid ?? "", date: fDate }, ...prev]);
     }
-
-    const t: Transaction = { id: Date.now().toString(), title: fTitle.trim(), amount: amt, type: fType, category: fCat, expenseClass: fType === "expense" ? fExpCls : undefined, accountId: aid, pocketId: pid, date: fDate };
-    sTxs([t, ...txs]);
-    applyTxEffect(t);
-
     setFTitle(""); setFAmount(""); setShowAdd(false);
   }
 
-  /** حذف معاملة مع عكس أثرها من الأرصدة */
-  function deleteTx(id: string) {
+  /** حذف معاملة */
+  async function deleteTx(id: string) {
     const tx = txs.find(t => t.id === id);
     if (!tx) return;
-    applyTxEffect(tx, true); // عكس الأثر
+    api.delete(`/api/finance/transactions/${id}`).catch(() => {});
     sTxs(txs.filter(t => t.id !== id));
   }
 
   /** تعديل معاملة: عكس القديمة ثم تطبيق الجديدة */
   const [editTx, setEditTx] = useState<Transaction | null>(null);
-  function saveEditTx() {
+  async function saveEditTx() {
     if (!editTx) return;
-    const old = txs.find(t => t.id === editTx.id);
-    if (old) applyTxEffect(old, true);
-    applyTxEffect(editTx);
-    sTxs(txs.map(t => t.id === editTx.id ? editTx : t));
+    try {
+      await api.put(`/api/finance/transactions/${editTx.id}`, {
+        title: editTx.title, amount: editTx.amount, type: editTx.type, category: editTx.category,
+        expenseClass: editTx.expenseClass, accountId: editTx.accountId || null, pocketId: editTx.pocketId || null, date: editTx.date,
+      });
+    } catch {}
+    setTxs(prev => prev.map(t => t.id === editTx.id ? editTx : t));
     setEditTx(null);
   }
 
-  function addAccount() {
+  async function addAccount() {
     if (!naName.trim()) return;
-    sAccts([...accounts, { id: Date.now().toString(), name: naName.trim(), icon: naIcon, balance: Number(naBal) || 0 }]);
+    try {
+      const { data } = await api.post("/api/finance/accounts", { name: naName.trim(), icon: naIcon, balance: Number(naBal) || 0 });
+      setAccounts(prev => [...prev, { ...data, balance: data.balance ?? 0 }]);
+    } catch {
+      setAccounts(prev => [...prev, { id: Date.now().toString(), name: naName.trim(), icon: naIcon, balance: Number(naBal) || 0 }]);
+    }
     setNaName(""); setNaBal(""); setShowNewAcct(false);
   }
 
-  function addPocket() {
+  async function addPocket() {
     if (!npName.trim()) return;
-    sPockets([...pockets, { id: Date.now().toString(), name: npName.trim(), icon: npIcon, type: npType, balance: 0, commitments: [] }]);
+    try {
+      const { data } = await api.post("/api/finance/pockets", { name: npName.trim(), icon: npIcon, type: npType });
+      setPockets(prev => [...prev, { ...data, commitments: [] }]);
+    } catch {
+      setPockets(prev => [...prev, { id: Date.now().toString(), name: npName.trim(), icon: npIcon, type: npType, balance: 0, commitments: [] }]);
+    }
     setNpName(""); setShowNewPocket(false);
   }
 
@@ -1091,8 +1141,8 @@ export default function FinancePage() {
                         <div className="flex items-center gap-2 mt-1">
                           <input type="number" value={editAcctBal} onChange={(e) => setEditAcctBal(e.target.value)}
                             className="w-28 px-2 py-1 rounded-lg border border-[#D4AF37] text-sm font-bold focus:outline-none" autoFocus
-                            onKeyDown={(e) => { if (e.key === "Enter") { sAccts(accounts.map(x => x.id === a.id ? { ...x, balance: Number(editAcctBal) || 0 } : x)); setEditAcctId(null); } }} />
-                          <button onClick={() => { sAccts(accounts.map(x => x.id === a.id ? { ...x, balance: Number(editAcctBal) || 0 } : x)); setEditAcctId(null); }}
+                            onKeyDown={(e) => { if (e.key === "Enter") { const bal = Number(editAcctBal) || 0; api.put(`/api/finance/accounts/${a.id}`, { name: a.name, icon: a.icon, balance: bal }).catch(() => {}); sAccts(accounts.map(x => x.id === a.id ? { ...x, balance: bal } : x)); setEditAcctId(null); } }} />
+                          <button onClick={() => { const bal = Number(editAcctBal) || 0; api.put(`/api/finance/accounts/${a.id}`, { name: a.name, icon: a.icon, balance: bal }).catch(() => {}); sAccts(accounts.map(x => x.id === a.id ? { ...x, balance: bal } : x)); setEditAcctId(null); }}
                             className="text-[10px] px-2 py-1 rounded-lg bg-[#3D8C5A] text-white font-bold">حفظ</button>
                           <button onClick={() => setEditAcctId(null)} className="text-[10px] px-2 py-1 rounded-lg bg-gray-100 text-[#6B7280]">✕</button>
                         </div>
@@ -1105,7 +1155,7 @@ export default function FinancePage() {
                         </p>
                       )}
                     </div>
-                    <button onClick={() => sAccts(accounts.filter((x) => x.id !== a.id))} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
+                    <button onClick={() => { api.delete(`/api/finance/accounts/${a.id}`).catch(() => {}); sAccts(accounts.filter((x) => x.id !== a.id)); }} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
                   </div>
                 </div>
               ))}
@@ -1150,7 +1200,7 @@ export default function FinancePage() {
                         </div>
                         <p className="text-lg font-black mt-1" style={{ color: calcPocketBal(p.id) >= 0 ? "#3D8C5A" : "#DC2626" }}>{calcPocketBal(p.id).toLocaleString()} ريال</p>
                       </div>
-                      <button onClick={() => sPockets(pockets.filter((x) => x.id !== p.id))} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
+                      <button onClick={() => { api.delete(`/api/finance/pockets/${p.id}`).catch(() => {}); sPockets(pockets.filter((x) => x.id !== p.id)); }} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
                     </div>
 
                     {/* Commitments inside pocket */}
@@ -1265,7 +1315,7 @@ export default function FinancePage() {
                   <button onClick={() => setShowGoalForm(false)} className="flex-1 py-2.5 rounded-xl text-sm text-[#6B7280] bg-gray-100">إلغاء</button>
                   <button onClick={() => {
                     if (!gfTitle.trim()) return;
-                    sFinGoals([{ id: Date.now().toString(), title: gfTitle.trim(), description: "", targetAmount: Number(gfAmount) || 0, savedSoFar: 0, deadline: gfDeadline, items: [] }, ...finGoals]);
+                    api.post("/api/finance/goals", { title: gfTitle.trim(), description: "", targetAmount: Number(gfAmount) || 0, savedSoFar: 0, deadline: gfDeadline || null, items: [] }).then(({ data }) => { sFinGoals([{ id: data.id, title: gfTitle.trim(), description: "", targetAmount: Number(gfAmount) || 0, savedSoFar: 0, deadline: gfDeadline, items: [] }, ...finGoals]); }).catch(() => { sFinGoals([{ id: Date.now().toString(), title: gfTitle.trim(), description: "", targetAmount: Number(gfAmount) || 0, savedSoFar: 0, deadline: gfDeadline, items: [] }, ...finGoals]); });
                     setGfTitle(""); setGfAmount(""); setGfDeadline(""); setShowGoalForm(false);
                   }} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>إضافة</button>
                 </div>
@@ -1285,7 +1335,7 @@ export default function FinancePage() {
                       <p className="font-bold text-sm text-[#16213E]">{g.title}</p>
                       <div className="flex gap-1">
                         <button onClick={() => { setShowSaveForm(g.id); setSfAmount(""); }} className="text-[10px] px-2 py-1 rounded-lg bg-[#3D8C5A] text-white font-bold">+ ادخار</button>
-                        <button onClick={() => sFinGoals(finGoals.filter(x => x.id !== g.id))} className="text-[#9CA3AF] hover:text-red-400 text-xs px-1">✕</button>
+                        <button onClick={() => { api.delete(`/api/finance/goals/${g.id}`).catch(() => {}); sFinGoals(finGoals.filter(x => x.id !== g.id)); }} className="text-[#9CA3AF] hover:text-red-400 text-xs px-1">✕</button>
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-center mb-3">
@@ -1375,15 +1425,20 @@ export default function FinancePage() {
           const [goldForm, setGoldForm] = useState<"buy"|"sell"|null>(null);
           const [gfGrams, setGfGrams] = useState(""); const [gfPrice, setGfPrice] = useState(""); const [gfNotes, setGfNotes] = useState("");
 
-          function submitGoldTx() {
+          async function submitGoldTx() {
             const g = Number(gfGrams); const p = Number(gfPrice);
             if (!g || !p) return;
             const isSell = goldForm === "sell";
-            const purchase: GoldPurchase = {
-              id: Date.now().toString(), grams: isSell ? -g : g, pricePerGram: p,
-              totalCost: Math.round(g * p), date: new Date().toISOString().slice(0, 10), notes: (isSell ? "بيع" : "شراء") + (gfNotes ? ` · ${gfNotes}` : ""),
-            };
-            sZakat({ ...zakatData, goldGrams: zakatData.goldGrams + (isSell ? -g : g), goldPurchases: [purchase, ...zakatData.goldPurchases] });
+            const grams = isSell ? -g : g;
+            const notes = (isSell ? "بيع" : "شراء") + (gfNotes ? ` · ${gfNotes}` : "");
+            try {
+              const { data } = await api.post("/api/finance/zakat/purchases", { grams, pricePerGram: p, date: new Date().toISOString().slice(0, 10), notes });
+              const purchase: GoldPurchase = { id: data.id, grams, pricePerGram: p, totalCost: Math.round(Math.abs(g) * p), date: new Date().toISOString().slice(0, 10), notes };
+              setZakatData(prev => ({ ...prev, goldGrams: data.goldGrams ?? prev.goldGrams + grams, goldPurchases: [purchase, ...prev.goldPurchases] }));
+            } catch {
+              const purchase: GoldPurchase = { id: Date.now().toString(), grams, pricePerGram: p, totalCost: Math.round(Math.abs(g) * p), date: new Date().toISOString().slice(0, 10), notes };
+              setZakatData(prev => ({ ...prev, goldGrams: prev.goldGrams + grams, goldPurchases: [purchase, ...prev.goldPurchases] }));
+            }
             setGoldForm(null); setGfGrams(""); setGfPrice(""); setGfNotes("");
           }
 
@@ -1442,7 +1497,7 @@ export default function FinancePage() {
                     <p className="text-[9px] text-[#9CA3AF]">{p.date}{p.notes ? ` · ${p.notes}` : ""}</p>
                   </div>
                   <p className="text-sm font-bold" style={{ color: p.grams > 0 ? "#3D8C5A" : "#DC2626" }}>{p.grams > 0 ? "+" : "-"}{p.totalCost.toLocaleString()}</p>
-                  <button onClick={() => sZakat({ ...zakatData, goldGrams: zakatData.goldGrams - p.grams, goldPurchases: zakatData.goldPurchases.filter(x => x.id !== p.id) })}
+                  <button onClick={() => { api.delete(`/api/finance/zakat/purchases/${p.id}`).catch(() => {}); setZakatData(prev => ({ ...prev, goldGrams: prev.goldGrams - p.grams, goldPurchases: prev.goldPurchases.filter(x => x.id !== p.id) })); }}
                     className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
                 </div>
               ))}
