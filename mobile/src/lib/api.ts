@@ -53,13 +53,14 @@ api.interceptors.response.use(
         const accessToken = await getAccessToken();
         const refreshToken = await getRefreshToken();
         if (!accessToken || !refreshToken) throw new Error('No tokens');
-        const { data } = await axios.post<TokenResponse>(`${API_BASE_URL}/api/auth/refresh-token`, {
+        const { data: res } = await axios.post<TokenResponse>(`${API_BASE_URL}/api/auth/refresh-token`, {
           accessToken,
           refreshToken,
         });
-        await setTokens(data.accessToken, data.refreshToken);
-        processQueue(null, data.accessToken);
-        originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+        const tokens = res.data ?? res;
+        await setTokens(tokens.accessToken, tokens.refreshToken);
+        processQueue(null, tokens.accessToken);
+        originalRequest.headers.Authorization = `Bearer ${tokens.accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError);

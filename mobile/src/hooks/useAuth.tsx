@@ -69,9 +69,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated, segments, isLoading]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const { data } = await authApi.login(email, password);
-    await setTokens(data.accessToken, data.refreshToken);
-    extractUser(data.accessToken);
+    const { data: res } = await authApi.login(email, password);
+    // Backend returns { succeeded, data: { accessToken, refreshToken } }
+    const tokens = res.data ?? res;
+    await setTokens(tokens.accessToken, tokens.refreshToken);
+    extractUser(tokens.accessToken);
     setIsAuthenticated(true);
   }, []);
 

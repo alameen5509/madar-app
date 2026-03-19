@@ -118,6 +118,12 @@ export interface Habit {
 }
 
 export interface TokenResponse {
+  succeeded: boolean;
+  data: {
+    accessToken: string;
+    refreshToken: string;
+    accessTokenExpiry: string;
+  };
   accessToken: string;
   refreshToken: string;
   accessTokenExpiry: string;
