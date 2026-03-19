@@ -2707,9 +2707,57 @@ export default function TasksPage() {
               </div>
             )}
 
-            {!loading && !error && visibleTasks.length > 0 && (
+            {!loading && !error && visibleTasks.length > 0 && (() => {
+              const todayStr = new Date().toISOString().slice(0, 10);
+              const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+              const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+              // تصنيف المهام حسب اليوم
+              function getTaskDay(t: TaskRow): string {
+                if (t.context === "habit") return todayStr; // العادات دائماً اليوم
+                if (t.dueDate) {
+                  const d = t.dueDate.slice(0, 10);
+                  if (d <= todayStr) return todayStr; // المستحقة اليوم أو قبل
+                  return d;
+                }
+                if (t.createdAt) return t.createdAt.slice(0, 10);
+                return todayStr;
+              }
+
+              const groups = new Map<string, TaskRow[]>();
+              visibleTasks.forEach(t => {
+                const day = getTaskDay(t);
+                groups.set(day, [...(groups.get(day) ?? []), t]);
+              });
+
+              // ترتيب: اليوم أولاً ثم الأقرب
+              const sortedDays = Array.from(groups.entries()).sort((a, b) => {
+                if (a[0] === todayStr && b[0] !== todayStr) return -1;
+                if (b[0] === todayStr && a[0] !== todayStr) return 1;
+                return a[0].localeCompare(b[0]);
+              });
+
+              function dayLabel(d: string): string {
+                if (d === todayStr) return "اليوم";
+                if (d === yesterdayStr) return "أمس";
+                if (d === tomorrowStr) return "غداً";
+                if (d < todayStr) return "سابقة";
+                return new Date(d).toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "short" });
+              }
+
+              return (
               <div className="px-5 py-3 space-y-1">
-                {visibleTasks.map((t) => (
+                {sortedDays.map(([day, dayTasks]) => (
+                  <details key={day} open={day === todayStr || day === tomorrowStr || sortedDays.length <= 2}>
+                    <summary className="flex items-center justify-between py-2 px-2 rounded-lg cursor-pointer hover:bg-[#C9A84C]/5 transition sticky top-0 z-10"
+                      style={{ background: "var(--card)" }}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold" style={{ color: day === todayStr ? "var(--gold, #D4AF37)" : day < todayStr ? "var(--muted)" : "#5E5495" }}>{dayLabel(day)}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100" style={{ color: "var(--muted)" }}>{dayTasks.filter(x => !x.done).length}/{dayTasks.length}</span>
+                      </div>
+                      <span className="text-[10px]" style={{ color: "var(--muted)" }}>{day !== todayStr ? day : ""}</span>
+                    </summary>
+                {dayTasks.map((t) => (
                   <div key={t.id}>
                     <div
                       onClick={() => bulkMode ? toggleSelect(t.id) : toggle(t.id, t.done)}
@@ -2826,8 +2874,11 @@ export default function TasksPage() {
                     )}
                   </div>
                 ))}
+                  </details>
+                ))}
               </div>
-            )}
+              );
+            })()}
           </div>
         </section>
 
