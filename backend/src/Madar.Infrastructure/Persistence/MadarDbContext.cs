@@ -30,6 +30,19 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
     public DbSet<Contact> Contacts => Set<Contact>();
     public DbSet<WatchLinkRequest_Entity> WatchLinkRequests => Set<WatchLinkRequest_Entity>();
 
+    // Finance module
+    public DbSet<FinAccount> FinAccounts => Set<FinAccount>();
+    public DbSet<FinPocket> FinPockets => Set<FinPocket>();
+    public DbSet<PocketCommitment> PocketCommitments => Set<PocketCommitment>();
+    public DbSet<FinTransaction> FinTransactions => Set<FinTransaction>();
+    public DbSet<FinDebt> FinDebts => Set<FinDebt>();
+    public DbSet<FinRecurringDue> FinRecurringDues => Set<FinRecurringDue>();
+    public DbSet<FinGoal> FinGoals => Set<FinGoal>();
+    public DbSet<FinGoalItem> FinGoalItems => Set<FinGoalItem>();
+    public DbSet<ZakatProfile> ZakatProfiles => Set<ZakatProfile>();
+    public DbSet<GoldPurchase> GoldPurchases => Set<GoldPurchase>();
+    public DbSet<FinSettings> FinSettings => Set<FinSettings>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -163,6 +176,100 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
             np.HasKey(x => x.Id);
             np.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             np.HasIndex(x => x.UserId).IsUnique();
+        });
+
+        // ═══ Finance Module ═══
+        builder.Entity<FinAccount>(e => {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Icon).HasMaxLength(10);
+            e.Property(x => x.Balance).HasPrecision(18, 2);
+            e.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<FinPocket>(e => {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Icon).HasMaxLength(10);
+            e.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<PocketCommitment>(e => {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Title).HasMaxLength(300).IsRequired();
+            e.Property(x => x.MonthlyAmount).HasPrecision(18, 2);
+            e.Property(x => x.TotalAmount).HasPrecision(18, 2);
+            e.Property(x => x.PaidSoFar).HasPrecision(18, 2);
+            e.HasOne(x => x.Pocket).WithMany(x => x.Commitments).HasForeignKey(x => x.PocketId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<FinTransaction>(e => {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Title).HasMaxLength(500).IsRequired();
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.Category).HasMaxLength(100);
+            e.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Account).WithMany(x => x.Transactions).HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.Pocket).WithMany().HasForeignKey(x => x.PocketId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(x => new { x.OwnerId, x.Date });
+        });
+
+        builder.Entity<FinDebt>(e => {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.CreditorName).HasMaxLength(200).IsRequired();
+            e.Property(x => x.CreditorPhone).HasMaxLength(30);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.OriginalAmount).HasPrecision(18, 2);
+            e.Property(x => x.PaidSoFar).HasPrecision(18, 2);
+            e.Property(x => x.MonthlyPayment).HasPrecision(18, 2);
+            e.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<FinRecurringDue>(e => {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Title).HasMaxLength(300).IsRequired();
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.Category).HasMaxLength(100);
+            e.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<FinGoal>(e => {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Title).HasMaxLength(300).IsRequired();
+            e.Property(x => x.Description).HasMaxLength(1000);
+            e.Property(x => x.TargetAmount).HasPrecision(18, 2);
+            e.Property(x => x.SavedSoFar).HasPrecision(18, 2);
+            e.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<FinGoalItem>(e => {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).HasMaxLength(300).IsRequired();
+            e.Property(x => x.Cost).HasPrecision(18, 2);
+            e.HasOne(x => x.Goal).WithMany(x => x.Items).HasForeignKey(x => x.GoalId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<ZakatProfile>(e => {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.HawalDate).HasMaxLength(20);
+            e.Property(x => x.GoldGrams).HasPrecision(10, 4);
+            e.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.OwnerId).IsUnique();
+        });
+
+        builder.Entity<GoldPurchase>(e => {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Grams).HasPrecision(10, 4);
+            e.Property(x => x.PricePerGram).HasPrecision(18, 2);
+            e.Property(x => x.TotalCost).HasPrecision(18, 2);
+            e.Property(x => x.Notes).HasMaxLength(300);
+            e.HasOne(x => x.ZakatProfile).WithMany(x => x.GoldPurchases).HasForeignKey(x => x.ZakatProfileId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<FinSettings>(e => {
+            e.HasKey(x => x.Id);
+            e.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.OwnerId).IsUnique();
         });
 
         builder.Entity<Contact>(ct =>
