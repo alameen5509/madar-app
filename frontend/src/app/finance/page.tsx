@@ -75,6 +75,21 @@ interface RecurringDue {
   lastConfirmedDate?: string; // آخر مرة تأكد
 }
 
+interface GoldPurchase {
+  id: string;
+  grams: number;
+  pricePerGram: number;
+  totalCost: number;
+  date: string;
+  notes?: string;
+}
+
+interface ZakatData {
+  hawalDate: string; // تاريخ بداية الحول (هجري ISO)
+  goldGrams: number; // إجمالي الذهب (جرام)
+  goldPurchases: GoldPurchase[];
+}
+
 interface FinSettings {
   debtPercent: number;
   savingsPercent: number;
@@ -585,7 +600,9 @@ export default function FinancePage() {
   const [settings, setSettings] = useState<FinSettings>({ debtPercent: 10, savingsPercent: 10, expenseCategories: DEF_EXP_CATS, incomeCategories: DEF_INC_CATS });
   const [debts, setDebts]       = useState<Debt[]>([]);
   const [dues, setDues]         = useState<RecurringDue[]>([]);
-  const [tab, setTab] = useState<"overview" | "transactions" | "accounts" | "pockets" | "debts" | "dues" | "settings">("overview");
+  const [zakatData, setZakatData] = useState<ZakatData>({ hawalDate: "", goldGrams: 0, goldPurchases: [] });
+  const [goldPrice, setGoldPrice] = useState<number>(0); // سعر جرام الذهب بالريال
+  const [tab, setTab] = useState<"overview" | "transactions" | "accounts" | "pockets" | "debts" | "dues" | "zakat" | "settings">("overview");
   const [showAdd, setShowAdd] = useState(false);
   const [month, setMonth]     = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; });
 
@@ -619,6 +636,11 @@ export default function FinancePage() {
     setSettings({ ...s, expenseCategories: s.expenseCategories ?? DEF_EXP_CATS, incomeCategories: s.incomeCategories ?? DEF_INC_CATS });
     setDebts(load("mfin_debts", []));
     setDues(load("mfin_dues", []));
+    setZakatData(load("mfin_zakat", { hawalDate: "", goldGrams: 0, goldPurchases: [] }));
+    // جلب سعر الذهب
+    fetch("https://api.goldapi.io/v1/XAU/SAR", { headers: { "x-access-token": "goldapi-demo" } })
+      .then(r => r.json()).then(d => { if (d.price_gram_24k) setGoldPrice(Math.round(d.price_gram_24k)); })
+      .catch(() => { setGoldPrice(310); }); // سعر تقريبي كبديل
   }, []);
 
   function sTxs(v: Transaction[]) { setTxs(v); save("mfin_tx", v); }
@@ -639,6 +661,7 @@ export default function FinancePage() {
   function sSettings(v: FinSettings) { setSettings(v); save("mfin_settings", v); }
   function sDebts(v: Debt[]) { setDebts(v); save("mfin_debts", v); }
   function sDues(v: RecurringDue[]) { setDues(v); save("mfin_dues", v); }
+  function sZakat(v: ZakatData) { setZakatData(v); save("mfin_zakat", v); }
 
   /** تأكيد استلام/دفع مستحق وتحويله لمعاملة فعلية */
   function confirmDue(due: RecurringDue) {
@@ -784,6 +807,7 @@ export default function FinancePage() {
     { key: "pockets",      label: "محافظ" },
     { key: "dues",         label: "مستحقات" },
     { key: "debts",        label: "ديون" },
+    { key: "zakat",        label: "زكاة" },
     { key: "settings",     label: "إعدادات" },
   ] as const;
 
@@ -1096,6 +1120,106 @@ export default function FinancePage() {
 
         {/* ═══ Debts ═══ */}
         {tab === "debts" && (<DebtSection debts={debts} onUpdate={sDebts} />)}
+
+        {/* ═══ Zakat (زكاة) ═══ */}
+        {tab === "zakat" && (() => {
+          const nisab = goldPrice > 0 ? goldPrice * 85 : 310 * 85; // 85 جرام ذهب
+          const totalWealth = totalAcctBal + (zakatData.goldGrams * (goldPrice || 310));
+          const zakatDue = totalWealth >= nisab ? Math.round(totalWealth * 0.025) : 0;
+          const goldValue = zakatData.goldGrams * (goldPrice || 310);
+          const avgBuyPrice = zakatData.goldPurchases.length > 0
+            ? Math.round(zakatData.goldPurchases.reduce((s, p) => s + p.pricePerGram, 0) / zakatData.goldPurchases.length)
+            : 0;
+          const goldProfit = avgBuyPrice > 0 ? Math.round((goldPrice - avgBuyPrice) * zakatData.goldGrams) : 0;
+
+          return (
+            <section className="space-y-5">
+              {/* النصاب وسعر الذهب */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Stat label="سعر جرام الذهب" value={goldPrice || 310} color="#D4AF37" sub="ريال / 24 قيراط" />
+                <Stat label="النصاب (85 جرام)" value={nisab} color="#2C2C54" sub="ريال" />
+                <Stat label="إجمالي أموالك" value={totalWealth} color={totalWealth >= nisab ? "#3D8C5A" : "#6B7280"} sub="ريال" />
+                <Stat label="الزكاة المستحقة" value={zakatDue} color={zakatDue > 0 ? "#DC2626" : "#3D8C5A"} sub={zakatDue > 0 ? "2.5%" : "لم تبلغ النصاب"} />
+              </div>
+
+              {zakatDue > 0 && (
+                <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+                  <p className="text-green-800 text-sm font-bold mb-1">💰 زكاتك: {zakatDue.toLocaleString()} ريال</p>
+                  <p className="text-green-600 text-xs">إجمالي أموالك ({totalWealth.toLocaleString()}) تجاوزت النصاب ({nisab.toLocaleString()}) × 2.5%</p>
+                </div>
+              )}
+
+              {/* تاريخ الحول */}
+              <GeometricDivider label="تاريخ الحول" />
+              <div className="bg-white rounded-xl p-5 border border-gray-200 space-y-3">
+                <p className="text-[10px] text-[#6B7280]">حدد تاريخ بداية الحول (السنة الهجرية) — تستحق الزكاة بعد سنة هجرية كاملة</p>
+                <input type="date" value={zakatData.hawalDate} onChange={(e) => sZakat({ ...zakatData, hawalDate: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                {zakatData.hawalDate && (() => {
+                  const start = new Date(zakatData.hawalDate);
+                  const hawlEnd = new Date(start); hawlEnd.setFullYear(hawlEnd.getFullYear() + 1);
+                  const now = new Date();
+                  const daysLeft = Math.max(0, Math.ceil((hawlEnd.getTime() - now.getTime()) / 86400000));
+                  return (
+                    <div className="flex items-center gap-3">
+                      <p className="text-xs text-[#16213E]">استحقاق الزكاة: <b>{hawlEnd.toLocaleDateString("ar-SA")}</b></p>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                        style={{ background: daysLeft === 0 ? "#DC262620" : "#D4AF3720", color: daysLeft === 0 ? "#DC2626" : "#D4AF37" }}>
+                        {daysLeft === 0 ? "مستحقة الآن!" : `${daysLeft} يوم متبقي`}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* الذهب */}
+              <GeometricDivider label="الذهب" />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Stat label="إجمالي الذهب" value={zakatData.goldGrams} color="#D4AF37" sub="جرام" />
+                <Stat label="قيمته الحالية" value={goldValue} color="#D4AF37" sub="ريال" />
+                <Stat label="متوسط سعر الشراء" value={avgBuyPrice} color="#6B7280" sub="ريال / جرام" />
+                <Stat label={goldProfit >= 0 ? "الربح" : "الخسارة"} value={Math.abs(goldProfit)} color={goldProfit >= 0 ? "#3D8C5A" : "#DC2626"} sub="ريال" />
+              </div>
+
+              {goldPrice > 0 && avgBuyPrice > 0 && goldPrice < avgBuyPrice && (
+                <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+                  <p className="text-green-800 text-sm font-bold">💡 السعر الحالي أقل من متوسط شرائك — فرصة شراء!</p>
+                  <p className="text-green-600 text-xs">السعر الآن {goldPrice} ريال/جرام — متوسط شرائك {avgBuyPrice} ريال/جرام</p>
+                </div>
+              )}
+
+              {/* فواتير شراء الذهب */}
+              <div className="bg-white rounded-xl p-5 border border-gray-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-bold text-[#16213E]">فواتير شراء الذهب</p>
+                  <button onClick={() => {
+                    const grams = prompt("كم جرام؟"); if (!grams) return;
+                    const price = prompt("سعر الجرام (ريال)؟"); if (!price) return;
+                    const notes = prompt("ملاحظات (اختياري)") || "";
+                    const g = Number(grams); const p = Number(price);
+                    if (!g || !p) return;
+                    const purchase: GoldPurchase = { id: Date.now().toString(), grams: g, pricePerGram: p, totalCost: Math.round(g * p), date: new Date().toISOString().slice(0, 10), notes: notes || undefined };
+                    sZakat({ ...zakatData, goldGrams: zakatData.goldGrams + g, goldPurchases: [purchase, ...zakatData.goldPurchases] });
+                  }}
+                    className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style={{ background: "#D4AF37" }}>+ شراء ذهب</button>
+                </div>
+                {zakatData.goldPurchases.length === 0 && <p className="text-center text-[#9CA3AF] text-xs py-4">لا توجد فواتير</p>}
+                {zakatData.goldPurchases.map(p => (
+                  <div key={p.id} className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0">
+                    <span className="text-lg">🪙</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-[#16213E]">{p.grams} جرام × {p.pricePerGram} ريال</p>
+                      <p className="text-[9px] text-[#9CA3AF]">{p.date}{p.notes ? ` · ${p.notes}` : ""}</p>
+                    </div>
+                    <p className="text-sm font-bold text-[#D4AF37]">{p.totalCost.toLocaleString()} ريال</p>
+                    <button onClick={() => sZakat({ ...zakatData, goldGrams: zakatData.goldGrams - p.grams, goldPurchases: zakatData.goldPurchases.filter(x => x.id !== p.id) })}
+                      className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          );
+        })()}
 
         {/* ═══ Settings ═══ */}
         {tab === "settings" && (
