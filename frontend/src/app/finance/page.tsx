@@ -658,37 +658,50 @@ export default function FinancePage() {
     setDataLoading(true);
     try {
       const { data } = await api.get("/api/finance/snapshot");
+      const hasApiData = data && (
+        (data.transactions && data.transactions.length > 0) ||
+        (data.accounts && data.accounts.length > 0) ||
+        (data.debts && data.debts.length > 0) ||
+        (data.goals && data.goals.length > 0) ||
+        (data.pockets && data.pockets.length > 0)
+      );
 
-      // إذا الـ API فارغ وعندنا بيانات محلية → رحّلها
-      const localTxs = load<Transaction[]>("mfin_tx", []);
-      if ((!data.transactions || data.transactions.length === 0) && localTxs.length > 0) {
-        // ترحيل تلقائي من localStorage
-        try {
-          await api.post("/api/finance/sync", {
-            accounts: load("mfin_accts", DEF_ACCOUNTS).map((a: Account) => ({ id: a.id, name: a.name, icon: a.icon, balance: a.balance })),
-            pockets: load("mfin_pockets", DEF_POCKETS).map((p: Pocket) => ({ id: p.id, name: p.name, icon: p.icon, type: p.type, commitments: p.commitments })),
-            transactions: localTxs.map((t: Transaction) => ({ title: t.title, amount: t.amount, type: t.type, category: t.category, expenseClass: t.expenseClass, accountId: t.accountId, pocketId: t.pocketId, date: t.date })),
-            debts: load("mfin_debts", []),
-            dues: load<RecurringDue[]>("mfin_dues", []).map((d) => ({ title: d.title, amount: d.amount, type: d.type, frequency: d.frequency, dueDay: d.dueDay, dueMonth: d.dueMonth, accountId: d.accountId, pocketId: d.pocketId, category: d.category, isActive: d.isActive })),
-            goals: load<FinGoal[]>("mfin_goals", []).map((g) => ({ title: g.title, description: g.description, targetAmount: g.targetAmount, savedSoFar: g.savedSoFar, deadline: g.deadline, items: g.items })),
-            zakat: load("mfin_zakat", null),
-            settings: load("mfin_settings", null),
-          });
-          // امسح localStorage المالي بعد الترحيل
-          ["mfin_tx", "mfin_accts", "mfin_pockets", "mfin_settings", "mfin_debts", "mfin_dues", "mfin_goals", "mfin_zakat"].forEach(k => localStorage.removeItem(k));
-          // أعد جلب البيانات من API
-          const { data: fresh } = await api.get("/api/finance/snapshot");
-          applySnapshot(fresh);
-        } catch { applyLocalStorage(); }
-      } else if (data.transactions?.length > 0 || data.accounts?.length > 0) {
+      if (hasApiData) {
+        // الـ API فيه بيانات — استخدمها
+        console.log("[Finance] Loading from API:", data.transactions?.length ?? 0, "transactions");
         applySnapshot(data);
-        // امسح localStorage القديم
-        ["mfin_tx", "mfin_accts", "mfin_pockets", "mfin_settings", "mfin_debts", "mfin_dues", "mfin_goals", "mfin_zakat"].forEach(k => localStorage.removeItem(k));
       } else {
-        applyLocalStorage();
+        // الـ API فارغ — جرب ترحيل localStorage
+        const localTxs = load<Transaction[]>("mfin_tx", []);
+        const localAccts = load<Account[]>("mfin_accts", []);
+        const hasLocal = localTxs.length > 0 || localAccts.length > 0;
+
+        if (hasLocal) {
+          console.log("[Finance] Migrating localStorage to API...");
+          try {
+            await api.post("/api/finance/sync", {
+              accounts: load("mfin_accts", DEF_ACCOUNTS).map((a: Account) => ({ id: a.id, name: a.name, icon: a.icon, balance: a.balance })),
+              pockets: load("mfin_pockets", DEF_POCKETS).map((p: Pocket) => ({ id: p.id, name: p.name, icon: p.icon, type: p.type, commitments: p.commitments })),
+              transactions: localTxs.map((t: Transaction) => ({ title: t.title, amount: t.amount, type: t.type, category: t.category, expenseClass: t.expenseClass, accountId: t.accountId, pocketId: t.pocketId, date: t.date })),
+              debts: load("mfin_debts", []),
+              dues: load<RecurringDue[]>("mfin_dues", []).map((d) => ({ title: d.title, amount: d.amount, type: d.type, frequency: d.frequency, dueDay: d.dueDay, dueMonth: d.dueMonth, accountId: d.accountId, pocketId: d.pocketId, category: d.category, isActive: d.isActive })),
+              goals: load<FinGoal[]>("mfin_goals", []).map((g) => ({ title: g.title, description: g.description, targetAmount: g.targetAmount, savedSoFar: g.savedSoFar, deadline: g.deadline, items: g.items })),
+              zakat: load("mfin_zakat", null),
+              settings: load("mfin_settings", null),
+            });
+            ["mfin_tx", "mfin_accts", "mfin_pockets", "mfin_settings", "mfin_debts", "mfin_dues", "mfin_goals", "mfin_zakat"].forEach(k => localStorage.removeItem(k));
+            const { data: fresh } = await api.get("/api/finance/snapshot");
+            applySnapshot(fresh);
+            console.log("[Finance] Migration complete!");
+          } catch (e) { console.error("[Finance] Migration failed:", e); applyLocalStorage(); }
+        } else {
+          // لا بيانات في أي مكان — صفحة فارغة
+          console.log("[Finance] No data found (API empty, localStorage empty)");
+          applySnapshot(data ?? {});
+        }
       }
-    } catch {
-      // API فشل — استخدم localStorage
+    } catch (e) {
+      console.error("[Finance] API failed, using localStorage:", e);
       applyLocalStorage();
     }
     setDataLoading(false);
@@ -696,11 +709,27 @@ export default function FinancePage() {
 
   function applySnapshot(data: Record<string, unknown>) {
     const d = data as { accounts?: Account[]; pockets?: Pocket[]; transactions?: Transaction[]; debts?: Debt[]; dues?: RecurringDue[]; goals?: FinGoal[]; zakat?: ZakatData; settings?: FinSettings };
-    setAccounts(d.accounts ?? DEF_ACCOUNTS);
-    setPockets((d.pockets ?? DEF_POCKETS).map(p => ({ ...p, commitments: p.commitments ?? [] })));
-    setTxs(d.transactions ?? []);
+
+    // تحويل أسماء الأنواع من PascalCase (API) إلى camelCase (frontend)
+    const typeMap: Record<string, string> = { Income: "income", Expense: "expense", Transfer: "transfer", DebtPayment: "debt_payment", Installment: "installment", Gift: "gift" };
+    const expClsMap: Record<string, string> = { Essential: "essential", Luxury: "luxury", Improvement: "improvement" };
+    const pocketTypeMap: Record<string, string> = { Personal: "personal", Debt: "debt", Savings: "savings", Installment: "installment", Emergency: "emergency" };
+    const dueTypeMap: Record<string, string> = { Salary: "salary", Bill: "bill", Installment: "installment", ExpectedIncome: "expected_income", ExpectedExpense: "expected_expense" };
+    const dueFreqMap: Record<string, string> = { Monthly: "monthly", Yearly: "yearly", Once: "once" };
+
+    setAccounts((d.accounts ?? []).length > 0 ? d.accounts! : DEF_ACCOUNTS);
+    setPockets(((d.pockets ?? []).length > 0 ? d.pockets! : DEF_POCKETS).map(p => ({
+      ...p, type: (pocketTypeMap[p.type] ?? p.type) as Pocket["type"], commitments: p.commitments ?? [],
+    })));
+    setTxs((d.transactions ?? []).map(t => ({
+      ...t, type: (typeMap[t.type] ?? t.type) as Transaction["type"],
+      expenseClass: t.expenseClass ? (expClsMap[t.expenseClass] ?? t.expenseClass) as ExpenseClass : undefined,
+    })));
     setDebts(d.debts ?? []);
-    setDues(d.dues ?? []);
+    setDues((d.dues ?? []).map(du => ({
+      ...du, type: (dueTypeMap[du.type] ?? du.type) as RecurringDue["type"],
+      frequency: (dueFreqMap[du.frequency] ?? du.frequency) as RecurringDue["frequency"],
+    })));
     setFinGoals((d.goals ?? []).map(g => ({ ...g, items: g.items ?? [] })));
     setZakatData(d.zakat ?? { hawalDate: "", goldGrams: 0, goldPurchases: [] });
     if (d.settings) setSettings({ ...d.settings, expenseCategories: d.settings.expenseCategories ?? DEF_EXP_CATS, incomeCategories: d.settings.incomeCategories ?? DEF_INC_CATS });
@@ -807,7 +836,9 @@ export default function FinancePage() {
         expenseClass: fType === "expense" ? fExpCls : null,
         accountId: aid, pocketId: pid, date: fDate,
       });
-      setTxs(prev => [newTx, ...prev]);
+      // API يرجع PascalCase — نحوّل
+      const mapped = { ...newTx, type: fType, expenseClass: fType === "expense" ? fExpCls : undefined };
+      setTxs(prev => [mapped, ...prev]);
     } catch {
       // fallback — أضف محلياً
       setTxs(prev => [{ id: Date.now().toString(), title: fTitle.trim(), amount: amt, type: fType, category: fCat, expenseClass: fType === "expense" ? fExpCls : undefined, accountId: aid ?? "", pocketId: pid ?? "", date: fDate }, ...prev]);
