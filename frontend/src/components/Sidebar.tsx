@@ -48,7 +48,6 @@ function loadBadgeCounts(): BadgeCounts {
 /* ─── Nav items ───────────────────────────────────────────────────────── */
 
 const NAV_ITEMS = [
-  { icon: "⬡", label: "لوحة التحكم",        href: "/dashboard", badgeKey: null },
   { icon: "◻", label: "أعمال اليوم",        href: "/tasks",     badgeKey: "tasks" as const },
   { icon: "◎", label: "أدوار الحياة",       href: "/circles",   badgeKey: null },
   { icon: "◈", label: "الوظائف",            href: "/jobs",      badgeKey: null },
