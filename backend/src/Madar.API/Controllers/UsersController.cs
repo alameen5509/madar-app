@@ -168,6 +168,29 @@ public class UsersController : BaseController
         await _db.SaveChangesAsync(ct);
         return Ok(new { message = $"تم حذف حساب {user.FullName}" });
     }
+
+    /// <summary>جلب إعدادات المستخدم الحالي</summary>
+    [HttpGet("me/preferences")]
+    public async Task<IActionResult> GetPreferences(CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var user = await _db.Users.FindAsync(new object[] { userId }, ct);
+        if (user is null) return NotFound();
+        if (string.IsNullOrEmpty(user.PreferencesJson)) return Ok(new { });
+        return Content(user.PreferencesJson, "application/json");
+    }
+
+    /// <summary>حفظ إعدادات المستخدم الحالي</summary>
+    [HttpPut("me/preferences")]
+    public async Task<IActionResult> SavePreferences([FromBody] System.Text.Json.JsonElement prefs, CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var user = await _db.Users.FindAsync(new object[] { userId }, ct);
+        if (user is null) return NotFound();
+        user.PreferencesJson = prefs.GetRawText();
+        await _db.SaveChangesAsync(ct);
+        return Ok(new { message = "تم حفظ الإعدادات" });
+    }
 }
 
 public record UpdateUserRequest(

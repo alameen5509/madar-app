@@ -479,7 +479,7 @@ export function NewTaskDialog({
             </label>
             {hasCost && (() => {
               let totalBal = 0;
-              try { const accts = JSON.parse(localStorage.getItem("mfin_accts") ?? "[]"); totalBal = accts.reduce((s: number, a: { balance: number }) => s + a.balance, 0); } catch {}
+              // الرصيد يُحسب من المعاملات — لا يُقرأ من localStorage
               const costNum = Number(cost) || 0;
               const insufficient = costNum > 0 && costNum > totalBal;
               return (
@@ -639,21 +639,17 @@ function QuickFinanceDialog({ onClose }: { onClose: () => void }) {
     setShowCalcLocal(false);
   }
 
-  function save() {
+  async function save() {
     if (!amount) return;
-    const txs = JSON.parse(localStorage.getItem("madar_fin_tx") ?? "[]");
-    const wallets = JSON.parse(localStorage.getItem("madar_fin_wallets") ?? "[]");
-    const wid = wallets[0]?.id ?? "w1";
-    txs.unshift({
-      id: Date.now().toString(), title: desc.trim() || (type === "expense" ? "مصروف" : "دخل"),
-      amount: Number(amount), type, category: "أخرى", expenseClass: "essential",
-      walletId: wid, date: new Date().toISOString().slice(0, 10),
-    });
-    localStorage.setItem("madar_fin_tx", JSON.stringify(txs));
-    if (wallets.length > 0) {
-      wallets[0].balance += type === "income" ? Number(amount) : -Number(amount);
-      localStorage.setItem("madar_fin_wallets", JSON.stringify(wallets));
-    }
+    try {
+      await import("@/lib/api").then(({ api: a }) =>
+        a.post("/api/finance/transactions", {
+          title: desc.trim() || (type === "expense" ? "مصروف" : "دخل"),
+          amount: Number(amount), type: type === "income" ? "Income" : "Expense",
+          category: "أخرى", date: new Date().toISOString().slice(0, 10),
+        })
+      );
+    } catch {}
     onClose();
   }
 
@@ -1521,15 +1517,17 @@ function TodaySummary() {
         const done = active.filter((x: { todayDone: boolean }) => lastDate === today && x.todayDone).length;
         setHabitsLocal({ total: active.length, done });
       } catch {}
-      try {
-        const d = JSON.parse(localStorage.getItem("mfin_dues") ?? "[]");
-        const now = new Date();
-        const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-        const pending = d.filter((x: { isActive: boolean; dueDay: number; lastConfirmedDate?: string }) =>
-          x.isActive && now.getDate() >= x.dueDay && !x.lastConfirmedDate?.startsWith(monthStr)
-        ).length;
-        setDues(pending);
-      } catch {}
+      // جلب المستحقات من API
+      import("@/lib/api").then(({ api: a }) => {
+        a.get("/api/finance/snapshot").then(({ data }) => {
+          const now = new Date();
+          const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+          const pending = (data.dues ?? []).filter((x: { isActive: boolean; dueDay: number; lastConfirmedDate?: string }) =>
+            x.isActive && now.getDate() >= x.dueDay && !x.lastConfirmedDate?.startsWith(monthStr)
+          ).length;
+          setDues(pending);
+        }).catch(() => {});
+      });
     }
     load();
     window.addEventListener("madar-update", load);

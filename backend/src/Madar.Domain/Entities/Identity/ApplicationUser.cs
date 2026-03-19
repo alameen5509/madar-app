@@ -15,6 +15,7 @@ public class ApplicationUser : IdentityUser<Guid>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastLoginAt { get; set; }
     public bool IsActive { get; set; } = true;
+    public string? PreferencesJson { get; set; }
     public ICollection<UserEcosystemMember> EcosystemMemberships { get; set; } = [];
     public ICollection<LifeCircle> OwnedCircles { get; set; } = [];
     public ICollection<SmartTask> Tasks { get; set; } = [];

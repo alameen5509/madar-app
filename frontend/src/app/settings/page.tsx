@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { GeometricDivider } from "@/components/IslamicPattern";
-import { logout } from "@/lib/api";
+import { logout, api } from "@/lib/api";
 
 interface Settings {
   userName: string;
@@ -125,14 +125,24 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const s = localStorage.getItem("madar_settings");
-    if (s) { try { setSettings({ ...DEFAULTS, ...JSON.parse(s) }); } catch { /* ignore */ } }
+    // جلب من API أولاً ثم localStorage كـ fallback
+    api.get("/api/users/me/preferences").then(({ data }) => {
+      if (data && Object.keys(data).length > 0) setSettings({ ...DEFAULTS, ...data });
+      else {
+        const s = localStorage.getItem("madar_settings");
+        if (s) { try { const parsed = JSON.parse(s); setSettings({ ...DEFAULTS, ...parsed }); /* ارفع للسيرفر */ api.put("/api/users/me/preferences", { ...DEFAULTS, ...parsed }).catch(() => {}); } catch {} }
+      }
+    }).catch(() => {
+      const s = localStorage.getItem("madar_settings");
+      if (s) { try { setSettings({ ...DEFAULTS, ...JSON.parse(s) }); } catch {} }
+    });
   }, []);
 
   function update<K extends keyof Settings>(key: K, val: Settings[K]) {
     setSettings((p) => {
       const updated = { ...p, [key]: val };
-      localStorage.setItem("madar_settings", JSON.stringify(updated));
+      localStorage.setItem("madar_settings", JSON.stringify(updated)); // cache
+      api.put("/api/users/me/preferences", updated).catch(() => {}); // sync to server
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       return updated;

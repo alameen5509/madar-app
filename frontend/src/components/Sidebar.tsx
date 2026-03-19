@@ -28,19 +28,8 @@ function loadBadgeCounts(): BadgeCounts {
     ).length;
   } catch {}
 
-  // Dues
-  let duesCount = 0;
-  try {
-    const dues = JSON.parse(localStorage.getItem("mfin_dues") ?? "[]");
-    const now = new Date();
-    const todayDay = now.getDate();
-    const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    duesCount = dues.filter((d: { isActive: boolean; dueDay: number; frequency: string; dueMonth?: number; lastConfirmedDate?: string }) => {
-      if (!d.isActive) return false;
-      if (d.frequency === "yearly" && d.dueMonth !== now.getMonth() + 1) return false;
-      return !d.lastConfirmedDate?.startsWith(monthStr) && todayDay >= d.dueDay;
-    }).length;
-  } catch {}
+  // Dues — سيُحدّث من API في useEffect
+  const duesCount = 0;
 
   return { tasks: 0, inbox: 0, habits: habitsCount, dues: duesCount };
 }
