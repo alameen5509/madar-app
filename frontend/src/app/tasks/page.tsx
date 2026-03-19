@@ -1660,6 +1660,19 @@ export default function TasksPage() {
   /* ── Mood ── */
   const [mood, setMood]                  = useState<Mood>(null);
   const [showMoodPanel, setShowMoodPanel] = useState(false);
+
+  /* ── Focus task picker + custom durations ── */
+  const [showFocusTaskPicker, setShowFocusTaskPicker] = useState(false);
+  const [customDurations, setCustomDurations] = useState<Record<string, number>>(() => {
+    try { return JSON.parse(localStorage.getItem("madar_task_durations") ?? "{}"); } catch { return {}; }
+  });
+  const [editDurationTaskId, setEditDurationTaskId] = useState<string | null>(null);
+  function setTaskDuration(taskId: string, mins: number) {
+    const updated = { ...customDurations, [taskId]: mins };
+    setCustomDurations(updated);
+    localStorage.setItem("madar_task_durations", JSON.stringify(updated));
+    setEditDurationTaskId(null);
+  }
   const [lowMoodMsg]                     = useState(() => LOW_MOOD_MSGS[Math.floor(Math.random() * LOW_MOOD_MSGS.length)]);
 
   /* ── Night work ── */
@@ -1854,7 +1867,9 @@ export default function TasksPage() {
   }, [mode, taskPaused, focusTaskId]);
 
   /* ── Default task duration by context ── */
-  function getDefaultDuration(context: string): number {
+  function getDefaultDuration(context: string, taskId?: string): number {
+    // أولاً: مدة مخصصة للمهمة
+    if (taskId && customDurations[taskId]) return customDurations[taskId] * 60;
     if (context === "habit") {
       try { return (JSON.parse(localStorage.getItem("madar_settings") ?? "{}").habitDuration ?? 30) * 60; } catch { return 30 * 60; }
     }
@@ -2024,39 +2039,70 @@ export default function TasksPage() {
           </div>
 
           {/* Current task */}
-          {focusTask && (
+          {focusTask && (() => {
+            const est = getDefaultDuration(focusTask.context, focusTask.id);
+            const estMins = Math.round(est / 60);
+            const pct = Math.min(100, Math.round((taskElapsed / est) * 100));
+            return (
             <div className="w-full bg-white/10 rounded-xl px-5 py-4 border border-white/10">
               <div className="flex items-center justify-between mb-1">
                 <p className="text-white/40 text-[10px] tracking-wider">المهمة الحالية</p>
-                {(() => {
-                  const est = getDefaultDuration(focusTask.context);
-                  const pct = Math.min(100, Math.round((taskElapsed / est) * 100));
-                  return <span className="text-[10px]" style={{ color: pct >= 100 ? "#DC2626" : "#8FD49B" }}>{pct}% من الوقت المقدر</span>;
-                })()}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px]" style={{ color: pct >= 100 ? "#DC2626" : "#8FD49B" }}>{pct}% من {estMins}د</span>
+                  <button onClick={() => setEditDurationTaskId(editDurationTaskId === focusTask.id ? null : focusTask.id)}
+                    className="text-[9px] px-1.5 py-0.5 rounded-full border border-white/20 text-white/40 hover:text-white/70 transition">
+                    ⏱ تعديل
+                  </button>
+                </div>
               </div>
               <p className="text-white font-semibold text-base">{focusTask.title}</p>
               <div className="flex items-center gap-2 mt-2">
                 <span className="text-[10px] text-white/30">{focusTask.circle}</span>
-                {focusTask.context !== "Anywhere" && (
+                {focusTask.context !== "Anywhere" && focusTask.context !== "habit" && (
                   <span className="text-[10px] text-white/30">{TASK_CONTEXTS.find(c=>c.key===focusTask.context)?.icon} {TASK_CONTEXTS.find(c=>c.key===focusTask.context)?.label}</span>
                 )}
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${P_COLORS[focusTask.priority]}`}>
                   {focusTask.priority}
                 </span>
               </div>
-              {/* Progress bar - task duration */}
+              {/* Duration quick-select (1-25 min) */}
+              {editDurationTaskId === focusTask.id && (
+                <div className="mt-3 p-3 bg-white/5 rounded-lg border border-white/10 fade-up">
+                  <p className="text-white/40 text-[10px] mb-2 text-center">الوقت المقدر (دقائق):</p>
+                  <div className="flex flex-wrap gap-1.5 justify-center">
+                    {Array.from({ length: 25 }, (_, i) => i + 1).map(m => (
+                      <button key={m} onClick={() => setTaskDuration(focusTask.id, m)}
+                        className="w-8 h-8 rounded-lg text-xs font-bold transition"
+                        style={{
+                          background: estMins === m ? "#C9A84C" : "rgba(255,255,255,0.08)",
+                          color: estMins === m ? "#1A1830" : "rgba(255,255,255,0.5)",
+                          border: estMins === m ? "2px solid #C9A84C" : "1px solid rgba(255,255,255,0.1)",
+                        }}>
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Progress bar */}
               <div className="mt-3 bg-white/10 rounded-full h-1.5 overflow-hidden">
                 <div className="h-full rounded-full transition-all" style={{
-                  width: `${Math.min(100, Math.round((taskElapsed / getDefaultDuration(focusTask.context)) * 100))}%`,
-                  background: taskElapsed >= getDefaultDuration(focusTask.context) ? "#DC2626" : "#8FD49B",
+                  width: `${pct}%`,
+                  background: pct >= 100 ? "#DC2626" : "#8FD49B",
                 }} />
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {!focusTask && (
             <div className="w-full bg-white/10 rounded-xl px-5 py-4 border border-white/10 text-center">
               <p className="text-white/40 text-sm">تركيز حر — بدون مهمة محددة</p>
+              <button onClick={() => setShowFocusTaskPicker(true)}
+                className="mt-2 text-xs px-4 py-1.5 rounded-lg font-semibold transition"
+                style={{ background: "#C9A84C30", color: "#C9A84C", border: "1px solid #C9A84C40" }}>
+                + اختر مهمة
+              </button>
             </div>
           )}
 
@@ -2162,22 +2208,64 @@ export default function TasksPage() {
             <p className="text-white/30 text-xs">{sessionCount} جلسة مكتملة — دورة {cycleNum}</p>
           )}
 
-          {/* المهام القادمة في الجلسة */}
-          {pendingTasks.filter(t => t.id !== focusTaskId).length > 0 && (
-            <div className="w-full mt-2 pt-3 border-t border-white/10">
-              <p className="text-white/30 text-[10px] mb-2 text-center">المهام القادمة:</p>
-              <div className="space-y-1 max-h-24 overflow-y-auto">
-                {pendingTasks.filter(t => t.id !== focusTaskId).slice(0, 4).map((t, i) => (
-                  <div key={t.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 cursor-pointer hover:bg-white/10 transition"
-                    onClick={() => { if (focusTaskId) localStorage.setItem(`madar_task_time_${focusTaskId}`, String(taskElapsed)); setFocusTaskId(t.id); setTaskElapsed(Number(localStorage.getItem(`madar_task_time_${t.id}`) ?? "0")); setTaskPaused(false); }}>
-                    <span className="text-white/20 text-[10px] w-3">{i + 1}</span>
-                    <span className="text-white/50 text-xs flex-1 truncate">{t.title}</span>
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${P_COLORS[t.priority]}`}>{t.priority}</span>
-                  </div>
-                ))}
-              </div>
+          {/* المهام القادمة + إضافة مهمة */}
+          <div className="w-full mt-2 pt-3 border-t border-white/10">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-white/30 text-[10px]">المهام القادمة:</p>
+              <button onClick={() => setShowFocusTaskPicker(!showFocusTaskPicker)}
+                className="text-[10px] px-2.5 py-1 rounded-lg font-semibold transition"
+                style={{ background: "#C9A84C20", color: "#C9A84C", border: "1px solid #C9A84C30" }}>
+                {showFocusTaskPicker ? "✕ إغلاق" : "+ إضافة مهمة"}
+              </button>
             </div>
-          )}
+
+            {/* Task picker */}
+            {showFocusTaskPicker && (
+              <div className="mb-3 max-h-48 overflow-y-auto space-y-1 p-2 bg-white/5 rounded-xl border border-white/10 fade-up">
+                <p className="text-white/40 text-[10px] text-center mb-1">اختر مهمة:</p>
+                {pendingTasks.filter(t => t.id !== focusTaskId).map(t => {
+                  const dur = Math.round(getDefaultDuration(t.context, t.id) / 60);
+                  return (
+                    <div key={t.id} onClick={() => {
+                      if (focusTaskId) localStorage.setItem(`madar_task_time_${focusTaskId}`, String(taskElapsed));
+                      setFocusTaskId(t.id);
+                      setTaskElapsed(Number(localStorage.getItem(`madar_task_time_${t.id}`) ?? "0"));
+                      setTaskPaused(false);
+                      setShowFocusTaskPicker(false);
+                    }}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer hover:bg-white/10 transition">
+                      {t.context === "habit" && <span className="text-[10px]" style={{ color: "#2ABFBF" }}>🔄</span>}
+                      <span className="text-white/70 text-xs flex-1 truncate">{t.title}</span>
+                      <span className="text-[9px] text-white/30">{dur}د</span>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${P_COLORS[t.priority]}`}>{t.priority}</span>
+                    </div>
+                  );
+                })}
+                {pendingTasks.filter(t => t.id !== focusTaskId).length === 0 && (
+                  <p className="text-white/30 text-[10px] text-center py-2">لا توجد مهام معلقة</p>
+                )}
+              </div>
+            )}
+
+            {/* Current queue */}
+            {pendingTasks.filter(t => t.id !== focusTaskId).length > 0 && !showFocusTaskPicker && (
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {pendingTasks.filter(t => t.id !== focusTaskId).slice(0, 5).map((t, i) => {
+                  const dur = Math.round(getDefaultDuration(t.context, t.id) / 60);
+                  return (
+                    <div key={t.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 cursor-pointer hover:bg-white/10 transition"
+                      onClick={() => { if (focusTaskId) localStorage.setItem(`madar_task_time_${focusTaskId}`, String(taskElapsed)); setFocusTaskId(t.id); setTaskElapsed(Number(localStorage.getItem(`madar_task_time_${t.id}`) ?? "0")); setTaskPaused(false); }}>
+                      <span className="text-white/20 text-[10px] w-3">{i + 1}</span>
+                      {t.context === "habit" && <span className="text-[9px]" style={{ color: "#2ABFBF" }}>🔄</span>}
+                      <span className="text-white/50 text-xs flex-1 truncate">{t.title}</span>
+                      <span className="text-[9px] text-white/25">{dur}د</span>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${P_COLORS[t.priority]}`}>{t.priority}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
