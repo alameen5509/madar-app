@@ -258,6 +258,7 @@ export function NewTaskDialog({
   const [customInterval, setCustomInterval] = useState(2);
   const [customUnit, setCustomUnit] = useState<"minute"|"hour"|"day"|"week"|"month">("day");
   const [isWorkTask, setIsWorkTask] = useState(true);
+  const [totalBal, setTotalBal] = useState(0);
   const [isUrgent, setIsUrgent]     = useState(false);
   const [waitingFor, setWaitingFor] = useState("");
   const [assignTo, setAssignTo]     = useState("");
@@ -275,6 +276,12 @@ export function NewTaskDialog({
   useEffect(() => {
     import("@/lib/api").then(m => m.api.get("/api/users")).then(r => setPUsers(r.data)).catch(() => {});
     import("@/lib/api").then(m => m.getCircles()).then(c => setCircles(c.map(x => ({ id: x.id, name: x.name, iconKey: x.iconKey, tier: x.tier })))).catch(() => {});
+    import("@/lib/api").then(m => m.api.get("/api/finance/snapshot")).then(r => {
+      const txs = r.data?.transactions ?? [];
+      const inc = txs.filter((t: { type: string }) => t.type === "Income" || t.type === "income").reduce((s: number, t: { amount: number }) => s + t.amount, 0);
+      const exp = txs.filter((t: { type: string }) => t.type !== "Income" && t.type !== "income").reduce((s: number, t: { amount: number }) => s + t.amount, 0);
+      setTotalBal(inc - exp);
+    }).catch(() => {});
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -474,10 +481,8 @@ export function NewTaskDialog({
               <span className="text-sm font-semibold text-[#1A1830]">💰 مهمة مالية</span>
             </label>
             {hasCost && (() => {
-              let totalBal = 0;
-              // الرصيد يُحسب من المعاملات — لا يُقرأ من localStorage
               const costNum = Number(cost) || 0;
-              const insufficient = costNum > 0 && costNum > totalBal;
+              const insufficient = costNum > 0 && totalBal > 0 && costNum > totalBal;
               return (
                 <div className="space-y-2">
                   <input type="number" min={0} value={cost} onChange={(e) => setCost(e.target.value)}
