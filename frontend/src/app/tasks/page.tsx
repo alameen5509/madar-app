@@ -790,9 +790,14 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
         pt.push(...habitTasks);
       }
       for (let s = 0; s < slots && remaining.length > 0; s++) {
-        let idx = pCtx ? remaining.findIndex(t => t.context === pCtx) : -1;
-        if (idx < 0) idx = 0;
-        pt.push(remaining.splice(idx, 1)[0]);
+        if (pCtx) {
+          let idx = remaining.findIndex(t => t.context === pCtx);
+          if (idx < 0) idx = remaining.findIndex(t => t.context === "Anywhere" || t.context === "habit");
+          if (idx < 0) break;
+          pt.push(remaining.splice(idx, 1)[0]);
+        } else {
+          pt.push(remaining.shift()!);
+        }
       }
       periodTasks.set(period.name, pt);
     }
@@ -1303,9 +1308,15 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     if (!isPast) {
       const pCtx = periodContexts[period.name];
       for (let s = 0; s < slots && remaining.length > 0; s++) {
-        let idx = pCtx ? remaining.findIndex(t => t.context === pCtx) : -1;
-        if (idx < 0) idx = 0;
-        pt.push(remaining.splice(idx, 1)[0]);
+        if (pCtx) {
+          // بيئة محددة: أولاً مهام نفس البيئة، ثم Anywhere، وتجاهل البيئات الأخرى
+          let idx = remaining.findIndex(t => t.context === pCtx);
+          if (idx < 0) idx = remaining.findIndex(t => t.context === "Anywhere" || t.context === "habit");
+          if (idx < 0) break; // لا مهام مناسبة لهذه البيئة
+          pt.push(remaining.splice(idx, 1)[0]);
+        } else {
+          pt.push(remaining.shift()!);
+        }
       }
     }
     periodTasksMap.set(period.name, pt);
@@ -1886,7 +1897,8 @@ export default function TasksPage() {
   const dotsInCycle  = sessionCount % 3 === 0 ? (sessionCount === 0 ? 0 : 3) : sessionCount % 3;
   const cycleNum     = sessionCount === 0 ? 1 : Math.ceil(sessionCount / 3);
   const focusTask    = focusTaskId ? tasks.find((t) => t.id === focusTaskId) : null;
-  const pendingTasks = visibleTasks.filter((t) => !t.done);
+  // في شاشة التركيز نعرض كل المهام المعلقة (بغض النظر عن الفلتر)
+  const pendingTasks = baseTasks.filter((t) => !t.done && !t.isInbox);
 
   /* ── Task timer tick ── */
   useEffect(() => {
