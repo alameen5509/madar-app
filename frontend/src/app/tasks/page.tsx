@@ -1261,17 +1261,22 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     return a.circleOrder - b.circleOrder;
   });
 
-  // بناء جميع الفترات من أوقات الصلاة
+  // بناء الفترات — دائماً 7 فترات حتى لو الصلوات لم تُحمّل
+  const defaultPrayers = [
+    { name: "الفجر", start: 280, adhan: 240 },
+    { name: "الضحى", start: 615, adhan: 600 },
+    { name: "الظهر", start: 770, adhan: 730 },
+    { name: "العصر", start: 930, adhan: 890 },
+    { name: "المغرب", start: 1100, adhan: 1060 },
+  ];
+  const prayerList = prayers.length >= 2 ? prayers : defaultPrayers;
   const allPeriods: { name: string; startMin: number; endMin: number; duration: number; blocked: boolean }[] = [];
-  if (prayers.length >= 2) {
-    for (let i = 0; i < prayers.length; i++) {
-      const endMin = i + 1 < prayers.length ? prayers[i + 1].adhan : (prayers[prayers.length - 1].start + 60);
-      const dur = endMin - prayers[i].start;
-      if (dur > 0) allPeriods.push({ name: prayers[i].name, startMin: prayers[i].start, endMin, duration: dur, blocked: blockedPeriods.includes(prayers[i].name) });
-    }
+  for (let i = 0; i < prayerList.length; i++) {
+    const endMin = i + 1 < prayerList.length ? prayerList[i + 1].adhan : (prayerList[prayerList.length - 1].start + 60);
+    const dur = endMin - prayerList[i].start;
+    if (dur > 0) allPeriods.push({ name: prayerList[i].name, startMin: prayerList[i].start, endMin, duration: dur, blocked: blockedPeriods.includes(prayerList[i].name) });
   }
-  // فترات ليلية — تظهر دائماً (ليست موقوفة افتراضياً)
-  const ishaEnd = prayers.length > 0 ? prayers[prayers.length - 1].start : 21 * 60;
+  const ishaEnd = prayerList[prayerList.length - 1].start;
   allPeriods.push(
     { name: "بعد العشاء", startMin: ishaEnd + 60, endMin: 24 * 60, duration: 24 * 60 - ishaEnd - 60, blocked: blockedPeriods.includes("بعد العشاء") },
     { name: "بعد منتصف الليل", startMin: 0, endMin: 2 * 60, duration: 120, blocked: blockedPeriods.includes("بعد منتصف الليل") },
@@ -1363,50 +1368,17 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     return `${h > 12 ? h - 12 : h}:${String(m).padStart(2, "0")} ${h >= 12 ? "م" : "ص"}`;
   }
 
-  if (prayers.length === 0) return <p className="text-center text-sm py-4" style={{ color: "var(--muted)" }}>جارٍ تحميل مواقيت الصلاة...</p>;
+  // لا نخفي الفترات أبداً — نعرض فترات افتراضية حتى لو الصلوات لم تُحمّل
 
   return (
     <div className="space-y-3 mt-3">
       <div className="flex gap-2 flex-wrap text-[11px]" style={{ color: "var(--muted)" }}>
         <span>{pending.length} مهمة</span><span>•</span><span>الفترات الماضية فارغة</span><span>•</span><span>اسحب المهام بين الفترات</span>
       </div>
-      {plan.map((p) => {
-        const isPast = p.endMin <= now && p.name !== "بعد منتصف الليل";
-        const isCurrent = !isPast && p.startMin <= now && p.endMin > now;
-        return (
-        <div key={p.name} className="rounded-xl overflow-hidden"
-          onDragOver={(e) => { if (!p.blocked) { e.preventDefault(); e.currentTarget.style.borderColor = "var(--gold, #D4AF37)"; } }}
-          onDragLeave={(e) => { e.currentTarget.style.borderColor = p.blocked ? "var(--card-border)" : isCurrent ? "var(--gold, #D4AF37)" : "var(--gold, #D4AF37)25"; }}
-          onDrop={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "var(--gold, #D4AF37)25"; handleDrop(p.name); }}
-          style={{ border: `1px solid ${p.blocked ? "var(--card-border)" : isCurrent ? "var(--gold, #D4AF37)" : "var(--gold, #D4AF37)25"}`, opacity: p.blocked ? 0.4 : isPast ? 0.6 : 1 }}>
-          <div className="flex items-center justify-between px-4 py-2" style={{ background: isCurrent ? "var(--gold, #D4AF37)08" : "var(--bg)" }}>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold" style={{ color: isPast ? "var(--muted)" : isCurrent ? "var(--gold)" : "var(--text)" }}>🕌 {p.name}</span>
-              <span className="text-xs" style={{ color: "var(--muted)" }}>{fmtTime(p.startMin)} — {fmtTime(p.endMin)}</span>
-              {isPast && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-100 text-[#9CA3AF]">انتهت</span>}
-              {isCurrent && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "var(--gold, #D4AF37)15", color: "var(--gold)" }}>الآن</span>}
-            </div>
-            <div className="flex items-center gap-1">
-              {!p.blocked && (
-                <select value={periodContexts[p.name] ?? ""}
-                  onChange={(e) => setPeriodContexts(prev => ({ ...prev, [p.name]: e.target.value }))}
-                  className="text-[10px] px-1.5 py-0.5 rounded-lg border focus:outline-none"
-                  style={{ background: "var(--bg)", color: "var(--muted)", borderColor: "var(--card-border)" }}>
-                  <option value="">كل البيئات</option>
-                  {TASK_CONTEXTS.map(c => <option key={c.key} value={c.key}>{c.icon} {c.label}</option>)}
-                </select>
-              )}
-              <button onClick={() => {
-                if (p.name === "بعد العشاء" || p.name === "بعد منتصف الليل") onBlockToggle(p.name);
-                else onBlockToggle(p.name);
-              }}
-                className="text-[11px] px-2 py-1 rounded-lg font-semibold"
-                style={{ background: p.blocked ? "#DC262610" : "var(--bg)", color: p.blocked ? "#DC2626" : "var(--muted)", border: `1px solid ${p.blocked ? "#DC262620" : "var(--card-border)"}` }}>
-                {p.blocked ? "موقوفة" : "إيقاف"}
-              </button>
-            </div>
-          </div>
-          {!p.blocked && p.tasks.length > 0 && (
+      {(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        function renderTasks(p: any) {
+          return (
             <div className="px-4 py-1.5 space-y-0.5">
               {p.habitSlot && (
                 <div className="flex items-center gap-2 py-1.5 px-1 rounded" style={{ background: "#2ABFBF10", borderRight: "3px solid #2ABFBF" }}>
@@ -1415,7 +1387,7 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
                   <span className="text-[10px] font-semibold" style={{ color: "#2ABFBF" }}>~{habitDuration} د</span>
                 </div>
               )}
-              {p.tasks.filter(t => t.context !== "habit").map((t, i) => (
+              {p.tasks.filter((t: TaskRow) => t.context !== "habit").map((t: TaskRow, i: number) => (
                 <div key={t.id} draggable
                   onDragStart={() => setDragTask({ taskId: t.id, fromPeriod: p.name })}
                   className="flex items-center gap-2 py-1.5 px-1 rounded cursor-grab active:cursor-grabbing hover:opacity-80 transition"
@@ -1429,13 +1401,68 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
                 </div>
               ))}
             </div>
-          )}
+          );
+        }
+        return plan.map((p) => {
+        const isPast = p.endMin <= now && p.name !== "بعد منتصف الليل";
+        const isCurrent = !isPast && p.startMin <= now && p.endMin > now;
+        const isNight = p.name === "بعد العشاء" || p.name === "بعد منتصف الليل";
+
+        const header = (
+          <div className="flex items-center justify-between px-4 py-2" style={{ background: isCurrent ? "var(--gold, #D4AF37)08" : "var(--bg)" }}>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold" style={{ color: isPast ? "var(--muted)" : isCurrent ? "var(--gold)" : "var(--text)" }}>🕌 {p.name}</span>
+              <span className="text-xs" style={{ color: "var(--muted)" }}>{fmtTime(p.startMin)} — {fmtTime(p.endMin)}</span>
+              {isPast && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-100 text-[#9CA3AF]">انتهت</span>}
+              {isCurrent && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "var(--gold, #D4AF37)15", color: "var(--gold)" }}>الآن</span>}
+              {isNight && <span className="text-[9px] text-[#9CA3AF]">▾</span>}
+            </div>
+            <div className="flex items-center gap-1">
+              {!p.blocked && (
+                <select value={periodContexts[p.name] ?? ""}
+                  onChange={(e) => { e.stopPropagation(); setPeriodContexts(prev => ({ ...prev, [p.name]: e.target.value })); }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-[10px] px-1.5 py-0.5 rounded-lg border focus:outline-none"
+                  style={{ background: "var(--bg)", color: "var(--muted)", borderColor: "var(--card-border)" }}>
+                  <option value="">كل البيئات</option>
+                  {TASK_CONTEXTS.map(c => <option key={c.key} value={c.key}>{c.icon} {c.label}</option>)}
+                </select>
+              )}
+              <button onClick={(e) => { e.stopPropagation(); if (p.name === "بعد العشاء" || p.name === "بعد منتصف الليل") onBlockToggle(p.name); else onBlockToggle(p.name); }}
+                className="text-[11px] px-2 py-1 rounded-lg font-semibold"
+                style={{ background: p.blocked ? "#DC262610" : "var(--bg)", color: p.blocked ? "#DC2626" : "var(--muted)", border: `1px solid ${p.blocked ? "#DC262620" : "var(--card-border)"}` }}>
+                {p.blocked ? "موقوفة" : "إيقاف"}
+              </button>
+            </div>
+          </div>
+        );
+
+        if (isNight) {
+          return (
+            <details key={p.name} className="rounded-xl overflow-hidden"
+              style={{ border: `1px solid var(--gold, #D4AF37)25`, opacity: p.blocked ? 0.4 : 0.8 }}>
+              <summary className="cursor-pointer list-none">{header}</summary>
+              {!p.blocked && p.tasks.length > 0 && renderTasks(p)}
+              {!p.blocked && p.tasks.length === 0 && <p className="px-4 py-2 text-xs" style={{ color: "var(--muted)" }}>—</p>}
+            </details>
+          );
+        }
+
+        return (
+        <div key={p.name} className="rounded-xl overflow-hidden"
+          onDragOver={(e) => { if (!p.blocked) { e.preventDefault(); e.currentTarget.style.borderColor = "var(--gold, #D4AF37)"; } }}
+          onDragLeave={(e) => { e.currentTarget.style.borderColor = "var(--card-border)"; }}
+          onDrop={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "var(--card-border)"; handleDrop(p.name); }}
+          style={{ border: `1px solid ${p.blocked ? "var(--card-border)" : isCurrent ? "var(--gold, #D4AF37)" : "var(--gold, #D4AF37)25"}`, opacity: p.blocked ? 0.4 : isPast ? 0.6 : 1 }}>
+          {header}
+          {!p.blocked && p.tasks.length > 0 && renderTasks(p)}
           {!p.blocked && p.tasks.length === 0 && (
             <p className="px-4 py-2 text-xs" style={{ color: "var(--muted)" }}>—</p>
           )}
         </div>
         );
-      })}
+      });
+      })()}
       {remaining.length > 0 && (
         <div className="rounded-xl p-3" style={{ background: "#FEF3C7", border: "1px solid #F59E0B30" }}>
           <p className="text-amber-800 text-sm font-semibold">{remaining.length} مهمة لم تتسع</p>
