@@ -1912,7 +1912,8 @@ export default function TasksPage() {
   const inWorkTime   = periodInfo !== null;
   const inAdhan      = isInAdhanWindow(prayers, nowMinState);
   const weekend      = isWeekend();
-  const baseTasks    = weekend ? tasks.filter((t) => !t.isWork) : tasks;
+  // لا نخفي مهام العمل — نعرض الكل دائماً
+  const baseTasks    = tasks;
   const visibleTasks = taskFilter === "all" ? baseTasks
     : taskFilter === "pending" ? baseTasks.filter((t) => !t.done)
     : taskFilter === "done" ? baseTasks.filter((t) => t.done)
