@@ -1261,21 +1261,34 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     return a.circleOrder - b.circleOrder;
   });
 
-  const periods = prayers.length >= 2 ? prayers.slice(0, -1).map((p, i) => {
-    const next = prayers[i + 1];
-    return { name: p.name, startMin: p.start, endMin: next.adhan, duration: next.adhan - p.start, blocked: blockedPeriods.includes(p.name) };
-  }).filter(p => p.duration > 0) : [];
-
+  // بناء جميع الفترات من أوقات الصلاة
+  const allPeriods: { name: string; startMin: number; endMin: number; duration: number; blocked: boolean }[] = [];
+  if (prayers.length >= 2) {
+    for (let i = 0; i < prayers.length; i++) {
+      const endMin = i + 1 < prayers.length ? prayers[i + 1].adhan : (prayers[prayers.length - 1].start + 60);
+      const dur = endMin - prayers[i].start;
+      if (dur > 0) allPeriods.push({ name: prayers[i].name, startMin: prayers[i].start, endMin, duration: dur, blocked: blockedPeriods.includes(prayers[i].name) });
+    }
+  }
+  // فترات ليلية
   const ishaEnd = prayers.length > 0 ? prayers[prayers.length - 1].start : 21 * 60;
-  const allPeriods = [
-    ...periods,
-    { name: "بعد العشاء", startMin: ishaEnd, endMin: 24 * 60, duration: 24 * 60 - ishaEnd, blocked: !blockedPeriods.includes("بعد العشاء_open") },
+  allPeriods.push(
+    { name: "بعد العشاء", startMin: ishaEnd + 60, endMin: 24 * 60, duration: 24 * 60 - ishaEnd - 60, blocked: !blockedPeriods.includes("بعد العشاء_open") },
     { name: "بعد منتصف الليل", startMin: 0, endMin: 2 * 60, duration: 120, blocked: !blockedPeriods.includes("بعد منتصف الليل_open") },
-  ];
+  );
 
   const now = nowMin();
-  // بيئة كل فترة
-  const [periodContexts, setPeriodContexts] = useState<Record<string, string>>({});
+  // بيئة كل فترة — تُحفظ في localStorage
+  const [periodContexts, setPeriodContexts] = useState<Record<string, string>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem("madar_period_contexts") ?? "{}"); } catch { return {}; }
+  });
+  // حفظ عند التغيير
+  useEffect(() => {
+    if (Object.keys(periodContexts).length > 0) {
+      localStorage.setItem("madar_period_contexts", JSON.stringify(periodContexts));
+    }
+  }, [periodContexts]);
 
   // عرض جميع الفترات بترتيبها الطبيعي — بدون إخفاء أي فترة
   const firstAvailable = allPeriods.find(p => !p.blocked && p.endMin > now) ?? allPeriods.find(p => !p.blocked);
@@ -2132,13 +2145,20 @@ export default function TasksPage() {
           })()}
 
           {!focusTask && (
-            <div className="w-full bg-white/10 rounded-xl px-5 py-4 border border-white/10 text-center">
+            <div className="w-full bg-white/10 rounded-xl px-5 py-4 border border-white/10 text-center space-y-3">
               <p className="text-white/40 text-sm">تركيز حر — بدون مهمة محددة</p>
-              <button onClick={() => setShowFocusTaskPicker(true)}
-                className="mt-2 text-xs px-4 py-1.5 rounded-lg font-semibold transition"
-                style={{ background: "#C9A84C30", color: "#C9A84C", border: "1px solid #C9A84C40" }}>
-                + اختر مهمة
-              </button>
+              <div className="flex gap-2 justify-center">
+                <button onClick={() => setShowFocusTaskPicker(true)}
+                  className="text-xs px-4 py-2 rounded-lg font-semibold transition"
+                  style={{ background: "#C9A84C30", color: "#C9A84C", border: "1px solid #C9A84C40" }}>
+                  اختر مهمة
+                </button>
+                <button onClick={() => { stopFocus(); setShowDialog(true); }}
+                  className="text-xs px-4 py-2 rounded-lg font-semibold transition"
+                  style={{ background: "#5E549530", color: "#9B8FD4", border: "1px solid #5E549540" }}>
+                  + مهمة جديدة
+                </button>
+              </div>
             </div>
           )}
 
@@ -2278,7 +2298,14 @@ export default function TasksPage() {
                   );
                 })}
                 {pendingTasks.filter(t => t.id !== focusTaskId).length === 0 && (
-                  <p className="text-white/30 text-[10px] text-center py-2">لا توجد مهام معلقة</p>
+                  <div className="text-center py-2">
+                    <p className="text-white/30 text-[10px] mb-2">لا توجد مهام معلقة</p>
+                    <button onClick={() => { stopFocus(); setShowDialog(true); }}
+                      className="text-[10px] px-3 py-1.5 rounded-lg font-semibold"
+                      style={{ background: "#5E549530", color: "#9B8FD4", border: "1px solid #5E549540" }}>
+                      + إنشاء مهمة جديدة
+                    </button>
+                  </div>
                 )}
               </div>
             )}
