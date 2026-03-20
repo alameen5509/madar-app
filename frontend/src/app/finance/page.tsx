@@ -672,6 +672,17 @@ export default function FinancePage() {
   // Gold alert
   const [goldAdvice, setGoldAdvice] = useState<string | null>(null);
   const [showTransfer, setShowTransfer]   = useState(false);
+  // Deductions form
+  const [showAddDed, setShowAddDed] = useState(false);
+  const [ddTitle, setDdTitle] = useState(""); const [ddType, setDdType] = useState<"percent"|"fixed">("percent");
+  const [ddValue, setDdValue] = useState(""); const [ddSource, setDdSource] = useState("all");
+  // Receivables form
+  const [showAddRec, setShowAddRec] = useState(false);
+  const [rrTitle, setRrTitle] = useState(""); const [rrAmount, setRrAmount] = useState("");
+  const [rrFrom, setRrFrom] = useState(""); const [rrDate, setRrDate] = useState("");
+  // Gold form
+  const [goldForm, setGoldForm] = useState<"buy"|"sell"|null>(null);
+  const [gfGrams, setGfGrams] = useState(""); const [gfPrice, setGfPrice] = useState(""); const [gfNotes, setGfNotes] = useState("");
   const [trFrom, setTrFrom] = useState(""); const [trTo, setTrTo] = useState(""); const [trAmt, setTrAmt] = useState("");
   const [ncTitle, setNcTitle] = useState(""); const [ncAmount, setNcAmount] = useState(""); const [ncTotal, setNcTotal] = useState(""); const [ncDay, setNcDay] = useState("1");
 
@@ -1481,8 +1492,6 @@ export default function FinancePage() {
             : 0;
           const goldProfit = avgBuyPrice > 0 ? Math.round(((goldPrice || 310) - avgBuyPrice) * zakatData.goldGrams) : 0;
 
-          const [goldForm, setGoldForm] = useState<"buy"|"sell"|null>(null);
-          const [gfGrams, setGfGrams] = useState(""); const [gfPrice, setGfPrice] = useState(""); const [gfNotes, setGfNotes] = useState("");
 
           async function submitGoldTx() {
             const g = Number(gfGrams); const p = Number(gfPrice);
@@ -1631,9 +1640,6 @@ export default function FinancePage() {
         {/* ═══ Deductions (استقطاعات) ═══ */}
         {tab === "deductions" && (() => {
           const deds = settings.deductions ?? [];
-          const [showAddDed, setShowAddDed] = useState(false);
-          const [ddTitle, setDdTitle] = useState(""); const [ddType, setDdType] = useState<"percent"|"fixed">("percent");
-          const [ddValue, setDdValue] = useState(""); const [ddSource, setDdSource] = useState("all");
 
           // حساب إجمالي الاستقطاعات من الدخل الشهري
           const monthlyIncome = mTx.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
@@ -1708,9 +1714,6 @@ export default function FinancePage() {
         {/* ═══ Receivables (مستحقات لي — غير مستلمة) ═══ */}
         {tab === "receivables" && (() => {
           const recs = settings.receivables ?? [];
-          const [showAddRec, setShowAddRec] = useState(false);
-          const [rrTitle, setRrTitle] = useState(""); const [rrAmount, setRrAmount] = useState("");
-          const [rrFrom, setRrFrom] = useState(""); const [rrDate, setRrDate] = useState("");
           const unpaid = recs.filter(r => !r.isPaid);
           const paid = recs.filter(r => r.isPaid);
           const totalUnpaid = unpaid.reduce((s, r) => s + r.amount, 0);
