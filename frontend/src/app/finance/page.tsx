@@ -101,11 +101,31 @@ interface FinGoal {
   items: { name: string; cost: number }[];
 }
 
+interface Deduction {
+  id: string;
+  title: string;
+  type: "percent" | "fixed";
+  value: number; // نسبة أو مبلغ
+  source: "all" | string; // "all" = من كل الدخل, أو id مصدر محدد
+  targetPocketId?: string; // المحفظة المستهدفة
+}
+
+interface Receivable {
+  id: string;
+  title: string;
+  amount: number;
+  fromWhom: string;
+  dueDate?: string;
+  isPaid: boolean;
+}
+
 interface FinSettings {
   debtPercent: number;
   savingsPercent: number;
   expenseCategories: string[];
   incomeCategories: string[];
+  deductions: Deduction[];
+  receivables: Receivable[];
 }
 
 /* ═══ Constants ═══════════════════════════════════════════════════════════ */
@@ -612,14 +632,14 @@ export default function FinancePage() {
   const [txs, setTxs]           = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>(DEF_ACCOUNTS);
   const [pockets, setPockets]   = useState<Pocket[]>(DEF_POCKETS);
-  const [settings, setSettings] = useState<FinSettings>({ debtPercent: 10, savingsPercent: 10, expenseCategories: DEF_EXP_CATS, incomeCategories: DEF_INC_CATS });
+  const [settings, setSettings] = useState<FinSettings>({ debtPercent: 10, savingsPercent: 10, expenseCategories: DEF_EXP_CATS, incomeCategories: DEF_INC_CATS, deductions: [], receivables: [] });
   const [debts, setDebts]       = useState<Debt[]>([]);
   const [dues, setDues]         = useState<RecurringDue[]>([]);
   const [zakatData, setZakatData] = useState<ZakatData>({ hawalDate: "", goldGrams: 0, goldPurchases: [] });
   const [finGoals, setFinGoals] = useState<FinGoal[]>([]);
   const [goldPrice, setGoldPriceRaw] = useState<number>(0);
   function setGoldPrice(v: number) { setGoldPriceRaw(v); if (v > 0) save("mfin_gold_price", v); }
-  const [tab, setTab] = useState<"overview" | "transactions" | "accounts" | "pockets" | "debts" | "dues" | "goals" | "gold" | "zakat" | "settings">("overview");
+  const [tab, setTab] = useState<"overview" | "transactions" | "accounts" | "pockets" | "debts" | "dues" | "goals" | "deductions" | "receivables" | "gold" | "zakat" | "settings">("overview");
   const [showAdd, setShowAdd] = useState(false);
   const [month, setMonth]     = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; });
 
@@ -736,14 +756,14 @@ export default function FinancePage() {
     })));
     setFinGoals((d.goals ?? []).map(g => ({ ...g, items: g.items ?? [] })));
     setZakatData(d.zakat ?? { hawalDate: "", goldGrams: 0, goldPurchases: [] });
-    if (d.settings) setSettings({ ...d.settings, expenseCategories: d.settings.expenseCategories ?? DEF_EXP_CATS, incomeCategories: d.settings.incomeCategories ?? DEF_INC_CATS });
+    if (d.settings) setSettings({ ...d.settings, expenseCategories: d.settings.expenseCategories ?? DEF_EXP_CATS, incomeCategories: d.settings.incomeCategories ?? DEF_INC_CATS, deductions: d.settings.deductions ?? [], receivables: d.settings.receivables ?? [] });
   }
 
   function applyLocalStorage() {
     setTxs(load("mfin_tx", []));
     setAccounts(load("mfin_accts", DEF_ACCOUNTS));
     setPockets(load("mfin_pockets", DEF_POCKETS));
-    const s = load("mfin_settings", { debtPercent: 10, savingsPercent: 10, expenseCategories: DEF_EXP_CATS, incomeCategories: DEF_INC_CATS });
+    const s = load("mfin_settings", { debtPercent: 10, savingsPercent: 10, expenseCategories: DEF_EXP_CATS, incomeCategories: DEF_INC_CATS, deductions: [], receivables: [] });
     setSettings({ ...s, expenseCategories: s.expenseCategories ?? DEF_EXP_CATS, incomeCategories: s.incomeCategories ?? DEF_INC_CATS });
     setDebts(load("mfin_debts", []));
     setDues(load("mfin_dues", []));
@@ -954,6 +974,8 @@ export default function FinancePage() {
     { key: "dues",         label: "مستحقات" },
     { key: "debts",        label: "ديون" },
     { key: "goals",        label: "أهداف" },
+    { key: "deductions",   label: "استقطاعات" },
+    { key: "receivables",  label: "مستحقات لي" },
     { key: "gold",         label: "ذهب" },
     { key: "zakat",        label: "زكاة" },
     { key: "settings",     label: "إعدادات" },
@@ -1604,6 +1626,159 @@ export default function FinancePage() {
         })()}
 
         {/* ═══ Settings ═══ */}
+        {/* ═══ Deductions (استقطاعات) ═══ */}
+        {tab === "deductions" && (() => {
+          const deds = settings.deductions ?? [];
+          const [showAddDed, setShowAddDed] = useState(false);
+          const [ddTitle, setDdTitle] = useState(""); const [ddType, setDdType] = useState<"percent"|"fixed">("percent");
+          const [ddValue, setDdValue] = useState(""); const [ddSource, setDdSource] = useState("all");
+
+          // حساب إجمالي الاستقطاعات من الدخل الشهري
+          const monthlyIncome = mTx.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
+          const totalDeducted = deds.reduce((s, d) => s + (d.type === "percent" ? Math.round(monthlyIncome * d.value / 100) : d.value), 0);
+          // خصم ما سُدد من الديون هذا الشهر
+          const debtPaidThisMonth = mTx.filter(t => t.type === "debt_payment").reduce((s, t) => s + t.amount, 0);
+          const debtDeductionTotal = deds.filter(d => d.title.includes("دين") || d.title.includes("سداد")).reduce((s, d) => s + (d.type === "percent" ? Math.round(monthlyIncome * d.value / 100) : d.value), 0);
+          const debtRemaining = Math.max(0, debtDeductionTotal - debtPaidThisMonth);
+
+          return (
+            <section className="space-y-5">
+              <div className="flex items-center justify-between">
+                <div><p className="text-sm font-bold text-[#16213E]">الاستقطاعات الدورية</p><p className="text-[10px] text-[#6B7280]">نسبة أو مبلغ يُستقطع من الدخل تلقائياً</p></div>
+                <button onClick={() => setShowAddDed(true)} className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style={{ background: "#2C2C54" }}>+ استقطاع</button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <Stat label="الدخل الشهري" value={monthlyIncome} color="#3D8C5A" />
+                <Stat label="إجمالي الاستقطاعات" value={totalDeducted} color="#5E5495" />
+                <Stat label="المتبقي بعد الاستقطاع" value={monthlyIncome - totalDeducted} color={monthlyIncome - totalDeducted >= 0 ? "#2C2C54" : "#DC2626"} />
+              </div>
+
+              {debtPaidThisMonth > 0 && debtDeductionTotal > 0 && (
+                <div className="bg-green-50 rounded-xl p-3 border border-green-200">
+                  <p className="text-green-800 text-xs font-semibold">سددت {debtPaidThisMonth.toLocaleString()} من أصل {debtDeductionTotal.toLocaleString()} مخصص للديون{debtRemaining > 0 ? ` — متبقي ${debtRemaining.toLocaleString()}` : " ✅ تم السداد"}</p>
+                </div>
+              )}
+
+              {showAddDed && (
+                <div className="bg-white rounded-xl p-5 border border-[#5E5495] shadow-sm fade-up space-y-3">
+                  <input value={ddTitle} onChange={e => setDdTitle(e.target.value)} placeholder="اسم الاستقطاع (مثال: ادخار، نفقة، سداد ديون)"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                  <div className="flex gap-2">
+                    <button onClick={() => setDdType("percent")} className="flex-1 py-2 rounded-lg text-xs font-semibold"
+                      style={{ background: ddType === "percent" ? "#5E5495" : "#F3F4F6", color: ddType === "percent" ? "#fff" : "#6B7280" }}>نسبة %</button>
+                    <button onClick={() => setDdType("fixed")} className="flex-1 py-2 rounded-lg text-xs font-semibold"
+                      style={{ background: ddType === "fixed" ? "#5E5495" : "#F3F4F6", color: ddType === "fixed" ? "#fff" : "#6B7280" }}>مبلغ ثابت</button>
+                  </div>
+                  <input type="number" value={ddValue} onChange={e => setDdValue(e.target.value)} placeholder={ddType === "percent" ? "النسبة (مثال: 10)" : "المبلغ"}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowAddDed(false)} className="flex-1 py-2.5 rounded-xl text-sm text-[#6B7280] bg-gray-100">إلغاء</button>
+                    <button onClick={() => {
+                      if (!ddTitle.trim() || !ddValue) return;
+                      const newDed: Deduction = { id: Date.now().toString(), title: ddTitle.trim(), type: ddType, value: Number(ddValue), source: ddSource };
+                      sSettings({ ...settings, deductions: [...deds, newDed] });
+                      setDdTitle(""); setDdValue(""); setShowAddDed(false);
+                    }} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "#5E5495" }}>إضافة</button>
+                  </div>
+                </div>
+              )}
+
+              {deds.length === 0 && !showAddDed && <p className="text-center text-[#9CA3AF] text-xs py-6">لا توجد استقطاعات — أضف لتنظيم دخلك</p>}
+              {deds.map(d => {
+                const amount = d.type === "percent" ? Math.round(monthlyIncome * d.value / 100) : d.value;
+                return (
+                  <div key={d.id} className="bg-white rounded-xl px-5 py-4 border border-gray-200 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ background: "#5E549515" }}>💰</div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-[#16213E]">{d.title}</p>
+                      <p className="text-[10px] text-[#6B7280]">{d.type === "percent" ? `${d.value}% من الدخل` : `${d.value.toLocaleString()} ريال ثابت`}</p>
+                    </div>
+                    <p className="text-sm font-black text-[#5E5495]">{amount.toLocaleString()}</p>
+                    <button onClick={() => sSettings({ ...settings, deductions: deds.filter(x => x.id !== d.id) })} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
+                  </div>
+                );
+              })}
+            </section>
+          );
+        })()}
+
+        {/* ═══ Receivables (مستحقات لي — غير مستلمة) ═══ */}
+        {tab === "receivables" && (() => {
+          const recs = settings.receivables ?? [];
+          const [showAddRec, setShowAddRec] = useState(false);
+          const [rrTitle, setRrTitle] = useState(""); const [rrAmount, setRrAmount] = useState("");
+          const [rrFrom, setRrFrom] = useState(""); const [rrDate, setRrDate] = useState("");
+          const unpaid = recs.filter(r => !r.isPaid);
+          const paid = recs.filter(r => r.isPaid);
+          const totalUnpaid = unpaid.reduce((s, r) => s + r.amount, 0);
+
+          return (
+            <section className="space-y-5">
+              <div className="flex items-center justify-between">
+                <div><p className="text-sm font-bold text-[#16213E]">مبالغ مستحقة لي</p><p className="text-[10px] text-[#6B7280]">أموال عند أشخاص لم تُسلّم بعد</p></div>
+                <button onClick={() => setShowAddRec(true)} className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style={{ background: "#D4AF37" }}>+ مستحق</button>
+              </div>
+
+              <Stat label="إجمالي المستحق لك" value={totalUnpaid} color="#D4AF37" sub={`${unpaid.length} مستحق`} />
+
+              {showAddRec && (
+                <div className="bg-white rounded-xl p-5 border border-[#D4AF37] shadow-sm fade-up space-y-3">
+                  <input value={rrTitle} onChange={e => setRrTitle(e.target.value)} placeholder="وصف المستحق (مثال: سلفة لأحمد)"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                  <input type="number" value={rrAmount} onChange={e => setRrAmount(e.target.value)} placeholder="المبلغ"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                  <input value={rrFrom} onChange={e => setRrFrom(e.target.value)} placeholder="من عند (الشخص/الجهة)"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                  <input type="date" value={rrDate} onChange={e => setRrDate(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowAddRec(false)} className="flex-1 py-2.5 rounded-xl text-sm text-[#6B7280] bg-gray-100">إلغاء</button>
+                    <button onClick={() => {
+                      if (!rrTitle.trim() || !rrAmount) return;
+                      const r: Receivable = { id: Date.now().toString(), title: rrTitle.trim(), amount: Number(rrAmount), fromWhom: rrFrom.trim(), dueDate: rrDate || undefined, isPaid: false };
+                      sSettings({ ...settings, receivables: [r, ...recs] });
+                      setRrTitle(""); setRrAmount(""); setRrFrom(""); setRrDate(""); setShowAddRec(false);
+                    }} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "#D4AF37" }}>إضافة</button>
+                  </div>
+                </div>
+              )}
+
+              {unpaid.length === 0 && !showAddRec && <p className="text-center text-[#9CA3AF] text-xs py-6">لا توجد مبالغ مستحقة — الحمد لله</p>}
+
+              {unpaid.map(r => (
+                <div key={r.id} className="bg-white rounded-xl px-5 py-4 border border-gray-200 flex items-center gap-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-[#16213E]">{r.title}</p>
+                    <p className="text-[10px] text-[#6B7280]">من: {r.fromWhom}{r.dueDate ? ` · ${new Date(r.dueDate).toLocaleDateString("ar-SA")}` : ""}</p>
+                  </div>
+                  <p className="text-sm font-black text-[#D4AF37]">{r.amount.toLocaleString()}</p>
+                  <button onClick={async () => {
+                    // تم الاستلام — أضف كدخل وحوّل لمستلم
+                    try { await api.post("/api/finance/transactions", { title: `استلام: ${r.title}`, amount: r.amount, type: "Income", category: "أخرى", date: new Date().toISOString().slice(0, 10) }); } catch {}
+                    setTxs(prev => [{ id: Date.now().toString(), title: `استلام: ${r.title}`, amount: r.amount, type: "income", category: "أخرى", accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) }, ...prev]);
+                    sSettings({ ...settings, receivables: recs.map(x => x.id === r.id ? { ...x, isPaid: true } : x) });
+                  }} className="text-[10px] px-3 py-1.5 rounded-lg font-bold text-white bg-[#3D8C5A]">تم الاستلام</button>
+                  <button onClick={() => sSettings({ ...settings, receivables: recs.filter(x => x.id !== r.id) })} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
+                </div>
+              ))}
+
+              {paid.length > 0 && (
+                <>
+                  <GeometricDivider label="مستلمة" />
+                  {paid.map(r => (
+                    <div key={r.id} className="bg-white rounded-xl px-5 py-3 border border-gray-200 flex items-center gap-3 opacity-50">
+                      <p className="text-sm text-[#16213E] flex-1 line-through">{r.title} — {r.fromWhom}</p>
+                      <p className="text-sm text-[#3D8C5A]">{r.amount.toLocaleString()} ✓</p>
+                      <button onClick={() => sSettings({ ...settings, receivables: recs.filter(x => x.id !== r.id) })} className="text-[#9CA3AF] text-xs">✕</button>
+                    </div>
+                  ))}
+                </>
+              )}
+            </section>
+          );
+        })()}
+
         {tab === "settings" && (
           <>
             <FinSettingsSection settings={settings} onUpdate={sSettings} />
