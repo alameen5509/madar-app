@@ -1278,6 +1278,15 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
 
   const now = nowMin();
 
+  // بيئة كل فترة — تُحفظ في localStorage
+  const [periodContexts, setPeriodContexts] = useState<Record<string, string>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem("madar_period_contexts") ?? "{}"); } catch { return {}; }
+  });
+  useEffect(() => {
+    if (Object.keys(periodContexts).length > 0) localStorage.setItem("madar_period_contexts", JSON.stringify(periodContexts));
+  }, [periodContexts]);
+
   // عرض جميع الفترات بترتيبها الطبيعي — بدون إخفاء أي فترة
   const firstAvailable = allPeriods.find(p => !p.blocked && p.endMin > now) ?? allPeriods.find(p => !p.blocked);
   const habitPeriodName = firstAvailable?.name ?? "";
@@ -1305,14 +1314,31 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     return !p.blocked && !isPast;
   });
 
-  // وزّع مجموعات البيئات على الفترات — كل بيئة في فترة
+  // وزّع المهام: إذا الفترة لها بيئة محددة → مهام نفس البيئة فقط + Anywhere
   const periodAssignments = new Map<string, TaskRow[]>();
-  let periodIdx = 0;
-  for (const [ctx, ctxTasks] of sortedContexts) {
-    if (availablePeriods.length === 0) break;
-    const target = availablePeriods[Math.min(periodIdx, availablePeriods.length - 1)].name;
-    periodAssignments.set(target, [...(periodAssignments.get(target) ?? []), ...ctxTasks]);
-    if (ctx !== "Anywhere") periodIdx++;
+  const assigned = new Set<string>();
+
+  // أولاً: الفترات التي لها بيئة محددة → تأخذ مهام تلك البيئة
+  for (const p of availablePeriods) {
+    const pCtx = periodContexts[p.name];
+    if (!pCtx) continue;
+    const matching = sortedContexts.find(([ctx]) => ctx === pCtx)?.[1] ?? [];
+    const anywhereT = sortedContexts.find(([ctx]) => ctx === "Anywhere")?.[1] ?? [];
+    const combined = [...matching, ...anywhereT].filter(t => !assigned.has(t.id));
+    const slots = Math.floor(p.duration / 30);
+    const taken = combined.slice(0, slots);
+    taken.forEach(t => assigned.add(t.id));
+    periodAssignments.set(p.name, taken);
+  }
+
+  // ثانياً: الفترات بدون بيئة محددة → تأخذ المهام المتبقية
+  for (const p of availablePeriods) {
+    if (periodAssignments.has(p.name)) continue;
+    const slots = Math.floor(p.duration / 30);
+    const remaining = pending.filter(t => !assigned.has(t.id));
+    const taken = remaining.slice(0, slots);
+    taken.forEach(t => assigned.add(t.id));
+    periodAssignments.set(p.name, taken);
   }
 
   // بناء الخريطة النهائية
@@ -1337,7 +1363,7 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   const [dragTask, setDragTask] = useState<{ taskId: string; fromPeriod: string } | null>(null);
 
   // Re-compute when blockedPeriods/contexts change
-  useEffect(() => { setPlan(initialPlan); }, [blockedPeriods.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setPlan(initialPlan); }, [blockedPeriods.join(","), JSON.stringify(periodContexts)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleDrop(toPeriod: string) {
     if (!dragTask || dragTask.fromPeriod === toPeriod) { setDragTask(null); return; }
@@ -1413,6 +1439,16 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
               {isNight && <span className="text-[9px] text-[#9CA3AF]">▾</span>}
             </div>
             <div className="flex items-center gap-1">
+              {!p.blocked && (
+                <select value={periodContexts[p.name] ?? ""}
+                  onChange={(e) => { e.stopPropagation(); setPeriodContexts(prev => ({ ...prev, [p.name]: e.target.value })); }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-[10px] px-1.5 py-0.5 rounded-lg border focus:outline-none"
+                  style={{ background: "var(--bg)", color: "var(--muted)", borderColor: "var(--card-border)" }}>
+                  <option value="">الكل</option>
+                  {TASK_CONTEXTS.filter(c => c.key !== "Anywhere").map(c => <option key={c.key} value={c.key}>{c.icon} {c.label}</option>)}
+                </select>
+              )}
               <button onClick={(e) => { e.stopPropagation(); onBlockToggle(p.name); }}
                 className="text-[11px] px-2 py-1 rounded-lg font-semibold"
                 style={{ background: p.blocked ? "#DC262610" : "var(--bg)", color: p.blocked ? "#DC2626" : "var(--muted)", border: `1px solid ${p.blocked ? "#DC262620" : "var(--card-border)"}` }}>
