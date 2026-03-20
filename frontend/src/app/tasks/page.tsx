@@ -1275,17 +1275,6 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   );
 
   const now = nowMin();
-  // بيئة كل فترة — تُحفظ في localStorage
-  const [periodContexts, setPeriodContexts] = useState<Record<string, string>>(() => {
-    if (typeof window === "undefined") return {};
-    try { return JSON.parse(localStorage.getItem("madar_period_contexts") ?? "{}"); } catch { return {}; }
-  });
-  // حفظ عند التغيير
-  useEffect(() => {
-    if (Object.keys(periodContexts).length > 0) {
-      localStorage.setItem("madar_period_contexts", JSON.stringify(periodContexts));
-    }
-  }, [periodContexts]);
 
   // عرض جميع الفترات بترتيبها الطبيعي — بدون إخفاء أي فترة
   const firstAvailable = allPeriods.find(p => !p.blocked && p.endMin > now) ?? allPeriods.find(p => !p.blocked);
@@ -1314,29 +1303,14 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     return !p.blocked && !isPast;
   });
 
-  // وزّع مجموعات البيئات على الفترات
+  // وزّع مجموعات البيئات على الفترات — كل بيئة في فترة
   const periodAssignments = new Map<string, TaskRow[]>();
   let periodIdx = 0;
   for (const [ctx, ctxTasks] of sortedContexts) {
-    if (periodIdx >= availablePeriods.length) {
-      // لم تتسع الفترات — أضف للأخيرة
-      const lastP = availablePeriods[availablePeriods.length - 1]?.name;
-      if (lastP) periodAssignments.set(lastP, [...(periodAssignments.get(lastP) ?? []), ...ctxTasks]);
-      continue;
-    }
-    const targetPeriod = availablePeriods[periodIdx].name;
-    // إذا البيئة المختارة للفترة تطابق — أو الفترة بدون بيئة محددة
-    const pCtx = periodContexts[targetPeriod];
-    if (!pCtx || pCtx === ctx || ctx === "Anywhere") {
-      periodAssignments.set(targetPeriod, [...(periodAssignments.get(targetPeriod) ?? []), ...ctxTasks]);
-      if (ctx !== "Anywhere") periodIdx++; // بيئة محددة تأخذ فترة كاملة
-    } else {
-      // البيئة لا تطابق — جرب الفترة التالية
-      periodIdx++;
-      const next = availablePeriods[periodIdx]?.name ?? targetPeriod;
-      periodAssignments.set(next, [...(periodAssignments.get(next) ?? []), ...ctxTasks]);
-      periodIdx++;
-    }
+    if (availablePeriods.length === 0) break;
+    const target = availablePeriods[Math.min(periodIdx, availablePeriods.length - 1)].name;
+    periodAssignments.set(target, [...(periodAssignments.get(target) ?? []), ...ctxTasks]);
+    if (ctx !== "Anywhere") periodIdx++;
   }
 
   // بناء الخريطة النهائية
@@ -1361,7 +1335,7 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   const [dragTask, setDragTask] = useState<{ taskId: string; fromPeriod: string } | null>(null);
 
   // Re-compute when blockedPeriods/contexts change
-  useEffect(() => { setPlan(initialPlan); }, [blockedPeriods.join(","), JSON.stringify(periodContexts)]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setPlan(initialPlan); }, [blockedPeriods.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleDrop(toPeriod: string) {
     if (!dragTask || dragTask.fromPeriod === toPeriod) { setDragTask(null); return; }
@@ -1437,17 +1411,7 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
               {isNight && <span className="text-[9px] text-[#9CA3AF]">▾</span>}
             </div>
             <div className="flex items-center gap-1">
-              {!p.blocked && (
-                <select value={periodContexts[p.name] ?? ""}
-                  onChange={(e) => { e.stopPropagation(); setPeriodContexts(prev => ({ ...prev, [p.name]: e.target.value })); }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-[10px] px-1.5 py-0.5 rounded-lg border focus:outline-none"
-                  style={{ background: "var(--bg)", color: "var(--muted)", borderColor: "var(--card-border)" }}>
-                  <option value="">كل البيئات</option>
-                  {TASK_CONTEXTS.map(c => <option key={c.key} value={c.key}>{c.icon} {c.label}</option>)}
-                </select>
-              )}
-              <button onClick={(e) => { e.stopPropagation(); if (p.name === "بعد العشاء" || p.name === "بعد منتصف الليل") onBlockToggle(p.name); else onBlockToggle(p.name); }}
+              <button onClick={(e) => { e.stopPropagation(); onBlockToggle(p.name); }}
                 className="text-[11px] px-2 py-1 rounded-lg font-semibold"
                 style={{ background: p.blocked ? "#DC262610" : "var(--bg)", color: p.blocked ? "#DC2626" : "var(--muted)", border: `1px solid ${p.blocked ? "#DC262620" : "var(--card-border)"}` }}>
                 {p.blocked ? "موقوفة" : "إيقاف"}
