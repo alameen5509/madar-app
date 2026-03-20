@@ -247,11 +247,7 @@ export function NewTaskDialog({
   const [userPriority, setPriority] = useState<number>(3);
   const [cognitiveLoad, setLoad]    = useState<CreateTaskPayload["cognitiveLoad"]>("Medium");
   const [taskContext, setTaskContext] = useState("Anywhere");
-  const [dueDate, setDueDate]       = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().slice(0, 10);
-  });
+  const [dueDate, setDueDate]       = useState(() => new Date().toISOString().slice(0, 10));
   const [goalId, setGoalId]         = useState(defaultGoalId ?? "");
   const [circleId, setCircleId]     = useState("");
   const [circles, setCircles]       = useState<{id: string; name: string; iconKey?: string; tier: string}[]>([]);
@@ -1034,18 +1030,14 @@ function EditTaskDialog({ task, onClose, onSaved }: {
       if (assignEmail.trim()) {
         const { assignTask } = await import("@/lib/api");
         await assignTask(assignEmail.trim(), title.trim());
-        await api.patch(`/api/tasks/${task.id}/status`, { status: "Cancelled" });
       } else {
-        await api.patch(`/api/tasks/${task.id}/status`, { status: "Cancelled" });
-        await api.post("/api/tasks", {
+        // تعديل المهمة مباشرة — بدون حذف وإنشاء
+        await api.post(`/api/tasks/${task.id}/update`, {
           title: title.trim(),
           description: desc.trim() || undefined,
           userPriority: priority,
           dueDate: dueDate || undefined,
           taskContext: context !== "Anywhere" ? context : undefined,
-          isWorkTask: isWork || undefined,
-          isUrgent: isUrgent || undefined,
-          isRecurring: isRecurring || undefined,
         });
       }
       onSaved();
