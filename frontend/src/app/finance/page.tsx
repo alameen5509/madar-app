@@ -125,6 +125,10 @@ const DUE_TYPES = [
   { key: "salary",           label: "راتب",        icon: "💼", color: "#3D8C5A" },
   { key: "bill",             label: "فاتورة",      icon: "📄", color: "#DC2626" },
   { key: "installment",      label: "قسط",         icon: "📋", color: "#8C4A3D" },
+  { key: "nafaqa",           label: "نفقة",        icon: "👨‍👩‍👧", color: "#5E5495" },
+  { key: "rent",             label: "إيجار",       icon: "🏠", color: "#0F3460" },
+  { key: "subscription",     label: "اشتراك",      icon: "📱", color: "#2D6B9E" },
+  { key: "insurance",        label: "تأمين",       icon: "🛡️", color: "#6B7280" },
   { key: "expected_income",  label: "دخل متوقع",   icon: "📥", color: "#0F3460" },
   { key: "expected_expense", label: "مصروف متوقع", icon: "📤", color: "#D4AF37" },
 ] as const;
