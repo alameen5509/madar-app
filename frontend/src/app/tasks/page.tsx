@@ -1291,41 +1291,65 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   const firstAvailable = allPeriods.find(p => !p.blocked && p.endMin > now) ?? allPeriods.find(p => !p.blocked);
   const habitPeriodName = firstAvailable?.name ?? "";
 
-  // توزيع المهام: الفترات المنتهية فارغة، المهام تذهب للحالية والمستقبلية فقط
-  const remaining = [...pending];
+  // توزيع المهام: تجميع حسب البيئة — كل مهام البيئة تذهب لنفس الفترة
   const periodTasksMap = new Map<string, TaskRow[]>();
   const periodHabitMap = new Map<string, boolean>();
 
-  for (const period of allPeriods) {
-    if (period.blocked) { periodTasksMap.set(period.name, []); periodHabitMap.set(period.name, false); continue; }
+  // تجميع المهام حسب البيئة
+  const contextGroups = new Map<string, TaskRow[]>();
+  for (const t of pending) {
+    const ctx = t.context || "Anywhere";
+    contextGroups.set(ctx, [...(contextGroups.get(ctx) ?? []), t]);
+  }
+  // ترتيب: البيئات المحددة أولاً ثم "Anywhere"
+  const sortedContexts = Array.from(contextGroups.entries()).sort((a, b) => {
+    if (a[0] === "Anywhere") return 1;
+    if (b[0] === "Anywhere") return -1;
+    return b[1].length - a[1].length; // الأكثر مهاماً أولاً
+  });
 
+  // الفترات المتاحة (غير منتهية وغير موقوفة)
+  const availablePeriods = allPeriods.filter(p => {
+    const isPast = p.endMin <= now && p.name !== "بعد منتصف الليل";
+    return !p.blocked && !isPast;
+  });
+
+  // وزّع مجموعات البيئات على الفترات
+  const periodAssignments = new Map<string, TaskRow[]>();
+  let periodIdx = 0;
+  for (const [ctx, ctxTasks] of sortedContexts) {
+    if (periodIdx >= availablePeriods.length) {
+      // لم تتسع الفترات — أضف للأخيرة
+      const lastP = availablePeriods[availablePeriods.length - 1]?.name;
+      if (lastP) periodAssignments.set(lastP, [...(periodAssignments.get(lastP) ?? []), ...ctxTasks]);
+      continue;
+    }
+    const targetPeriod = availablePeriods[periodIdx].name;
+    // إذا البيئة المختارة للفترة تطابق — أو الفترة بدون بيئة محددة
+    const pCtx = periodContexts[targetPeriod];
+    if (!pCtx || pCtx === ctx || ctx === "Anywhere") {
+      periodAssignments.set(targetPeriod, [...(periodAssignments.get(targetPeriod) ?? []), ...ctxTasks]);
+      if (ctx !== "Anywhere") periodIdx++; // بيئة محددة تأخذ فترة كاملة
+    } else {
+      // البيئة لا تطابق — جرب الفترة التالية
+      periodIdx++;
+      const next = availablePeriods[periodIdx]?.name ?? targetPeriod;
+      periodAssignments.set(next, [...(periodAssignments.get(next) ?? []), ...ctxTasks]);
+      periodIdx++;
+    }
+  }
+
+  // بناء الخريطة النهائية
+  for (const period of allPeriods) {
     const isPast = period.endMin <= now && period.name !== "بعد منتصف الليل";
     const isHabitPeriod = period.name === habitPeriodName && habitTasks.length > 0;
-    const habitMins = isHabitPeriod ? habitDuration : 0;
-    const slots = Math.max(0, Math.floor((period.duration - habitMins) / 30));
     periodHabitMap.set(period.name, isHabitPeriod);
 
+    if (period.blocked) { periodTasksMap.set(period.name, []); continue; }
+
     const pt: TaskRow[] = [];
-    // العادات فقط في أول فترة متاحة (غير منتهية)
     if (isHabitPeriod && !isPast) pt.push(...habitTasks);
-
-    // الفترات المنتهية: فارغة (بدون مهام)
-    if (isPast) { periodTasksMap.set(period.name, pt); continue; }
-
-    const pCtx = periodContexts[period.name];
-    for (let s = 0; s < slots && remaining.length > 0; s++) {
-      if (pCtx) {
-        // أولاً: مهمة بنفس البيئة
-        let idx = remaining.findIndex(t => t.context === pCtx);
-        // ثانياً: مهمة بدون بيئة محددة
-        if (idx < 0) idx = remaining.findIndex(t => t.context === "Anywhere" || t.context === "habit");
-        // ثالثاً: أي مهمة متاحة (fallback)
-        if (idx < 0) idx = 0;
-        pt.push(remaining.splice(idx, 1)[0]);
-      } else {
-        pt.push(remaining.shift()!);
-      }
-    }
+    if (!isPast) pt.push(...(periodAssignments.get(period.name) ?? []));
     periodTasksMap.set(period.name, pt);
   }
 
@@ -1458,11 +1482,15 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
         );
       });
       })()}
-      {remaining.length > 0 && (
-        <div className="rounded-xl p-3" style={{ background: "#FEF3C7", border: "1px solid #F59E0B30" }}>
-          <p className="text-amber-800 text-sm font-semibold">{remaining.length} مهمة لم تتسع</p>
-        </div>
-      )}
+      {(() => {
+        const assigned = Array.from(periodTasksMap.values()).flat().filter(t => t.context !== "habit").length;
+        const unassigned = pending.length - assigned;
+        return unassigned > 0 ? (
+          <div className="rounded-xl p-3" style={{ background: "#FEF3C7", border: "1px solid #F59E0B30" }}>
+            <p className="text-amber-800 text-sm font-semibold">{unassigned} مهمة لم تتسع</p>
+          </div>
+        ) : null;
+      })()}
     </div>
   );
 }
