@@ -96,75 +96,79 @@ export default function HabitsPage() {
     async function load() {
       try {
         const { data } = await api.get("/api/habits");
-        if (data && data.length > 0) {
-          const mapped: Habit[] = data.map((h: { id: string; title: string; icon?: string; category?: string; isIdea: boolean; streak: number; lastCompletedDate?: string }) => ({
+        if (data && data.length >= 0) {
+          const mapped: Habit[] = data.map((h: { id: string; title: string; icon?: string; category?: string; isIdea: boolean; streak: number; todayDone?: boolean; lastCompletedDate?: string }) => ({
             id: h.id,
             title: h.title,
             icon: h.icon ?? "⭐",
             streak: h.streak ?? 0,
-            todayDone: h.lastCompletedDate === new Date().toISOString().slice(0, 10),
+            todayDone: h.todayDone ?? (h.lastCompletedDate ? h.lastCompletedDate.slice(0, 10) === new Date().toISOString().slice(0, 10) : false),
             category: (h.category as Habit["category"]) ?? "worship",
             isIdea: h.isIdea,
           }));
           setHabits(mapped);
+          // كاش محلي للـ Sidebar badges
           localStorage.setItem("madar_habits", JSON.stringify(mapped));
           localStorage.setItem("madar_habits_date", new Date().toDateString());
           return;
         }
       } catch {}
-      // Fallback to localStorage
+      // Fallback
       const saved = localStorage.getItem("madar_habits");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          const lastDate = localStorage.getItem("madar_habits_date");
-          const today = new Date().toDateString();
-          if (lastDate !== today) {
-            setHabits(parsed.map((h: Habit) => ({ ...h, todayDone: false })));
-            localStorage.setItem("madar_habits_date", today);
-          } else setHabits(parsed);
-        } catch { setHabits(DEFAULT_HABITS); }
-      } else setHabits(DEFAULT_HABITS);
+      if (saved) { try { setHabits(JSON.parse(saved)); } catch { setHabits(DEFAULT_HABITS); } }
+      else setHabits(DEFAULT_HABITS);
     }
     load();
   }, []);
 
-  function save(updated: Habit[]) {
+  function saveLocal(updated: Habit[]) {
     setHabits(updated);
     localStorage.setItem("madar_habits", JSON.stringify(updated));
     localStorage.setItem("madar_habits_date", new Date().toDateString());
     window.dispatchEvent(new Event("madar-update"));
   }
 
-  function toggle(id: string) {
+  async function toggle(id: string) {
     const habit = habits.find((h) => h.id === id);
     if (habit && !habit.todayDone) setShowCelebration(true);
-    save(habits.map((h) => {
+    // تحديث متفائل
+    const optimistic = habits.map((h) => {
       if (h.id !== id) return h;
       const nowDone = !h.todayDone;
       return { ...h, todayDone: nowDone, streak: nowDone ? h.streak + 1 : Math.max(0, h.streak - 1) };
-    }));
-    // Sync with API
-    api.patch(`/api/habits/${id}/toggle`).catch(() => {});
+    });
+    saveLocal(optimistic);
+    // مزامنة مع API واستخدام النتيجة الفعلية
+    try {
+      const { data } = await api.patch(`/api/habits/${id}/toggle`);
+      saveLocal(habits.map((h) => h.id !== id ? optimistic.find(x => x.id === h.id) ?? h : {
+        ...h, todayDone: data.todayDone ?? !h.todayDone, streak: data.streak ?? h.streak,
+      }));
+    } catch {
+      // إذا فشل API — أبقِ التحديث المتفائل
+    }
   }
 
-  function addHabit() {
+  async function addHabit() {
     if (!newTitle.trim()) return;
-    const newH: Habit = { id: Date.now().toString(), title: newTitle.trim(), icon: newIcon, streak: 0, todayDone: false, category: newCat, isIdea: false };
-    save([...habits, newH]);
+    try {
+      const { data } = await api.post("/api/habits", { title: newTitle.trim(), icon: newIcon, category: newCat, isIdea: false });
+      const newH: Habit = { id: data.id, title: data.title ?? newTitle.trim(), icon: data.icon ?? newIcon, streak: 0, todayDone: false, category: newCat, isIdea: false };
+      saveLocal([...habits, newH]);
+    } catch {
+      saveLocal([...habits, { id: Date.now().toString(), title: newTitle.trim(), icon: newIcon, streak: 0, todayDone: false, category: newCat, isIdea: false }]);
+    }
     setNewTitle(""); setShowAdd(false);
-    // Sync with API
-    api.post("/api/habits", { title: newH.title, icon: newH.icon, category: newH.category, isIdea: false }).catch(() => {});
   }
 
   function removeHabit(id: string) {
     if (!confirm("حذف هذه العادة؟")) return;
-    save(habits.filter((h) => h.id !== id));
+    saveLocal(habits.filter((h) => h.id !== id));
     api.delete(`/api/habits/${id}`).catch(() => {});
   }
 
   function toggleIdea(id: string) {
-    save(habits.map((h) => h.id === id ? { ...h, isIdea: !h.isIdea } : h));
+    saveLocal(habits.map((h) => h.id === id ? { ...h, isIdea: !h.isIdea } : h));
     api.patch(`/api/habits/${id}/idea`).catch(() => {});
   }
 
@@ -177,12 +181,12 @@ export default function HabitsPage() {
 
   function saveEdit() {
     if (!editId || !editTitle.trim()) return;
-    save(habits.map((h) => h.id === editId ? { ...h, title: editTitle.trim(), icon: editIcon, category: editCat } : h));
+    saveLocal(habits.map((h) => h.id === editId ? { ...h, title: editTitle.trim(), icon: editIcon, category: editCat } : h));
     setEditId(null);
   }
 
   function resetStreak(id: string) {
-    save(habits.map((h) => h.id === id ? { ...h, streak: 0 } : h));
+    saveLocal(habits.map((h) => h.id === id ? { ...h, streak: 0 } : h));
   }
 
   // ── المسبحة ──
