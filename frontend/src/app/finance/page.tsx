@@ -65,7 +65,7 @@ interface RecurringDue {
   id: string;
   title: string;
   amount: number;
-  type: "salary" | "bill" | "installment" | "expected_income" | "expected_expense";
+  type: "salary" | "bill" | "installment" | "expected_income" | "expected_expense" | "nafaqa" | "rent" | "subscription" | "insurance";
   frequency: "monthly" | "yearly" | "once";
   dueDay: number; // يوم الشهر
   dueMonth?: number; // للسنوي
@@ -738,7 +738,7 @@ export default function FinancePage() {
     const typeMap: Record<string, string> = { Income: "income", Expense: "expense", Transfer: "transfer", DebtPayment: "debt_payment", Installment: "installment", Gift: "gift" };
     const expClsMap: Record<string, string> = { Essential: "essential", Luxury: "luxury", Improvement: "improvement" };
     const pocketTypeMap: Record<string, string> = { Personal: "personal", Debt: "debt", Savings: "savings", Installment: "installment", Emergency: "emergency" };
-    const dueTypeMap: Record<string, string> = { Salary: "salary", Bill: "bill", Installment: "installment", ExpectedIncome: "expected_income", ExpectedExpense: "expected_expense" };
+    const dueTypeMap: Record<string, string> = { Salary: "salary", Bill: "bill", Installment: "installment", ExpectedIncome: "expected_income", ExpectedExpense: "expected_expense", Nafaqa: "nafaqa", Rent: "rent", Subscription: "subscription", Insurance: "insurance" };
     const dueFreqMap: Record<string, string> = { Monthly: "monthly", Yearly: "yearly", Once: "once" };
 
     setAccounts((d.accounts ?? []).length > 0 ? d.accounts! : DEF_ACCOUNTS);
@@ -825,13 +825,14 @@ export default function FinancePage() {
   /** تأكيد استلام/دفع مستحق */
   async function confirmDue(due: RecurringDue) {
     const isIncome = due.type === "salary" || due.type === "expected_income";
-    const aid = due.accountId || accounts[0]?.id || "";
-    const pid = due.pocketId || pockets[0]?.id || "";
-    // أنشئ معاملة عبر API
+    const aid = due.accountId || accounts[0]?.id || null;
+    const pid = due.pocketId || pockets[0]?.id || null;
+    const safeAid = aid && String(aid).length > 10 ? aid : null;
+    const safePid = pid && String(pid).length > 10 ? pid : null;
     try {
       const { data: newTx } = await api.post("/api/finance/transactions", {
         title: due.title, amount: due.amount, type: isIncome ? "Income" : "Expense",
-        category: due.category ?? (isIncome ? "راتب" : "فواتير"), accountId: aid || null, pocketId: pid || null,
+        category: due.category ?? (isIncome ? "راتب" : "فواتير"), accountId: safeAid, pocketId: safePid,
         date: new Date().toISOString().slice(0, 10),
       });
       setTxs(prev => [newTx, ...prev]);
@@ -854,18 +855,19 @@ export default function FinancePage() {
     const aid = fAcct || accounts[0]?.id || null;
     const pid = fPocket || pockets[0]?.id || null;
 
+    // تحويل IDs الفارغة لـ null (الباكند يتوقع GUID أو null)
+    const safeAid = aid && aid.length > 10 ? aid : null;
+    const safePid = pid && pid.length > 10 ? pid : null;
     try {
       const { data: newTx } = await api.post("/api/finance/transactions", {
         title: fTitle.trim(), amount: amt, type: fType, category: fCat,
         expenseClass: fType === "expense" ? fExpCls : null,
-        accountId: aid, pocketId: pid, date: fDate,
+        accountId: safeAid, pocketId: safePid, date: fDate,
       });
-      // API يرجع PascalCase — نحوّل
       const mapped = { ...newTx, type: fType, expenseClass: fType === "expense" ? fExpCls : undefined };
       setTxs(prev => [mapped, ...prev]);
     } catch {
-      // fallback — أضف محلياً
-      setTxs(prev => [{ id: Date.now().toString(), title: fTitle.trim(), amount: amt, type: fType, category: fCat, expenseClass: fType === "expense" ? fExpCls : undefined, accountId: aid ?? "", pocketId: pid ?? "", date: fDate }, ...prev]);
+      setTxs(prev => [{ id: Date.now().toString(), title: fTitle.trim(), amount: amt, type: fType, category: fCat, expenseClass: fType === "expense" ? fExpCls : undefined, accountId: safeAid ?? "", pocketId: safePid ?? "", date: fDate }, ...prev]);
     }
     setFTitle(""); setFAmount(""); setShowAdd(false);
   }

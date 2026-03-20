@@ -7,7 +7,7 @@ namespace Madar.Domain.Entities.Core;
 public enum FinTransactionType { Income, Expense, Transfer, DebtPayment, Installment, Gift }
 public enum ExpenseClass { Essential, Luxury, Improvement }
 public enum PocketType { Personal, Debt, Savings, Installment, Emergency }
-public enum DueType { Salary, Bill, Installment, ExpectedIncome, ExpectedExpense }
+public enum DueType { Salary, Bill, Installment, ExpectedIncome, ExpectedExpense, Nafaqa, Rent, Subscription, Insurance }
 public enum DueFrequency { Monthly, Yearly, Once }
 
 // ═══ Account (أين المال) ═══
