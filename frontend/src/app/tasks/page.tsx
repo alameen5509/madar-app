@@ -1270,11 +1270,11 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
       if (dur > 0) allPeriods.push({ name: prayers[i].name, startMin: prayers[i].start, endMin, duration: dur, blocked: blockedPeriods.includes(prayers[i].name) });
     }
   }
-  // فترات ليلية
+  // فترات ليلية — تظهر دائماً (ليست موقوفة افتراضياً)
   const ishaEnd = prayers.length > 0 ? prayers[prayers.length - 1].start : 21 * 60;
   allPeriods.push(
-    { name: "بعد العشاء", startMin: ishaEnd + 60, endMin: 24 * 60, duration: 24 * 60 - ishaEnd - 60, blocked: !blockedPeriods.includes("بعد العشاء_open") },
-    { name: "بعد منتصف الليل", startMin: 0, endMin: 2 * 60, duration: 120, blocked: !blockedPeriods.includes("بعد منتصف الليل_open") },
+    { name: "بعد العشاء", startMin: ishaEnd + 60, endMin: 24 * 60, duration: 24 * 60 - ishaEnd - 60, blocked: blockedPeriods.includes("بعد العشاء") },
+    { name: "بعد منتصف الليل", startMin: 0, endMin: 2 * 60, duration: 120, blocked: blockedPeriods.includes("بعد منتصف الليل") },
   );
 
   const now = nowMin();
@@ -1294,7 +1294,7 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   const firstAvailable = allPeriods.find(p => !p.blocked && p.endMin > now) ?? allPeriods.find(p => !p.blocked);
   const habitPeriodName = firstAvailable?.name ?? "";
 
-  // توزيع المهام على جميع الفترات (حتى المنتهية)
+  // توزيع المهام: الفترات المنتهية فارغة، المهام تذهب للحالية والمستقبلية فقط
   const remaining = [...pending];
   const periodTasksMap = new Map<string, TaskRow[]>();
   const periodHabitMap = new Map<string, boolean>();
@@ -1302,13 +1302,18 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   for (const period of allPeriods) {
     if (period.blocked) { periodTasksMap.set(period.name, []); periodHabitMap.set(period.name, false); continue; }
 
+    const isPast = period.endMin <= now && period.name !== "بعد منتصف الليل";
     const isHabitPeriod = period.name === habitPeriodName && habitTasks.length > 0;
     const habitMins = isHabitPeriod ? habitDuration : 0;
     const slots = Math.max(0, Math.floor((period.duration - habitMins) / 30));
     periodHabitMap.set(period.name, isHabitPeriod);
 
     const pt: TaskRow[] = [];
-    if (isHabitPeriod) pt.push(...habitTasks);
+    // العادات فقط في أول فترة متاحة (غير منتهية)
+    if (isHabitPeriod && !isPast) pt.push(...habitTasks);
+
+    // الفترات المنتهية: فارغة (بدون مهام)
+    if (isPast) { periodTasksMap.set(period.name, pt); continue; }
 
     const pCtx = periodContexts[period.name];
     for (let s = 0; s < slots && remaining.length > 0; s++) {
@@ -1392,7 +1397,7 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
                 </select>
               )}
               <button onClick={() => {
-                if (p.name === "بعد العشاء" || p.name === "بعد منتصف الليل") onBlockToggle(p.name + "_open");
+                if (p.name === "بعد العشاء" || p.name === "بعد منتصف الليل") onBlockToggle(p.name);
                 else onBlockToggle(p.name);
               }}
                 className="text-[11px] px-2 py-1 rounded-lg font-semibold"
