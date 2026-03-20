@@ -1148,7 +1148,7 @@ function EditTaskDialog({ task, onClose, onSaved }: {
           </div>
           <button onClick={async () => {
             if (!confirm("حذف هذه المهمة نهائياً؟")) return;
-            try { await api.patch(`/api/tasks/${task.id}/status`, { status: "Cancelled" }); onSaved(); onClose(); } catch {}
+            try { await api.delete(`/api/tasks/${task.id}`); onSaved(); onClose(); } catch {}
           }}
             className="w-full py-2 rounded-xl text-xs font-medium text-red-400 hover:bg-red-50 transition" style={{ border: "1px solid #FCA5A530" }}>
             🗑️ حذف المهمة
@@ -1717,8 +1717,7 @@ export default function TasksPage() {
         }
       } else {
         if (action === "delete") {
-          // حذف فعلي: إلغاء أولاً ثم حذف — يعمل بغض النظر عن الحالة
-          await api.patch(`/api/tasks/${id}/status`, { status: "Cancelled" }).catch(() => {});
+          await api.delete(`/api/tasks/${id}`).catch(() => {});
         } else {
           const status = action === "complete" ? "Completed" : "Deferred";
           await api.patch(`/api/tasks/${id}/status`, { status });

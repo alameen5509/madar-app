@@ -25,7 +25,7 @@ public class TasksController : BaseController
             .Include(t => t.LifeCircle)
             .Include(t => t.Goal)
             .Include(t => t.AssignedTo)
-            .Where(t => t.OwnerId == userId)
+            .Where(t => t.OwnerId == userId && t.Status != Madar.Domain.Enums.TaskStatus.Cancelled)
             .OrderByDescending(t => t.AiPriorityScore)
             .ThenByDescending(t => t.UserPriority)
             .ThenBy(t => t.CreatedAt)
@@ -265,6 +265,18 @@ public class TasksController : BaseController
             .Select(t => new { t.Id, t.Title, status = t.Status.ToString(), t.UserPriority })
             .ToListAsync(ct);
         return Ok(subs);
+    }
+
+    /// <summary>حذف مهمة نهائياً</summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteTask(Guid id, CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var task = await _db.SmartTasks.FirstOrDefaultAsync(t => t.Id == id && t.OwnerId == userId, ct);
+        if (task is null) return NotFound();
+        _db.SmartTasks.Remove(task);
+        await _db.SaveChangesAsync(ct);
+        return Ok(new { message = "تم الحذف" });
     }
 
     /// <summary>قبول أو رفض مهمة في صندوق الوارد</summary>
