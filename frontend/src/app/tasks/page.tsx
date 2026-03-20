@@ -721,7 +721,8 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
   })();
 
   // فصل العادات عن المهام العادية
-  const allPending = tasks.filter((t) => !t.done && !t.isInbox);
+  const _todayISO = new Date().toISOString().slice(0, 10);
+  const allPending = tasks.filter((t) => !t.done && !t.isInbox && (!t.dueDate || t.dueDate.slice(0, 10) <= _todayISO));
   const habitTasks = allPending.filter(t => t.context === "habit");
   const pending = allPending.filter(t => t.context !== "habit").sort((a, b) => {
     if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
@@ -1244,7 +1245,8 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     try { return JSON.parse(localStorage.getItem("madar_settings") ?? "{}").habitDuration ?? 30; } catch { return 30; }
   })();
 
-  const allPending = tasks.filter((t) => !t.done && !t.isInbox);
+  const _todayISO = new Date().toISOString().slice(0, 10);
+  const allPending = tasks.filter((t) => !t.done && !t.isInbox && (!t.dueDate || t.dueDate.slice(0, 10) <= _todayISO));
   const habitTasks = allPending.filter(t => t.context === "habit");
   const pending = allPending.filter(t => t.context !== "habit").sort((a, b) => {
     if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
