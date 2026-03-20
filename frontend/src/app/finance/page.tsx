@@ -1583,7 +1583,40 @@ export default function FinancePage() {
 
         {/* ═══ Settings ═══ */}
         {tab === "settings" && (
-          <FinSettingsSection settings={settings} onUpdate={sSettings} />
+          <>
+            <FinSettingsSection settings={settings} onUpdate={sSettings} />
+            {/* أدوات الترحيل */}
+            <GeometricDivider label="مزامنة البيانات" />
+            <div className="bg-white rounded-xl p-5 border border-gray-200 space-y-3">
+              <p className="text-sm font-bold text-[#16213E]">ترحيل البيانات المحلية للسيرفر</p>
+              <p className="text-[10px] text-[#6B7280]">إذا عندك بيانات مالية على هذا الجهاز لم تُرحّل</p>
+              <button onClick={async () => {
+                const localTxs = load<Transaction[]>("mfin_tx", []);
+                const localAccts = load<Account[]>("mfin_accts", []);
+                if (localTxs.length === 0 && localAccts.length === 0) { alert("لا توجد بيانات محلية للترحيل"); return; }
+                try {
+                  await api.post("/api/finance/sync", {
+                    accounts: load("mfin_accts", []).map((a: Account) => ({ id: a.id, name: a.name, icon: a.icon, balance: a.balance })),
+                    pockets: load("mfin_pockets", []).map((p: Pocket) => ({ id: p.id, name: p.name, icon: p.icon, type: p.type, commitments: p.commitments })),
+                    transactions: localTxs.map((t: Transaction) => ({ title: t.title, amount: t.amount, type: t.type, category: t.category, expenseClass: t.expenseClass, accountId: t.accountId, pocketId: t.pocketId, date: t.date })),
+                    debts: load("mfin_debts", []),
+                    dues: load<RecurringDue[]>("mfin_dues", []).map((d) => ({ title: d.title, amount: d.amount, type: d.type, frequency: d.frequency, dueDay: d.dueDay, dueMonth: d.dueMonth, accountId: d.accountId, pocketId: d.pocketId, category: d.category, isActive: d.isActive })),
+                    goals: load<FinGoal[]>("mfin_goals", []).map((g) => ({ title: g.title, description: g.description, targetAmount: g.targetAmount, savedSoFar: g.savedSoFar, deadline: g.deadline, items: g.items })),
+                    zakat: load("mfin_zakat", null),
+                    settings: load("mfin_settings", null),
+                  });
+                  ["mfin_tx", "mfin_accts", "mfin_pockets", "mfin_settings", "mfin_debts", "mfin_dues", "mfin_goals", "mfin_zakat"].forEach(k => localStorage.removeItem(k));
+                  alert("تم الترحيل بنجاح! أعد تحميل الصفحة.");
+                  loadFinanceData();
+                } catch (e) { alert("فشل الترحيل: " + String(e)); }
+              }} className="w-full py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "#2C2C54" }}>
+                ترحيل البيانات المحلية
+              </button>
+              <button onClick={() => loadFinanceData()} className="w-full py-2 rounded-xl text-sm font-semibold text-[#6B7280] bg-gray-100">
+                إعادة تحميل من السيرفر
+              </button>
+            </div>
+          </>
         )}
 
         <div className="pb-4"><GeometricDivider /></div>
