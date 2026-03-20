@@ -1274,29 +1274,21 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   ];
 
   const now = nowMin();
-  // بيئة كل فترة (يمكن تخصيصها)
+  // بيئة كل فترة
   const [periodContexts, setPeriodContexts] = useState<Record<string, string>>({});
 
-  // ترتيب الفترات: الحالية/المستقبلية أولاً
-  const sortedPeriods = [...allPeriods].sort((a, b) => {
-    const aIsPast = a.endMin <= now;
-    const bIsPast = b.endMin <= now;
-    if (aIsPast !== bIsPast) return aIsPast ? 1 : -1;
-    return a.startMin - b.startMin;
-  });
-
-  const firstAvailable = sortedPeriods.find(p => !p.blocked);
+  // عرض جميع الفترات بترتيبها الطبيعي — بدون إخفاء أي فترة
+  const firstAvailable = allPeriods.find(p => !p.blocked && p.endMin > now) ?? allPeriods.find(p => !p.blocked);
   const habitPeriodName = firstAvailable?.name ?? "";
 
-  // توزيع: فترات مستقبلية فقط، مع مراعاة البيئة
+  // توزيع المهام على جميع الفترات (حتى المنتهية)
   const remaining = [...pending];
   const periodTasksMap = new Map<string, TaskRow[]>();
   const periodHabitMap = new Map<string, boolean>();
 
-  for (const period of sortedPeriods) {
+  for (const period of allPeriods) {
     if (period.blocked) { periodTasksMap.set(period.name, []); periodHabitMap.set(period.name, false); continue; }
 
-    const isPast = period.endMin <= now;
     const isHabitPeriod = period.name === habitPeriodName && habitTasks.length > 0;
     const habitMins = isHabitPeriod ? habitDuration : 0;
     const slots = Math.max(0, Math.floor((period.duration - habitMins) / 30));
@@ -1305,18 +1297,15 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     const pt: TaskRow[] = [];
     if (isHabitPeriod) pt.push(...habitTasks);
 
-    if (!isPast) {
-      const pCtx = periodContexts[period.name];
-      for (let s = 0; s < slots && remaining.length > 0; s++) {
-        if (pCtx) {
-          // بيئة محددة: أولاً مهام نفس البيئة، ثم Anywhere، وتجاهل البيئات الأخرى
-          let idx = remaining.findIndex(t => t.context === pCtx);
-          if (idx < 0) idx = remaining.findIndex(t => t.context === "Anywhere" || t.context === "habit");
-          if (idx < 0) break; // لا مهام مناسبة لهذه البيئة
-          pt.push(remaining.splice(idx, 1)[0]);
-        } else {
-          pt.push(remaining.shift()!);
-        }
+    const pCtx = periodContexts[period.name];
+    for (let s = 0; s < slots && remaining.length > 0; s++) {
+      if (pCtx) {
+        let idx = remaining.findIndex(t => t.context === pCtx);
+        if (idx < 0) idx = remaining.findIndex(t => t.context === "Anywhere" || t.context === "habit");
+        if (idx < 0) break;
+        pt.push(remaining.splice(idx, 1)[0]);
+      } else {
+        pt.push(remaining.shift()!);
       }
     }
     periodTasksMap.set(period.name, pt);
@@ -1365,20 +1354,22 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
       </div>
       {plan.map((p) => {
         const isPast = p.endMin <= now && p.name !== "بعد منتصف الليل";
+        const isCurrent = !isPast && p.startMin <= now && p.endMin > now;
         return (
         <div key={p.name} className="rounded-xl overflow-hidden"
-          onDragOver={(e) => { if (!p.blocked && !isPast) { e.preventDefault(); e.currentTarget.style.borderColor = "var(--gold, #D4AF37)"; } }}
-          onDragLeave={(e) => { e.currentTarget.style.borderColor = p.blocked ? "var(--card-border)" : "var(--gold, #D4AF37)25"; }}
+          onDragOver={(e) => { if (!p.blocked) { e.preventDefault(); e.currentTarget.style.borderColor = "var(--gold, #D4AF37)"; } }}
+          onDragLeave={(e) => { e.currentTarget.style.borderColor = p.blocked ? "var(--card-border)" : isCurrent ? "var(--gold, #D4AF37)" : "var(--gold, #D4AF37)25"; }}
           onDrop={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "var(--gold, #D4AF37)25"; handleDrop(p.name); }}
-          style={{ border: `1px solid ${p.blocked ? "var(--card-border)" : "var(--gold, #D4AF37)25"}`, opacity: p.blocked || isPast ? 0.4 : 1 }}>
-          <div className="flex items-center justify-between px-4 py-2" style={{ background: "var(--bg)" }}>
+          style={{ border: `1px solid ${p.blocked ? "var(--card-border)" : isCurrent ? "var(--gold, #D4AF37)" : "var(--gold, #D4AF37)25"}`, opacity: p.blocked ? 0.4 : isPast ? 0.6 : 1 }}>
+          <div className="flex items-center justify-between px-4 py-2" style={{ background: isCurrent ? "var(--gold, #D4AF37)08" : "var(--bg)" }}>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold" style={{ color: isPast ? "var(--muted)" : "var(--gold)" }}>🕌 {p.name}</span>
+              <span className="text-sm font-bold" style={{ color: isPast ? "var(--muted)" : isCurrent ? "var(--gold)" : "var(--text)" }}>🕌 {p.name}</span>
               <span className="text-xs" style={{ color: "var(--muted)" }}>{fmtTime(p.startMin)} — {fmtTime(p.endMin)}</span>
-              {isPast && <span className="text-[9px] text-[#9CA3AF]">(انتهت)</span>}
+              {isPast && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-100 text-[#9CA3AF]">انتهت</span>}
+              {isCurrent && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "var(--gold, #D4AF37)15", color: "var(--gold)" }}>الآن</span>}
             </div>
             <div className="flex items-center gap-1">
-              {!p.blocked && !isPast && (
+              {!p.blocked && (
                 <select value={periodContexts[p.name] ?? ""}
                   onChange={(e) => setPeriodContexts(prev => ({ ...prev, [p.name]: e.target.value }))}
                   className="text-[10px] px-1.5 py-0.5 rounded-lg border focus:outline-none"
@@ -1421,7 +1412,7 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
               ))}
             </div>
           )}
-          {!p.blocked && !isPast && p.tasks.length === 0 && (
+          {!p.blocked && p.tasks.length === 0 && (
             <p className="px-4 py-2 text-xs" style={{ color: "var(--muted)" }}>—</p>
           )}
         </div>
@@ -1806,6 +1797,7 @@ export default function TasksPage() {
     finally { setLoading(false); }
   }, []);
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
+
 
   // Auto-open task dialog if coming from projects page
   useEffect(() => {
