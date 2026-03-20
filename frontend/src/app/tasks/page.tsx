@@ -2863,6 +2863,13 @@ export default function TasksPage() {
                       {t.context === "habit" && !t.done && (
                         <span className="text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "#2ABFBF15", color: "#2ABFBF", border: "1px solid #2ABFBF30" }}>عادة</span>
                       )}
+                      {/* تعديل — أول زر */}
+                      {t.context !== "habit" && (
+                        <button onClick={(e) => { e.stopPropagation(); setEditingTask(t); }}
+                          className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-50 text-[#6B7280] border border-gray-200 flex-shrink-0 hover:bg-gray-100 transition" title="تعديل">
+                          ✏️
+                        </button>
+                      )}
                       {t.context === "habit" && t.description && (
                         <span className="text-[10px] text-orange-500 font-bold flex-shrink-0">{t.description}</span>
                       )}
@@ -2905,11 +2912,6 @@ export default function TasksPage() {
                       <button onClick={(e) => { e.stopPropagation(); setTransferTask({ id: t.id, title: t.title }); }}
                         className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-600 border border-purple-100 flex-shrink-0 hover:bg-purple-100 transition" title="حوّل لشخص">
                         📨
-                      </button>
-                      {/* تعديل */}
-                      <button onClick={(e) => { e.stopPropagation(); setEditingTask(t); }}
-                        className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-50 text-[#6B7280] border border-gray-200 flex-shrink-0 hover:bg-gray-100 transition" title="تعديل">
-                        ✏️
                       </button>
                       {t.circleColor ? (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium"
