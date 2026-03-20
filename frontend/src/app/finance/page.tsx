@@ -1552,27 +1552,45 @@ export default function FinancePage() {
                 <Stat label="سعر الذهب" value={goldPrice || 310} color="#D4AF37" sub="ريال / جرام" />
               </div>
               {zakatDue > 0 && (
-                <div className="bg-green-50 rounded-xl p-4 border border-green-200">
-                  <p className="text-green-800 text-sm font-bold mb-1">💰 زكاتك: {zakatDue.toLocaleString()} ريال</p>
+                <div className="bg-green-50 rounded-xl p-5 border border-green-200 space-y-3">
+                  <p className="text-green-800 text-sm font-bold">💰 زكاتك: {zakatDue.toLocaleString()} ريال</p>
                   <p className="text-green-600 text-xs">({totalWealth.toLocaleString()} ريال) × 2.5%</p>
+                  <button onClick={async () => {
+                    if (!confirm(`هل أخرجت الزكاة (${zakatDue.toLocaleString()} ريال)؟`)) return;
+                    try {
+                      await api.post("/api/finance/transactions", {
+                        title: "إخراج زكاة المال", amount: zakatDue, type: "Expense",
+                        category: "تبرعات", date: new Date().toISOString().slice(0, 10),
+                      });
+                      setTxs(prev => [{ id: Date.now().toString(), title: "إخراج زكاة المال", amount: zakatDue, type: "expense", category: "تبرعات", accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) }, ...prev]);
+                    } catch {}
+                  }}
+                    className="w-full py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "#3D8C5A" }}>
+                    ✅ نعم، أخرجت الزكاة — خصم {zakatDue.toLocaleString()} ريال
+                  </button>
                 </div>
               )}
-              <GeometricDivider label="تاريخ الحول" />
+              <GeometricDivider label="تاريخ الحول (هجري)" />
               <div className="bg-white rounded-xl p-5 border border-gray-200 space-y-3">
                 <p className="text-[10px] text-[#6B7280]">تستحق الزكاة بعد مرور سنة هجرية كاملة على بلوغ النصاب</p>
                 <input type="date" value={zakatData.hawalDate} onChange={(e) => sZakat({ ...zakatData, hawalDate: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
                 {zakatData.hawalDate && (() => {
                   const start = new Date(zakatData.hawalDate);
-                  const hawlEnd = new Date(start); hawlEnd.setFullYear(hawlEnd.getFullYear() + 1);
+                  // سنة هجرية ≈ 354 يوم
+                  const hawlEnd = new Date(start.getTime() + 354 * 86400000);
                   const daysLeft = Math.max(0, Math.ceil((hawlEnd.getTime() - Date.now()) / 86400000));
+                  const hijriEnd = hawlEnd.toLocaleDateString("ar-SA-u-ca-islamic", { year: "numeric", month: "long", day: "numeric" });
                   return (
-                    <div className="flex items-center gap-3">
-                      <p className="text-xs text-[#16213E]">استحقاق الزكاة: <b>{hawlEnd.toLocaleDateString("ar-SA")}</b></p>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
-                        style={{ background: daysLeft === 0 ? "#DC262620" : "#D4AF3720", color: daysLeft === 0 ? "#DC2626" : "#D4AF37" }}>
-                        {daysLeft === 0 ? "مستحقة الآن!" : `${daysLeft} يوم متبقي`}
-                      </span>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3">
+                        <p className="text-xs text-[#16213E]">استحقاق الزكاة: <b>{hijriEnd}</b></p>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                          style={{ background: daysLeft === 0 ? "#DC262620" : "#D4AF3720", color: daysLeft === 0 ? "#DC2626" : "#D4AF37" }}>
+                          {daysLeft === 0 ? "مستحقة الآن!" : `${daysLeft} يوم متبقي`}
+                        </span>
+                      </div>
+                      <p className="text-[9px] text-[#9CA3AF]">({hawlEnd.toLocaleDateString("ar-SA")} ميلادي)</p>
                     </div>
                   );
                 })()}
