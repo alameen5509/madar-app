@@ -404,7 +404,7 @@ export default function StatsPage() {
 
   return (
     <main className="flex-1 overflow-y-auto" style={{ background: "var(--bg)" }}>
-      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-gray-200 px-8 py-4">
+      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-gray-200 px-8 py-4 pr-16 md:pr-8">
         <h2 className="text-[#16213E] font-bold text-lg">الإحصائيات</h2>
         <p className="text-[#6B7280] text-xs">نظرة شاملة على إنتاجيتك</p>
       </header>

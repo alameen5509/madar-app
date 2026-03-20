@@ -117,7 +117,7 @@ export default function ProjectsPage() {
   return (
     <main className="flex-1 overflow-y-auto" dir="rtl" style={{ background: "var(--bg)" }}>
       {/* Header */}
-      <header className="sticky top-0 z-20 backdrop-blur border-b px-6 py-4" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+      <header className="sticky top-0 z-20 backdrop-blur border-b px-6 py-4 pr-16 md:pr-6" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="font-bold" style={{ color: "var(--text)", fontSize: 22 }}>إدارة المشاريع</h2>

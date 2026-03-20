@@ -282,7 +282,7 @@ export default function GoalsPage() {
     <main className="flex-1 overflow-y-auto" style={{ background: "var(--bg)" }}>
 
       {/* Header */}
-      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-[#E2D5B0] px-8 py-4">
+      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-[#E2D5B0] px-8 py-4 pr-16 md:pr-8">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-[#1A1830] font-bold text-lg">الأهداف</h2>

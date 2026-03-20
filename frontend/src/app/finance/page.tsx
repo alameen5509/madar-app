@@ -997,7 +997,7 @@ export default function FinancePage() {
 
   return (
     <main className="flex-1 overflow-y-auto" style={{ background: "var(--bg)" }}>
-      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-gray-200 px-8 py-4">
+      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-gray-200 px-8 py-4 pr-16 md:pr-8">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-[#16213E] font-bold text-lg">الإدارة المالية</h2>
