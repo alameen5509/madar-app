@@ -721,8 +721,9 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
   })();
 
   // فصل العادات عن المهام العادية
-  const _todayISO = new Date().toISOString().slice(0, 10);
-  const allPending = tasks.filter((t) => !t.done && !t.isInbox && (!t.dueDate || t.dueDate.slice(0, 10) <= _todayISO));
+  const _now = new Date();
+  const _todayLocal = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,"0")}-${String(_now.getDate()).padStart(2,"0")}`;
+  const allPending = tasks.filter((t) => !t.done && !t.isInbox && (!t.dueDate || t.dueDate.slice(0, 10) <= _todayLocal));
   const habitTasks = allPending.filter(t => t.context === "habit");
   const pending = allPending.filter(t => t.context !== "habit").sort((a, b) => {
     if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
@@ -1245,8 +1246,9 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     try { return JSON.parse(localStorage.getItem("madar_settings") ?? "{}").habitDuration ?? 30; } catch { return 30; }
   })();
 
-  const _todayISO = new Date().toISOString().slice(0, 10);
-  const allPending = tasks.filter((t) => !t.done && !t.isInbox && (!t.dueDate || t.dueDate.slice(0, 10) <= _todayISO));
+  const _now = new Date();
+  const _todayLocal = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,"0")}-${String(_now.getDate()).padStart(2,"0")}`;
+  const allPending = tasks.filter((t) => !t.done && !t.isInbox && (!t.dueDate || t.dueDate.slice(0, 10) <= _todayLocal));
   const habitTasks = allPending.filter(t => t.context === "habit");
   const pending = allPending.filter(t => t.context !== "habit").sort((a, b) => {
     if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
@@ -1278,14 +1280,8 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
 
   const now = nowMin();
 
-  // بيئة كل فترة — تُحفظ في localStorage
-  const [periodContexts, setPeriodContexts] = useState<Record<string, string>>(() => {
-    if (typeof window === "undefined") return {};
-    try { return JSON.parse(localStorage.getItem("madar_period_contexts") ?? "{}"); } catch { return {}; }
-  });
-  useEffect(() => {
-    if (Object.keys(periodContexts).length > 0) localStorage.setItem("madar_period_contexts", JSON.stringify(periodContexts));
-  }, [periodContexts]);
+  // بيئة كل فترة — فارغة افتراضياً (تعرض الكل)
+  const [periodContexts, setPeriodContexts] = useState<Record<string, string>>({});
 
   // عرض جميع الفترات بترتيبها الطبيعي — بدون إخفاء أي فترة
   const firstAvailable = allPeriods.find(p => !p.blocked && p.endMin > now) ?? allPeriods.find(p => !p.blocked);
