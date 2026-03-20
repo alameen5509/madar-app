@@ -789,7 +789,7 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
         if (pCtx) {
           let idx = remaining.findIndex(t => t.context === pCtx);
           if (idx < 0) idx = remaining.findIndex(t => t.context === "Anywhere" || t.context === "habit");
-          if (idx < 0) break;
+          if (idx < 0) idx = 0;
           pt.push(remaining.splice(idx, 1)[0]);
         } else {
           pt.push(remaining.shift()!);
@@ -1315,9 +1315,12 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     const pCtx = periodContexts[period.name];
     for (let s = 0; s < slots && remaining.length > 0; s++) {
       if (pCtx) {
+        // أولاً: مهمة بنفس البيئة
         let idx = remaining.findIndex(t => t.context === pCtx);
+        // ثانياً: مهمة بدون بيئة محددة
         if (idx < 0) idx = remaining.findIndex(t => t.context === "Anywhere" || t.context === "habit");
-        if (idx < 0) break;
+        // ثالثاً: أي مهمة متاحة (fallback)
+        if (idx < 0) idx = 0;
         pt.push(remaining.splice(idx, 1)[0]);
       } else {
         pt.push(remaining.shift()!);
