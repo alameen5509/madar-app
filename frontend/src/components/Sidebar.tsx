@@ -99,7 +99,7 @@ export default function Sidebar() {
   }, [refresh]);
 
   return (
-    <aside className="pattern-zellige relative w-64 flex-shrink-0 flex flex-col overflow-hidden">
+    <aside className="pattern-zellige relative w-full max-w-64 flex-shrink-0 flex flex-col overflow-hidden h-full">
       <SidebarPattern />
 
       {/* Logo */}
