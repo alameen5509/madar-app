@@ -233,19 +233,7 @@ export default function HabitsPage() {
           <button onClick={(e) => { e.stopPropagation(); setShowTasbih(false); setTasbihCount(0); }}
             className="absolute top-6 left-6 text-white/40 hover:text-white text-sm z-10">✕ إغلاق</button>
 
-          {/* اختيار الذكر */}
-          <div className="absolute top-6 right-6 flex gap-1 flex-wrap max-w-[200px] z-10" onClick={(e) => e.stopPropagation()}>
-            {TASBIH_OPTIONS.map((t) => (
-              <button key={t} onClick={() => { setTasbihText(t); setTasbihCount(0); }}
-                className="px-2 py-1 rounded-lg text-[11px] transition"
-                style={{ background: tasbihText === t ? "#D4AF3730" : "rgba(255,255,255,0.05)", color: tasbihText === t ? "#D4AF37" : "rgba(255,255,255,0.4)", border: `1px solid ${tasbihText === t ? "#D4AF3740" : "transparent"}` }}>
-                {t}
-              </button>
-            ))}
-          </div>
-
           {/* العداد الكبير */}
-          <p className="text-white/30 text-sm mb-2">{tasbihText}</p>
           <div className="w-52 h-52 rounded-full flex items-center justify-center mb-6"
             style={{ background: "linear-gradient(135deg, #D4AF37, #E8C96A)", boxShadow: "0 0 80px rgba(212,175,55,0.25)" }}>
             <span className="text-7xl font-black text-[#0a1f10] select-none">{tasbihCount}</span>
