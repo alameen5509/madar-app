@@ -1314,31 +1314,32 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     return !p.blocked && !isPast;
   });
 
-  // وزّع المهام: إذا الفترة لها بيئة محددة → مهام نفس البيئة فقط + Anywhere
+  // وزّع المهام على الفترات
   const periodAssignments = new Map<string, TaskRow[]>();
   const assigned = new Set<string>();
+  const pendingPool = [...pending];
 
-  // أولاً: الفترات التي لها بيئة محددة → تأخذ مهام تلك البيئة
   for (const p of availablePeriods) {
     const pCtx = periodContexts[p.name];
-    if (!pCtx) continue;
-    const matching = sortedContexts.find(([ctx]) => ctx === pCtx)?.[1] ?? [];
-    const anywhereT = sortedContexts.find(([ctx]) => ctx === "Anywhere")?.[1] ?? [];
-    const combined = [...matching, ...anywhereT].filter(t => !assigned.has(t.id));
     const slots = Math.floor(p.duration / 30);
-    const taken = combined.slice(0, slots);
-    taken.forEach(t => assigned.add(t.id));
-    periodAssignments.set(p.name, taken);
-  }
+    const pt: TaskRow[] = [];
 
-  // ثانياً: الفترات بدون بيئة محددة → تأخذ المهام المتبقية
-  for (const p of availablePeriods) {
-    if (periodAssignments.has(p.name)) continue;
-    const slots = Math.floor(p.duration / 30);
-    const remaining = pending.filter(t => !assigned.has(t.id));
-    const taken = remaining.slice(0, slots);
-    taken.forEach(t => assigned.add(t.id));
-    periodAssignments.set(p.name, taken);
+    for (let s = 0; s < slots && pendingPool.some(t => !assigned.has(t.id)); s++) {
+      let pick: TaskRow | undefined;
+      if (pCtx) {
+        // بيئة محددة: أولاً نفس البيئة، ثم Anywhere، ثم أي مهمة
+        pick = pendingPool.find(t => !assigned.has(t.id) && t.context === pCtx)
+            ?? pendingPool.find(t => !assigned.has(t.id) && (t.context === "Anywhere" || t.context === "habit"))
+            ?? pendingPool.find(t => !assigned.has(t.id));
+      } else {
+        // بدون بيئة: أي مهمة متاحة
+        pick = pendingPool.find(t => !assigned.has(t.id));
+      }
+      if (!pick) break;
+      assigned.add(pick.id);
+      pt.push(pick);
+    }
+    periodAssignments.set(p.name, pt);
   }
 
   // بناء الخريطة النهائية
