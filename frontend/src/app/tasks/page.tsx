@@ -1423,6 +1423,25 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
 
   const ctxIcon = (c: string) => TASK_CONTEXTS.find(x => x.key === c)?.icon ?? "";
 
+  function moveTaskInPeriod(periodName: string, taskIdx: number, direction: "up" | "down") {
+    setPlan(prev => {
+      const next = prev.map(x => ({ ...x, tasks: [...x.tasks] }));
+      const period = next.find(x => x.name === periodName);
+      if (!period) return prev;
+      const nonHabit = period.tasks.filter((x: TaskRow) => x.context !== "habit");
+      const habits = period.tasks.filter((x: TaskRow) => x.context === "habit");
+      const swapIdx = direction === "up" ? taskIdx - 1 : taskIdx + 1;
+      if (swapIdx < 0 || swapIdx >= nonHabit.length) return prev;
+      [nonHabit[taskIdx], nonHabit[swapIdx]] = [nonHabit[swapIdx], nonHabit[taskIdx]];
+      period.tasks = [...habits, ...nonHabit];
+      const overrides: Record<string, string[]> = {};
+      next.forEach(x => { overrides[x.name] = x.tasks.map((t: TaskRow) => t.id); });
+      try { localStorage.setItem("madar_plan_overrides", JSON.stringify(overrides)); } catch {}
+      return next;
+    });
+    setManualMode(true);
+  }
+
   function fmtTime(min: number): string {
     const h = Math.floor(min / 60);
     const m = min % 60;
@@ -1454,31 +1473,15 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
                   className="flex items-center gap-2 py-1.5 px-1 rounded cursor-grab active:cursor-grabbing hover:opacity-80 transition"
                   style={{ background: i % 2 === 0 ? "transparent" : "var(--bg)" }}>
                   {/* أزرار ترتيب داخل الفترة */}
-                  <div className="flex flex-col gap-0.5">
-                    <button onClick={(e) => { e.stopPropagation(); if (i === 0) return;
-                      setPlan(prev => {
-                        const next = prev.map(x => ({ ...x, tasks: [...x.tasks] }));
-                        const period = next.find(x => x.name === p.name); if (!period) return prev;
-                        const tasks = period.tasks.filter((x: TaskRow) => x.context !== "habit");
-                        [tasks[i-1], tasks[i]] = [tasks[i], tasks[i-1]];
-                        period.tasks = [...period.tasks.filter((x: TaskRow) => x.context === "habit"), ...tasks];
-                        const overrides: Record<string, string[]> = {}; next.forEach(x => { overrides[x.name] = x.tasks.map((t: TaskRow) => t.id); });
-                        try { localStorage.setItem("madar_plan_overrides", JSON.stringify(overrides)); } catch {}
-                        setManualMode(true); return next;
-                      });
-                    }} className="text-[8px] leading-none" style={{ color: i === 0 ? "transparent" : "var(--muted)" }}>▲</button>
-                    <button onClick={(e) => { e.stopPropagation(); if (i >= arr.length - 1) return;
-                      setPlan(prev => {
-                        const next = prev.map(x => ({ ...x, tasks: [...x.tasks] }));
-                        const period = next.find(x => x.name === p.name); if (!period) return prev;
-                        const tasks = period.tasks.filter((x: TaskRow) => x.context !== "habit");
-                        [tasks[i], tasks[i+1]] = [tasks[i+1], tasks[i]];
-                        period.tasks = [...period.tasks.filter((x: TaskRow) => x.context === "habit"), ...tasks];
-                        const overrides: Record<string, string[]> = {}; next.forEach(x => { overrides[x.name] = x.tasks.map((t: TaskRow) => t.id); });
-                        try { localStorage.setItem("madar_plan_overrides", JSON.stringify(overrides)); } catch {}
-                        setManualMode(true); return next;
-                      });
-                    }} className="text-[8px] leading-none" style={{ color: i >= arr.length - 1 ? "transparent" : "var(--muted)" }}>▼</button>
+                  <div className="flex flex-col">
+                    <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); moveTaskInPeriod(p.name, i, "up"); }}
+                      disabled={i === 0}
+                      className="px-1 py-0.5 text-[10px] leading-none rounded hover:bg-white/20 transition disabled:opacity-20"
+                      style={{ color: "var(--muted)" }}>▲</button>
+                    <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); moveTaskInPeriod(p.name, i, "down"); }}
+                      disabled={i >= arr.length - 1}
+                      className="px-1 py-0.5 text-[10px] leading-none rounded hover:bg-white/20 transition disabled:opacity-20"
+                      style={{ color: "var(--muted)" }}>▼</button>
                   </div>
                   <span className="text-[10px] w-4" style={{ color: "var(--muted)" }}>{i + 1}</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${P_COLORS[t.priority]}`}>{t.priority}</span>
