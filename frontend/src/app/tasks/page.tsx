@@ -2564,10 +2564,12 @@ export default function TasksPage() {
         </div>
       )}
 
-      <div className="px-8 py-6 space-y-5">
+      <div className="px-8 py-6 flex flex-col gap-5">
 
+        {/* الأقسام تُرتب بـ CSS order حسب sectionOrder */}
         {/* Prayer times table */}
-        {!hiddenSections.includes("prayers") && prayersReady && prayers.length > 0 && (
+        <div style={{ order: sectionOrder.indexOf("prayers"), display: hiddenSections.includes("prayers") ? "none" : undefined }}>
+        {prayersReady && prayers.length > 0 && (
           <div className="rounded-2xl border shadow-sm overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
             <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "var(--card-border)" }}>
               <p className="text-xs font-bold" style={{ color: "var(--text)" }}>🕌 مواقيت الصلاة</p>
@@ -2607,6 +2609,7 @@ export default function TasksPage() {
             </div>
           </div>
         )}
+        </div>
 
         {/* Weekend banner */}
         {weekend && (
@@ -2626,7 +2629,8 @@ export default function TasksPage() {
         )}
 
         {/* ── Focus Start Widget ── */}
-        {!hiddenSections.includes("focus") ? <div className="rounded-2xl overflow-hidden shadow-sm bg-white border border-[#E2D5B0]">
+        <div style={{ order: sectionOrder.indexOf("focus"), display: hiddenSections.includes("focus") ? "none" : undefined }}>
+        <div className="rounded-2xl overflow-hidden shadow-sm bg-white border border-[#E2D5B0]">
           {/* Period bar */}
           <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-[#F0EDE4]">
             <div className="flex items-center gap-2">
@@ -2710,10 +2714,12 @@ export default function TasksPage() {
               </p>
             )}
           </div>
-        </div> : null}
+        </div>
+        </div>
 
         {/* Progress bar */}
-        {!hiddenSections.includes("progress") ? <div className="bg-white rounded-2xl p-5 border border-[#E2D5B0] shadow-sm">
+        <div style={{ order: sectionOrder.indexOf("progress"), display: hiddenSections.includes("progress") ? "none" : undefined }}>
+        <div className="bg-white rounded-2xl p-5 border border-[#E2D5B0] shadow-sm">
           <div className="flex justify-between text-sm mb-2">
             <span className="text-[#7C7A8E]">تقدم اليوم</span>
             <span className="font-bold text-[#5E5495]">{pct}%</span>
@@ -2722,13 +2728,14 @@ export default function TasksPage() {
             <div className="h-full rounded-full transition-all duration-500"
               style={{ width: `${pct}%`, background: "linear-gradient(90deg, #5E5495, #C9A84C)" }} />
           </div>
-        </div> : null}
+        </div>
+        </div>
 
-        {/* PWA Install Prompt */}
+        {/* Summary section */}
+        <div style={{ order: sectionOrder.indexOf("summary"), display: hiddenSections.includes("summary") ? "none" : undefined }}>
         <InstallPWAButton />
-
-        {/* Today Summary — habits + quran + dues */}
-        {!hiddenSections.includes("summary") && <TodaySummary />}
+        <TodaySummary />
+        </div>
 
         {/* Overdue / Due Soon warning */}
         {(() => {
@@ -2827,7 +2834,7 @@ export default function TasksPage() {
         </div>
 
         {/* Task List */}
-        {!hiddenSections.includes("tasks") && (<>
+        <div style={{ order: sectionOrder.indexOf("tasks"), display: hiddenSections.includes("tasks") ? "none" : undefined }}>
         <section>
           <GeometricDivider label="قائمة المهام" />
           {/* Filters */}
@@ -3062,16 +3069,17 @@ export default function TasksPage() {
             })()}
           </div>
         </section>
-        </>)}
+        </div>
 
         {/* ── تخطيط اليوم — مدمج في أسفل الصفحة ── */}
-        {!hiddenSections.includes("planner") && (<>
+        <div style={{ order: sectionOrder.indexOf("planner"), display: hiddenSections.includes("planner") ? "none" : undefined }}>
         <GeometricDivider label="📋 تخطيط اليوم" />
         <InlineDayPlanner prayers={prayers} tasks={visibleTasks} blockedPeriods={blockedPeriods} onBlockToggle={(name) => setBlockedPeriods((p) => p.includes(name) ? p.filter((x) => x !== name) : [...p, name])} />
-        </>)}
+        </div>
 
         {/* ── المهام المستقبلية ── */}
-        {!hiddenSections.includes("future") && (() => {
+        <div style={{ order: sectionOrder.indexOf("future"), display: hiddenSections.includes("future") ? "none" : undefined }}>
+        {(() => {
           const today = new Date(); today.setHours(0,0,0,0);
           const future = baseTasks.filter(t => !t.done && t.dueDate && new Date(t.dueDate) > today)
             .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
@@ -3097,6 +3105,7 @@ export default function TasksPage() {
             </section>
           );
         })()}
+        </div>
 
         <div className="pb-4"><GeometricDivider /></div>
       </div>
