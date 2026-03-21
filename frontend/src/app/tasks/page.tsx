@@ -2989,41 +2989,29 @@ export default function TasksPage() {
                 {dayTasks.map((t) => (
                   <div key={t.id}>
                     <div
-                      onClick={() => bulkMode ? toggleSelect(t.id) : toggle(t.id, t.done)}
                       className={`flex items-center gap-3 py-3 border-b border-[#e2d5b0]/60 last:border-0
-                                  cursor-pointer hover:bg-[#C9A84C]/5 rounded-lg px-2 transition-all
+                                  rounded-lg px-2 transition-all
                                   ${t.done ? "opacity-50" : ""} ${selectedTasks.has(t.id) ? "bg-[#5E5495]/10 border-[#5E5495]/30" : ""}`}>
+                      {/* الدائرة — للإنجاز فقط */}
                       {bulkMode ? (
-                        <div className={`w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center transition-all ${selectedTasks.has(t.id) ? "bg-[#5E5495] border-[#5E5495]" : "border-[#C9A84C] bg-transparent"}`}>
+                        <div onClick={() => toggleSelect(t.id)} className={`w-7 h-7 rounded flex-shrink-0 border-2 flex items-center justify-center transition-all cursor-pointer ${selectedTasks.has(t.id) ? "bg-[#5E5495] border-[#5E5495]" : "border-[#C9A84C] bg-transparent"}`}>
                           {selectedTasks.has(t.id) && <span className="text-white text-[10px]">✓</span>}
                         </div>
                       ) : (
-                      <div className={`w-5 h-5 rounded-full flex-shrink-0 border-2 flex items-center justify-center transition-all
+                      <div onClick={() => toggle(t.id, t.done)} className={`w-7 h-7 rounded-full flex-shrink-0 border-2 flex items-center justify-center transition-all cursor-pointer hover:scale-110
                                       ${t.done
                                         ? t.context === "habit" ? "bg-[#2ABFBF] border-[#2ABFBF]" : "bg-[#5E5495] border-[#5E5495]"
                                         : t.context === "habit" ? "border-[#2ABFBF] bg-transparent" : "border-[#C9A84C] bg-transparent"}`}>
                         {t.done && <span className="text-white text-[10px]">✓</span>}
                       </div>
                       )}
-                      {t.context !== "habit" && (
-                        <button onClick={(e) => { e.stopPropagation(); toggleExpand(t.id); }}
-                          className="text-[10px] text-[#7C7A8E] hover:text-[#5E5495] transition flex-shrink-0"
-                          title="مهام فرعية">
-                          {expandedTask === t.id ? "▼" : "▶"}
-                        </button>
-                      )}
-                      <p className={`flex-1 text-sm ${t.done ? "line-through text-[#7C7A8E]" : "text-[#1A1830] font-medium"}`}>
+                      {/* اسم المهمة — لفتح التفاصيل */}
+                      <p onClick={() => t.context !== "habit" ? setEditingTask(t) : undefined}
+                        className={`flex-1 text-sm cursor-pointer hover:underline ${t.done ? "line-through text-[#7C7A8E]" : "text-[#1A1830] font-medium"}`}>
                         {t.title}
                       </p>
                       {t.context === "habit" && !t.done && (
                         <span className="text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "#2ABFBF15", color: "#2ABFBF", border: "1px solid #2ABFBF30" }}>عادة</span>
-                      )}
-                      {/* تعديل — أول زر */}
-                      {t.context !== "habit" && (
-                        <button onClick={(e) => { e.stopPropagation(); setEditingTask(t); }}
-                          className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-50 text-[#6B7280] border border-gray-200 flex-shrink-0 hover:bg-gray-100 transition" title="تعديل">
-                          ✏️
-                        </button>
                       )}
                       {t.context === "habit" && t.description && (
                         <span className="text-[10px] text-orange-500 font-bold flex-shrink-0">{t.description}</span>
