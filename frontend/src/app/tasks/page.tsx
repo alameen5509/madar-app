@@ -1027,6 +1027,22 @@ function EditTaskDialog({ task, onClose, onSaved }: {
   const [assignEmail, setAssignEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // بيانات إضافية من API
+  const [fullData, setFullData] = useState<{ goal?: { id: string; title: string }; assignedTo?: { id: string; fullName: string }; status?: string; createdAt?: string; completedAt?: string; cost?: number; projectId?: string } | null>(null);
+  const [circles, setCircles] = useState<{ id: string; name: string }[]>([]);
+  const [selectedCircle, setSelectedCircle] = useState("");
+
+  useEffect(() => {
+    // جلب التفاصيل الكاملة من API
+    api.get(`/api/tasks`).then(({ data }) => {
+      const full = (data as SmartTask[]).find(t => t.id === task.id);
+      if (full) {
+        setFullData({ goal: full.goal, assignedTo: full.assignedTo, status: full.status, createdAt: full.createdAt, completedAt: full.completedAt, cost: full.cost, projectId: full.projectId });
+        if (full.lifeCircle?.id) setSelectedCircle(full.lifeCircle.id);
+      }
+    }).catch(() => {});
+    import("@/lib/api").then(m => m.getCircles()).then(c => setCircles(c.map(x => ({ id: x.id, name: x.name })))).catch(() => {});
+  }, [task.id]);
 
   async function save() {
     if (!title.trim()) return;
@@ -1044,6 +1060,7 @@ function EditTaskDialog({ task, onClose, onSaved }: {
           userPriority: priority,
           dueDate: dueDate || undefined,
           taskContext: context !== "Anywhere" ? context : undefined,
+          lifeCircleId: selectedCircle || undefined,
         });
       }
       onSaved();
@@ -1123,13 +1140,27 @@ function EditTaskDialog({ task, onClose, onSaved }: {
             </label>
           </div>
           {/* الدائرة */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs" style={{ color: "var(--muted)" }}>الدائرة:</span>
-            <span className="text-xs font-medium px-2 py-0.5 rounded-full"
-              style={{ background: task.circleColor ? `${task.circleColor}15` : "var(--bg)", color: task.circleColor ?? "var(--text)" }}>
-              {task.circle}
-            </span>
+          <div>
+            <label className="block text-sm font-semibold mb-1.5" style={{ color: "var(--text)" }}>الدائرة / المشروع</label>
+            <select value={selectedCircle} onChange={(e) => setSelectedCircle(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
+              style={{ background: "var(--bg)", border: "1px solid var(--card-border)", color: "var(--text)" }}>
+              <option value="">بدون</option>
+              {circles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
           </div>
+          {/* معلومات إضافية */}
+          {fullData && (
+            <div className="rounded-xl p-3 space-y-1.5" style={{ background: "var(--bg)", border: "1px solid var(--card-border)" }}>
+              <p className="text-[10px] font-bold mb-1" style={{ color: "var(--muted)" }}>معلومات المهمة</p>
+              {fullData.status && <p className="text-[10px]" style={{ color: "var(--muted)" }}>الحالة: <b style={{ color: "var(--text)" }}>{fullData.status}</b></p>}
+              {fullData.goal && <p className="text-[10px]" style={{ color: "var(--muted)" }}>الهدف: <b style={{ color: "var(--text)" }}>{fullData.goal.title}</b></p>}
+              {fullData.assignedTo && <p className="text-[10px]" style={{ color: "var(--muted)" }}>موكلة إلى: <b style={{ color: "var(--text)" }}>{fullData.assignedTo.fullName}</b></p>}
+              {fullData.cost && <p className="text-[10px]" style={{ color: "var(--muted)" }}>التكلفة: <b style={{ color: "var(--text)" }}>{fullData.cost.toLocaleString()} ريال</b></p>}
+              {fullData.createdAt && <p className="text-[10px]" style={{ color: "var(--muted)" }}>تاريخ الإنشاء: <b style={{ color: "var(--text)" }}>{new Date(fullData.createdAt).toLocaleDateString("ar-SA")}</b></p>}
+              {fullData.completedAt && <p className="text-[10px]" style={{ color: "var(--muted)" }}>تاريخ الإنجاز: <b style={{ color: "var(--text)" }}>{new Date(fullData.completedAt).toLocaleDateString("ar-SA")}</b></p>}
+            </div>
+          )}
           {/* تعيين لشخص (اختياري) */}
           <div>
             <label className="block text-sm font-semibold mb-1.5" style={{ color: "var(--text)" }}>تعيين لشخص <span className="text-[10px] font-normal" style={{ color: "var(--muted)" }}>(اختياري)</span></label>
