@@ -1360,29 +1360,46 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
       }
     } catch {}
 
-    // 2. توزيع تلقائي حسب البيئة
+    // 2. توزيع تلقائي حسب البيئة — المهام في فترات منتهية تنتقل للتالية
     const assigned = new Set<string>();
-    return allPeriods.map(p => {
+    const result = allPeriods.map(p => {
       const isHabit = p.name === habitPeriodName && habitTasks.length > 0;
-      if (p.blocked) return { ...p, tasks: [], habitSlot: false };
+      if (p.blocked) return { ...p, tasks: [] as TaskRow[], habitSlot: false };
+      const isPast = p.endMin <= now && p.name !== "بعد منتصف الليل";
       const pCtx = periodContexts[p.name];
       const slots = Math.floor(p.duration / 30);
       const pt: TaskRow[] = [];
-      if (isHabit) pt.push(...habitTasks);
-      for (let s = 0; s < slots; s++) {
-        let pick: TaskRow | undefined;
-        if (pCtx) {
-          // بيئة محددة: فقط نفس البيئة (لا Anywhere حتى)
-          pick = pending.find(t => !assigned.has(t.id) && t.context === pCtx);
-        } else {
-          pick = pending.find(t => !assigned.has(t.id));
+      if (isHabit && !isPast) pt.push(...habitTasks);
+      // الفترات المنتهية: لا نوزع عليها (مهامها ستنتقل للتالية)
+      if (!isPast) {
+        for (let s = 0; s < slots; s++) {
+          let pick: TaskRow | undefined;
+          if (pCtx) {
+            pick = pending.find(t => !assigned.has(t.id) && t.context === pCtx);
+          } else {
+            pick = pending.find(t => !assigned.has(t.id));
+          }
+          if (!pick) break;
+          assigned.add(pick.id);
+          pt.push(pick);
         }
-        if (!pick) break;
-        assigned.add(pick.id);
-        pt.push(pick);
       }
-      return { ...p, tasks: pt, habitSlot: isHabit };
+      return { ...p, tasks: pt, habitSlot: isHabit && !isPast };
     });
+    // المهام غير الموزعة (كانت في فترات منتهية) → أول فترة مستقبلية مناسبة
+    const unassigned = pending.filter(t => !assigned.has(t.id));
+    for (const task of unassigned) {
+      const pCtx = task.context;
+      // ابحث عن فترة مستقبلية بنفس البيئة أو بدون بيئة
+      const target = result.find(p => {
+        if (p.blocked) return false;
+        if (p.endMin <= now && p.name !== "بعد منتصف الليل") return false;
+        const ctx = periodContexts[p.name];
+        return !ctx || ctx === pCtx || pCtx === "Anywhere";
+      });
+      if (target) target.tasks.push(task);
+    }
+    return result;
   }
 
   const initialPlan = buildPlan();
