@@ -146,7 +146,12 @@ export default function Sidebar() {
                 }}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing transition"
                 style={{ background: dragIdx === idx ? "rgba(212,175,55,0.15)" : "transparent", opacity: hidden.has(item.href) ? 0.4 : 1 }}>
-                <span className="text-white/30 text-xs">⠿</span>
+                <div className="flex flex-col">
+                  <button onClick={() => { if (idx === 0) return; const n = [...order]; [n[idx-1], n[idx]] = [n[idx], n[idx-1]]; setOrder(n); }}
+                    disabled={idx === 0} className="text-white/40 text-[10px] leading-none hover:text-[#D4AF37] disabled:opacity-20">▲</button>
+                  <button onClick={() => { if (idx >= sortedItems.length - 1) return; const n = [...order]; [n[idx], n[idx+1]] = [n[idx+1], n[idx]]; setOrder(n); }}
+                    disabled={idx >= sortedItems.length - 1} className="text-white/40 text-[10px] leading-none hover:text-[#D4AF37] disabled:opacity-20">▼</button>
+                </div>
                 <span className="text-base">{item.icon}</span>
                 <span className="text-white/70 text-xs flex-1">{item.label}</span>
                 {!item.fixed && (
