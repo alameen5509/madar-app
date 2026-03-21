@@ -1362,25 +1362,39 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   const [dragTask, setDragTask] = useState<{ taskId: string; fromPeriod: string } | null>(null);
   const [manualMode, setManualMode] = useState(false);
 
-  // عند تغيير المهام — أعد التوزيع (إلا إذا المستخدم عدّل يدوياً)
+  // عند تغيير المهام — طبّق الترتيب المحفوظ مع حذف المهام المنجزة
   useEffect(() => {
-    if (manualMode) return; // لا تمحو التعديل اليدوي
-    // جرّب تطبيق الترتيب المحفوظ
     try {
       const saved = localStorage.getItem("madar_plan_overrides");
-      if (saved && pending.length > 0) {
+      if (saved) {
         const data = JSON.parse(saved) as Record<string, string[]>;
         const allIds = new Set([...pending.map(t => t.id), ...habitTasks.map(t => t.id)]);
-        const hasAll = Object.values(data).flat().every(id => allIds.has(id));
-        if (hasAll) {
-          setPlan(initialPlan.map(p => {
-            const ids = data[p.name];
-            if (!ids) return p;
-            const mapped = ids.map(id => pending.find(t => t.id === id) ?? habitTasks.find(t => t.id === id)).filter(Boolean) as TaskRow[];
-            return { ...p, tasks: mapped.length > 0 ? mapped : p.tasks };
-          }));
-          return;
+        // احذف IDs المهام المنجزة/المحذوفة من الترتيب المحفوظ
+        const cleaned: Record<string, string[]> = {};
+        let hasChanges = false;
+        for (const [period, ids] of Object.entries(data)) {
+          cleaned[period] = ids.filter(id => allIds.has(id));
+          if (cleaned[period].length !== ids.length) hasChanges = true;
         }
+        // أضف المهام الجديدة (غير موجودة في أي فترة) لأول فترة متاحة
+        const assignedIds = new Set(Object.values(cleaned).flat());
+        const unassigned = pending.filter(t => !assignedIds.has(t.id));
+        if (unassigned.length > 0) {
+          const firstPeriod = Object.keys(cleaned).find(k => cleaned[k] !== undefined) ?? allPeriods[0]?.name;
+          if (firstPeriod) cleaned[firstPeriod] = [...(cleaned[firstPeriod] ?? []), ...unassigned.map(t => t.id)];
+          hasChanges = true;
+        }
+        if (hasChanges) {
+          try { localStorage.setItem("madar_plan_overrides", JSON.stringify(cleaned)); } catch {}
+        }
+        // طبّق الترتيب
+        setPlan(initialPlan.map(p => {
+          const ids = cleaned[p.name];
+          if (!ids || ids.length === 0) return p;
+          const mapped = ids.map(id => pending.find(t => t.id === id) ?? habitTasks.find(t => t.id === id)).filter(Boolean) as TaskRow[];
+          return { ...p, tasks: mapped.length > 0 ? mapped : p.tasks };
+        }));
+        return;
       }
     } catch {}
     setPlan(initialPlan);
