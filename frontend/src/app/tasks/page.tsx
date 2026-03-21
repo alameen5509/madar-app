@@ -1484,7 +1484,11 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${P_COLORS[t.priority]}`}>{t.priority}</span>
                   {t.isRecurring && <span className="text-[10px]">🔄</span>}
                   {t.isWork && <span className="text-[10px]">💼</span>}
-                  {t.context !== "Anywhere" && t.context !== "habit" && <span className="text-[10px]">{ctxIcon(t.context)}</span>}
+                  {t.context !== "Anywhere" && t.context !== "habit" && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "var(--bg)", color: "var(--muted)", border: "1px solid var(--card-border)" }}>
+                      {ctxIcon(t.context)} {TASK_CONTEXTS.find(c => c.key === t.context)?.label ?? t.context}
+                    </span>
+                  )}
                   <span className="text-sm flex-1 truncate" style={{ color: "var(--text)" }}>{t.title}</span>
                 </div>
               ))}
