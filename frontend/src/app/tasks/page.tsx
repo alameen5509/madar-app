@@ -1760,7 +1760,7 @@ export default function TasksPage() {
   const DEFAULT_SECTIONS = ["focus", "progress", "summary", "prayers", "tasks", "planner", "future"];
   const SECTION_LABELS: Record<string, string> = { focus: "⏱ التركيز", progress: "📊 تقدم اليوم", summary: "📋 الملخص", prayers: "🕌 الصلاة", tasks: "✅ المهام", planner: "📋 التخطيط", future: "📅 المستقبلية" };
   const [sectionOrder, setSectionOrder] = useState<string[]>(DEFAULT_SECTIONS);
-  const [hiddenSections, setHiddenSections] = useState<Set<string>>(new Set());
+  const [hiddenSections, setHiddenSections] = useState<string[]>([]);
   const [showSectionEditor, setShowSectionEditor] = useState(false);
   const [dragSectionIdx, setDragSectionIdx] = useState<number | null>(null);
   const [savedOrder, setSavedOrder] = useState<string[] | null>(null);
@@ -1770,18 +1770,18 @@ export default function TasksPage() {
     import("@/lib/api").then(({ api: a }) => {
       a.get("/api/users/me/preferences").then(({ data }) => {
         if (data?.sectionOrder) { setSectionOrder(data.sectionOrder); setSavedOrder(data.sectionOrder); }
-        if (data?.hiddenSections) setHiddenSections(new Set(data.hiddenSections));
+        if (data?.hiddenSections) setHiddenSections(data.hiddenSections);
       }).catch(() => {});
     });
   }, []);
 
-  function saveSectionOrder(order: string[], hidden: Set<string>) {
+  function saveSectionOrder(order: string[], hidden: string[]) {
     setSectionOrder(order);
     setHiddenSections(hidden);
     setSavedOrder(order);
     import("@/lib/api").then(({ api: a }) => {
       const settings = JSON.parse(localStorage.getItem("madar_settings") ?? "{}");
-      a.put("/api/users/me/preferences", { ...settings, sectionOrder: order, hiddenSections: Array.from(hidden) }).catch(() => {});
+      a.put("/api/users/me/preferences", { ...settings, sectionOrder: order, hiddenSections: hidden }).catch(() => {});
     });
   }
 
@@ -2553,11 +2553,11 @@ export default function TasksPage() {
               className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing transition"
               style={{ background: dragSectionIdx === idx ? "#D4AF3710" : "var(--bg)", border: `1px solid ${dragSectionIdx === idx ? "#D4AF37" : "var(--card-border)"}` }}>
               <span className="text-[#9CA3AF] text-xs">⠿</span>
-              <span className="text-sm font-medium flex-1" style={{ color: hiddenSections.has(sec) ? "var(--muted)" : "var(--text)" }}>{SECTION_LABELS[sec] ?? sec}</span>
-              <button onClick={() => setHiddenSections(prev => { const n = new Set(prev); n.has(sec) ? n.delete(sec) : n.add(sec); return n; })}
+              <span className="text-sm font-medium flex-1" style={{ color: hiddenSections.includes(sec) ? "var(--muted)" : "var(--text)" }}>{SECTION_LABELS[sec] ?? sec}</span>
+              <button onClick={() => setHiddenSections(prev => prev.includes(sec) ? prev.filter(s => s !== sec) : [...prev, sec])}
                 className="text-xs px-2 py-0.5 rounded-lg"
-                style={{ background: hiddenSections.has(sec) ? "#DC262610" : "#3D8C5A10", color: hiddenSections.has(sec) ? "#DC2626" : "#3D8C5A" }}>
-                {hiddenSections.has(sec) ? "مخفي" : "ظاهر"}
+                style={{ background: hiddenSections.includes(sec) ? "#DC262610" : "#3D8C5A10", color: hiddenSections.includes(sec) ? "#DC2626" : "#3D8C5A" }}>
+                {hiddenSections.includes(sec) ? "مخفي" : "ظاهر"}
               </button>
             </div>
           ))}
@@ -2567,7 +2567,7 @@ export default function TasksPage() {
       <div className="px-8 py-6 space-y-5">
 
         {/* Prayer times table */}
-        {!hiddenSections.has("prayers") && prayersReady && prayers.length > 0 && (
+        {!hiddenSections.includes("prayers") && prayersReady && prayers.length > 0 && (
           <div className="rounded-2xl border shadow-sm overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
             <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "var(--card-border)" }}>
               <p className="text-xs font-bold" style={{ color: "var(--text)" }}>🕌 مواقيت الصلاة</p>
@@ -2626,7 +2626,7 @@ export default function TasksPage() {
         )}
 
         {/* ── Focus Start Widget ── */}
-        {!hiddenSections.has("focus") && <div className="rounded-2xl overflow-hidden shadow-sm bg-white border border-[#E2D5B0]">
+        {!hiddenSections.includes("focus") && <div className="rounded-2xl overflow-hidden shadow-sm bg-white border border-[#E2D5B0]">
           {/* Period bar */}
           <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-[#F0EDE4]">
             <div className="flex items-center gap-2">
@@ -2713,7 +2713,7 @@ export default function TasksPage() {
         </div>}
 
         {/* Progress bar */}
-        {!hiddenSections.has("progress") && <div className="bg-white rounded-2xl p-5 border border-[#E2D5B0] shadow-sm">
+        {!hiddenSections.includes("progress") && <div className="bg-white rounded-2xl p-5 border border-[#E2D5B0] shadow-sm">
           <div className="flex justify-between text-sm mb-2">
             <span className="text-[#7C7A8E]">تقدم اليوم</span>
             <span className="font-bold text-[#5E5495]">{pct}%</span>
@@ -2728,7 +2728,7 @@ export default function TasksPage() {
         <InstallPWAButton />
 
         {/* Today Summary — habits + quran + dues */}
-        {!hiddenSections.has("summary") && <TodaySummary />}
+        {!hiddenSections.includes("summary") && <TodaySummary />}
 
         {/* Overdue / Due Soon warning */}
         {(() => {
@@ -2827,7 +2827,7 @@ export default function TasksPage() {
         </div>
 
         {/* Task List */}
-        {!hiddenSections.has("tasks") && (<>
+        {!hiddenSections.includes("tasks") && (<>
         <section>
           <GeometricDivider label="قائمة المهام" />
           {/* Filters */}
@@ -3065,13 +3065,13 @@ export default function TasksPage() {
         </>)}
 
         {/* ── تخطيط اليوم — مدمج في أسفل الصفحة ── */}
-        {!hiddenSections.has("planner") && (<>
+        {!hiddenSections.includes("planner") && (<>
         <GeometricDivider label="📋 تخطيط اليوم" />
         <InlineDayPlanner prayers={prayers} tasks={visibleTasks} blockedPeriods={blockedPeriods} onBlockToggle={(name) => setBlockedPeriods((p) => p.includes(name) ? p.filter((x) => x !== name) : [...p, name])} />
         </>)}
 
         {/* ── المهام المستقبلية ── */}
-        {!hiddenSections.has("future") && (() => {
+        {!hiddenSections.includes("future") && (() => {
           const today = new Date(); today.setHours(0,0,0,0);
           const future = baseTasks.filter(t => !t.done && t.dueDate && new Date(t.dueDate) > today)
             .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
