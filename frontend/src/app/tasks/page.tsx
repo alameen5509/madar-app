@@ -2564,9 +2564,8 @@ export default function TasksPage() {
         </div>
       )}
 
-      <div className="px-8 py-6 flex flex-col gap-5">
+      <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
 
-        {/* الأقسام تُرتب بـ CSS order حسب sectionOrder */}
         {/* Prayer times table */}
         <div style={{ order: sectionOrder.indexOf("prayers"), display: hiddenSections.includes("prayers") ? "none" : undefined }}>
         {prayersReady && prayers.length > 0 && (
