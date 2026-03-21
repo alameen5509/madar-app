@@ -1474,15 +1474,15 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
                   className="flex items-center gap-2 py-1.5 px-1 rounded cursor-grab active:cursor-grabbing hover:opacity-80 transition"
                   style={{ background: i % 2 === 0 ? "transparent" : "var(--bg)" }}>
                   {/* أزرار ترتيب داخل الفترة */}
-                  <div className="flex flex-col">
+                  <div className="flex flex-col gap-0.5">
                     <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); moveTaskInPeriod(p.name, i, "up"); }}
                       disabled={i === 0}
-                      className="px-1 py-0.5 text-[10px] leading-none rounded hover:bg-white/20 transition disabled:opacity-20"
-                      style={{ color: "var(--muted)" }}>▲</button>
+                      className="w-7 h-7 flex items-center justify-center rounded-lg text-sm hover:bg-[#D4AF37]/20 transition disabled:opacity-20"
+                      style={{ color: "var(--gold, #D4AF37)" }}>▲</button>
                     <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); moveTaskInPeriod(p.name, i, "down"); }}
                       disabled={i >= arr.length - 1}
-                      className="px-1 py-0.5 text-[10px] leading-none rounded hover:bg-white/20 transition disabled:opacity-20"
-                      style={{ color: "var(--muted)" }}>▼</button>
+                      className="w-7 h-7 flex items-center justify-center rounded-lg text-sm hover:bg-[#D4AF37]/20 transition disabled:opacity-20"
+                      style={{ color: "var(--gold, #D4AF37)" }}>▼</button>
                   </div>
                   <span className="text-[10px] w-4" style={{ color: "var(--muted)" }}>{i + 1}</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${P_COLORS[t.priority]}`}>{t.priority}</span>
