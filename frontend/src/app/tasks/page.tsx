@@ -2996,11 +2996,29 @@ export default function TasksPage() {
                 return todayStr;
               }
 
+              // ترتيب مهام اليوم حسب تخطيط اليوم (من localStorage)
+              let planOrder: string[] = [];
+              try {
+                const saved = localStorage.getItem("madar_plan_overrides");
+                if (saved) planOrder = Object.values(JSON.parse(saved) as Record<string, string[]>).flat();
+              } catch {}
+              const sortByPlan = (a: TaskRow, b: TaskRow) => {
+                const ai = planOrder.indexOf(a.id);
+                const bi = planOrder.indexOf(b.id);
+                if (ai >= 0 && bi >= 0) return ai - bi;
+                if (ai >= 0) return -1;
+                if (bi >= 0) return 1;
+                return 0;
+              };
+
               const groups = new Map<string, TaskRow[]>();
               visibleTasks.forEach(t => {
                 const day = getTaskDay(t);
                 groups.set(day, [...(groups.get(day) ?? []), t]);
               });
+              // رتّب مهام اليوم حسب تخطيط اليوم
+              const todayGroup = groups.get(todayStr);
+              if (todayGroup) groups.set(todayStr, todayGroup.sort(sortByPlan));
 
               // ترتيب: اليوم أولاً ثم الأقرب
               const sortedDays = Array.from(groups.entries()).sort((a, b) => {
