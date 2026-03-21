@@ -1286,8 +1286,11 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
 
   const now = nowMin();
 
-  // بيئة كل فترة — فارغة افتراضياً (تعرض الكل)
-  const [periodContexts, setPeriodContexts] = useState<Record<string, string>>({});
+  // بيئة كل فترة — تُحفظ في localStorage
+  const [periodContexts, setPeriodContexts] = useState<Record<string, string>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem("madar_period_ctx") ?? "{}"); } catch { return {}; }
+  });
 
   // عرض جميع الفترات بترتيبها الطبيعي — بدون إخفاء أي فترة
   const firstAvailable = allPeriods.find(p => !p.blocked && p.endMin > now) ?? allPeriods.find(p => !p.blocked);
@@ -1326,10 +1329,10 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     for (let s = 0; s < slots && pendingPool.some(t => !assigned.has(t.id)); s++) {
       let pick: TaskRow | undefined;
       if (pCtx) {
-        // بيئة محددة: أولاً نفس البيئة، ثم Anywhere، ثم أي مهمة
+        // بيئة محددة: فقط مهام نفس البيئة + مهام "أي مكان"
         pick = pendingPool.find(t => !assigned.has(t.id) && t.context === pCtx)
-            ?? pendingPool.find(t => !assigned.has(t.id) && (t.context === "Anywhere" || t.context === "habit"))
-            ?? pendingPool.find(t => !assigned.has(t.id));
+            ?? pendingPool.find(t => !assigned.has(t.id) && (t.context === "Anywhere" || t.context === "habit"));
+        // لا fallback — لا نضع مهمة مكتب في فترة مشوار
       } else {
         // بدون بيئة: أي مهمة متاحة
         pick = pendingPool.find(t => !assigned.has(t.id));
@@ -1512,7 +1515,7 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
             <div className="flex items-center gap-1">
               {!p.blocked && (
                 <select value={periodContexts[p.name] ?? ""}
-                  onChange={(e) => { e.stopPropagation(); setPeriodContexts(prev => ({ ...prev, [p.name]: e.target.value })); }}
+                  onChange={(e) => { e.stopPropagation(); const val = e.target.value; setPeriodContexts(prev => { const next = { ...prev, [p.name]: val }; localStorage.setItem("madar_period_ctx", JSON.stringify(next)); localStorage.removeItem("madar_plan_overrides"); return next; }); }}
                   onClick={(e) => e.stopPropagation()}
                   className="text-[10px] px-1.5 py-0.5 rounded-lg border focus:outline-none"
                   style={{ background: "var(--bg)", color: "var(--muted)", borderColor: "var(--card-border)" }}>
