@@ -1644,6 +1644,7 @@ interface BeforeInstallPromptEvent extends Event {
 function TodaySummary() {
   const [habits, setHabitsLocal] = useState<{ total: number; done: number }>({ total: 0, done: 0 });
   const [dues, setDues] = useState<number>(0);
+  const [finance, setFinance] = useState<{ balance: number; income: number; expense: number }>({ balance: 0, income: 0, expense: 0 });
 
   useEffect(() => {
     function load() {
@@ -1655,11 +1656,17 @@ function TodaySummary() {
         const done = active.filter((x: { todayDone: boolean }) => lastDate === today && x.todayDone).length;
         setHabitsLocal({ total: active.length, done });
       } catch {}
-      // جلب المستحقات من API
       import("@/lib/api").then(({ api: a }) => {
         a.get("/api/finance/snapshot").then(({ data }) => {
           const now = new Date();
           const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+          const txs = data.transactions ?? [];
+          const allIncome = txs.filter((t: { type: string }) => t.type === "Income" || t.type === "income").reduce((s: number, t: { amount: number }) => s + t.amount, 0);
+          const allExpense = txs.filter((t: { type: string }) => t.type !== "Income" && t.type !== "income").reduce((s: number, t: { amount: number }) => s + t.amount, 0);
+          const monthTx = txs.filter((t: { date: string }) => t.date?.startsWith(monthStr));
+          const mIncome = monthTx.filter((t: { type: string }) => t.type === "Income" || t.type === "income").reduce((s: number, t: { amount: number }) => s + t.amount, 0);
+          const mExpense = monthTx.filter((t: { type: string }) => t.type !== "Income" && t.type !== "income").reduce((s: number, t: { amount: number }) => s + t.amount, 0);
+          setFinance({ balance: allIncome - allExpense, income: mIncome, expense: mExpense });
           const pending = (data.dues ?? []).filter((x: { isActive: boolean; dueDay: number; lastConfirmedDate?: string }) =>
             x.isActive && now.getDate() >= x.dueDay && !x.lastConfirmedDate?.startsWith(monthStr)
           ).length;
@@ -1676,18 +1683,37 @@ function TodaySummary() {
   const habPct = habits.total > 0 ? Math.round((habits.done / habits.total) * 100) : 0;
 
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <a href="/habits" className="bg-white rounded-xl p-3 border border-[#E2D5B0] shadow-sm hover:shadow-md transition text-center">
-        <p className="text-[10px] text-[#7C7A8E]">العادات</p>
-        <p className="text-lg font-black" style={{ color: habPct === 100 ? "#3D8C5A" : "#5E5495" }}>{habits.done}/{habits.total}</p>
-        <div className="bg-[#F0EDE4] rounded-full h-1.5 mt-1 overflow-hidden">
-          <div className="h-full rounded-full" style={{ width: `${habPct}%`, background: habPct === 100 ? "#3D8C5A" : "#5E5495" }} />
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <a href="/habits" className="bg-white rounded-xl p-2.5 border border-[#E2D5B0] shadow-sm hover:shadow-md transition text-center">
+          <p className="text-[9px] text-[#7C7A8E]">العادات</p>
+          <p className="text-base font-black" style={{ color: habPct === 100 ? "#3D8C5A" : "#5E5495" }}>{habits.done}/{habits.total}</p>
+          <div className="bg-[#F0EDE4] rounded-full h-1 mt-1 overflow-hidden">
+            <div className="h-full rounded-full" style={{ width: `${habPct}%`, background: habPct === 100 ? "#3D8C5A" : "#5E5495" }} />
+          </div>
+        </a>
+        <a href="/finance" className="bg-white rounded-xl p-2.5 border border-[#E2D5B0] shadow-sm hover:shadow-md transition text-center">
+          <p className="text-[9px] text-[#7C7A8E]">مستحقات</p>
+          <p className="text-base font-black" style={{ color: dues === 0 ? "#3D8C5A" : "#DC2626" }}>{dues === 0 ? "✓" : dues}</p>
+          <p className="text-[8px] text-[#9CA3AF]">{dues === 0 ? "لا مستحقات" : "تنتظر تأكيد"}</p>
+        </a>
+      </div>
+      {/* ملخص مالي */}
+      <a href="/finance" className="bg-white rounded-xl p-2.5 border border-[#E2D5B0] shadow-sm hover:shadow-md transition flex items-center justify-between">
+        <div className="text-center flex-1">
+          <p className="text-[8px] text-[#7C7A8E]">الرصيد</p>
+          <p className="text-sm font-black" style={{ color: finance.balance >= 0 ? "#2C2C54" : "#DC2626" }}>{finance.balance.toLocaleString()}</p>
         </div>
-      </a>
-      <a href="/finance" className="bg-white rounded-xl p-3 border border-[#E2D5B0] shadow-sm hover:shadow-md transition text-center">
-        <p className="text-[10px] text-[#7C7A8E]">مستحقات</p>
-        <p className="text-lg font-black" style={{ color: dues === 0 ? "#3D8C5A" : "#DC2626" }}>{dues === 0 ? "✓" : dues}</p>
-        <p className="text-[9px] text-[#9CA3AF]">{dues === 0 ? "لا مستحقات" : "تنتظر تأكيد"}</p>
+        <div className="w-px h-8 bg-[#E2D5B0]" />
+        <div className="text-center flex-1">
+          <p className="text-[8px] text-[#7C7A8E]">دخل الشهر</p>
+          <p className="text-sm font-black text-[#3D8C5A]">{finance.income.toLocaleString()}</p>
+        </div>
+        <div className="w-px h-8 bg-[#E2D5B0]" />
+        <div className="text-center flex-1">
+          <p className="text-[8px] text-[#7C7A8E]">مصروفات</p>
+          <p className="text-sm font-black text-[#DC2626]">{finance.expense.toLocaleString()}</p>
+        </div>
       </a>
     </div>
   );
