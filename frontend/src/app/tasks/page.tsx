@@ -3014,63 +3014,15 @@ export default function TasksPage() {
                         className={`flex-1 text-sm cursor-pointer hover:underline ${t.done ? "line-through text-[#7C7A8E]" : "text-[#1A1830] font-medium"}`}>
                         {t.title}
                       </p>
-                      {t.context === "habit" && !t.done && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "#2ABFBF15", color: "#2ABFBF", border: "1px solid #2ABFBF30" }}>عادة</span>
-                      )}
-                      {t.context === "habit" && t.description && (
-                        <span className="text-[10px] text-orange-500 font-bold flex-shrink-0">{t.description}</span>
-                      )}
-                      {t.isUrgent && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200 flex-shrink-0" title={t.waitingFor ? `ينتظر: ${t.waitingFor}` : "ملحة"}>🔴 {t.waitingFor ?? "ملحة"}</span>}
-                      {t.isRecurring && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-600 border border-purple-100 flex-shrink-0">🔄</span>}
-                      {t.isWork && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex-shrink-0">💼</span>}
-                      {isOverdue(t) && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 bg-red-50 text-red-600 border border-red-200">
-                          ⏰ متأخرة
-                        </span>
-                      )}
-                      {t.dueDate && (
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                          isOverdue(t) ? "bg-red-50 text-red-600 border border-red-200" : "bg-gray-50 text-[#9CA3AF]"
-                        }`}>
-                          📅 {new Date(t.dueDate).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}
-                        </span>
-                      )}
-                      {/* بيئة المهمة */}
-                      {t.context && t.context !== "Anywhere" && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-50 text-[#6B7280] border border-gray-200 flex-shrink-0">
-                          {TASK_CONTEXTS.find(c => c.key === t.context)?.icon ?? "🌐"} {TASK_CONTEXTS.find(c => c.key === t.context)?.label ?? t.context}
-                        </span>
-                      )}
-                      {/* واتساب — فقط لمهام الاتصال */}
-                      {(t.context === "Phone" || t.context === "Anywhere") && (
-                        <button onClick={(e) => { e.stopPropagation(); window.open(`https://wa.me/?text=${encodeURIComponent(t.title)}`, "_blank"); }}
-                          className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-50 text-green-600 border border-green-100 flex-shrink-0 hover:bg-green-100 transition" title="أرسل واتساب">
-                          📱
-                        </button>
-                      )}
-                      {/* خريطة — فقط لمهام المشاوير */}
-                      {t.context === "Car" && (
-                        <button onClick={(e) => { e.stopPropagation(); window.open(`https://www.google.com/maps/search/${encodeURIComponent(t.title)}`, "_blank"); }}
-                          className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex-shrink-0 hover:bg-blue-100 transition" title="اذهب الآن">
-                          📍
-                        </button>
-                      )}
-                      {/* تحويل */}
-                      <button onClick={(e) => { e.stopPropagation(); setTransferTask({ id: t.id, title: t.title }); }}
-                        className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-600 border border-purple-100 flex-shrink-0 hover:bg-purple-100 transition" title="حوّل لشخص">
-                        📨
-                      </button>
+                      {/* المشروع المرتبط */}
                       {t.circleColor ? (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium"
                           style={{ background: `${t.circleColor}15`, color: t.circleColor, border: `1px solid ${t.circleColor}30` }}>
                           {t.circle}
                         </span>
-                      ) : (
+                      ) : t.circle !== "—" ? (
                         <span className="text-[10px] text-[#7C7A8E] flex-shrink-0">{t.circle}</span>
-                      )}
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold flex-shrink-0 ${P_COLORS[t.priority]}`}>
-                        {t.priority}
-                      </span>
+                      ) : null}
                     </div>
                     {/* Subtasks */}
                     {expandedTask === t.id && (
@@ -3142,7 +3094,7 @@ export default function TasksPage() {
         })()}
         </div>
 
-        <div className="pb-4"><GeometricDivider /></div>
+        <div className="pb-4" />
       </div>
 
       {/* ── Prayer Overlay ── */}
