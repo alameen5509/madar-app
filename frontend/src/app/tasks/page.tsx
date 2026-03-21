@@ -2642,7 +2642,7 @@ export default function TasksPage() {
         <div style={{ order: sectionOrder.indexOf("prayers"), display: hiddenSections.includes("prayers") ? "none" : undefined }}>
         {prayersReady && prayers.length > 0 && (
           <div className="rounded-2xl border shadow-sm overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-            <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "var(--card-border)" }}>
+            <div className="px-4 py-2 border-b flex items-center justify-between" style={{ borderColor: "var(--card-border)" }}>
               <p className="text-xs font-bold" style={{ color: "var(--text)" }}>🕌 مواقيت الصلاة</p>
               {(() => {
                 const now = nowMinState;
@@ -2668,7 +2668,7 @@ export default function TasksPage() {
                   const m = p.adhan % 60;
                   const timeStr = `${h > 12 ? h - 12 : h}:${String(m).padStart(2, "0")} ${h >= 12 ? "م" : "ص"}`;
                   return (
-                    <div key={p.name} className="text-center py-3" style={{ background: isNext ? "var(--gold, #D4AF37)10" : "transparent", borderLeft: "1px solid var(--card-border)" }}>
+                    <div key={p.name} className="text-center py-1.5" style={{ background: isNext ? "var(--gold, #D4AF37)10" : "transparent", borderLeft: "1px solid var(--card-border)" }}>
                       <p className="text-[10px] font-bold" style={{ color: passed ? "var(--muted)" : isNext ? "var(--gold)" : "var(--text)" }}>{p.name}</p>
                       <p className="text-xs font-black tabular-nums" style={{ color: passed ? "var(--muted)" : isNext ? "var(--gold)" : "var(--primary)" }}>{timeStr}</p>
                       {passed && <p className="text-[8px]" style={{ color: "var(--muted)" }}>✓</p>}
