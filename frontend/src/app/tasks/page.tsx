@@ -2567,7 +2567,7 @@ export default function TasksPage() {
       <div className="px-8 py-6 space-y-5">
 
         {/* Prayer times table */}
-        {prayersReady && prayers.length > 0 && (
+        {!hiddenSections.has("prayers") && prayersReady && prayers.length > 0 && (
           <div className="rounded-2xl border shadow-sm overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
             <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "var(--card-border)" }}>
               <p className="text-xs font-bold" style={{ color: "var(--text)" }}>🕌 مواقيت الصلاة</p>
@@ -2626,7 +2626,7 @@ export default function TasksPage() {
         )}
 
         {/* ── Focus Start Widget ── */}
-        <div className="rounded-2xl overflow-hidden shadow-sm bg-white border border-[#E2D5B0]">
+        {!hiddenSections.has("focus") && <div className="rounded-2xl overflow-hidden shadow-sm bg-white border border-[#E2D5B0]">
           {/* Period bar */}
           <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-[#F0EDE4]">
             <div className="flex items-center gap-2">
@@ -2710,10 +2710,10 @@ export default function TasksPage() {
               </p>
             )}
           </div>
-        </div>
+        </div>}
 
         {/* Progress bar */}
-        <div className="bg-white rounded-2xl p-5 border border-[#E2D5B0] shadow-sm">
+        {!hiddenSections.has("progress") && <div className="bg-white rounded-2xl p-5 border border-[#E2D5B0] shadow-sm">
           <div className="flex justify-between text-sm mb-2">
             <span className="text-[#7C7A8E]">تقدم اليوم</span>
             <span className="font-bold text-[#5E5495]">{pct}%</span>
@@ -2722,13 +2722,13 @@ export default function TasksPage() {
             <div className="h-full rounded-full transition-all duration-500"
               style={{ width: `${pct}%`, background: "linear-gradient(90deg, #5E5495, #C9A84C)" }} />
           </div>
-        </div>
+        </div>}
 
         {/* PWA Install Prompt */}
         <InstallPWAButton />
 
         {/* Today Summary — habits + quran + dues */}
-        <TodaySummary />
+        {!hiddenSections.has("summary") && <TodaySummary />}
 
         {/* Overdue / Due Soon warning */}
         {(() => {
@@ -2827,6 +2827,7 @@ export default function TasksPage() {
         </div>
 
         {/* Task List */}
+        {!hiddenSections.has("tasks") && (<>
         <section>
           <GeometricDivider label="قائمة المهام" />
           {/* Filters */}
@@ -3061,13 +3062,16 @@ export default function TasksPage() {
             })()}
           </div>
         </section>
+        </>)}
 
         {/* ── تخطيط اليوم — مدمج في أسفل الصفحة ── */}
+        {!hiddenSections.has("planner") && (<>
         <GeometricDivider label="📋 تخطيط اليوم" />
         <InlineDayPlanner prayers={prayers} tasks={visibleTasks} blockedPeriods={blockedPeriods} onBlockToggle={(name) => setBlockedPeriods((p) => p.includes(name) ? p.filter((x) => x !== name) : [...p, name])} />
+        </>)}
 
         {/* ── المهام المستقبلية ── */}
-        {(() => {
+        {!hiddenSections.has("future") && (() => {
           const today = new Date(); today.setHours(0,0,0,0);
           const future = baseTasks.filter(t => !t.done && t.dueDate && new Date(t.dueDate) > today)
             .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
