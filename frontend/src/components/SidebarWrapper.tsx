@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 
@@ -9,6 +9,9 @@ const AUTH_PATHS = ['/login', '/register'];
 export default function SidebarWrapper() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  // إغلاق القائمة عند الانتقال لصفحة جديدة
+  useEffect(() => { setOpen(false); }, [pathname]);
 
   if (AUTH_PATHS.some((p) => pathname.startsWith(p))) return null;
 
