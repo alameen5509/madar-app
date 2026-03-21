@@ -2636,7 +2636,7 @@ export default function TasksPage() {
         </div>
       )}
 
-      <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+      <div className="px-8 py-3" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
 
         {/* Prayer times table */}
         <div style={{ order: sectionOrder.indexOf("prayers"), display: hiddenSections.includes("prayers") ? "none" : undefined }}>
