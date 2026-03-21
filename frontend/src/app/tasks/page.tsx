@@ -1327,110 +1327,71 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   const firstAvailable = allPeriods.find(p => !p.blocked && p.endMin > now) ?? allPeriods.find(p => !p.blocked);
   const habitPeriodName = firstAvailable?.name ?? "";
 
-  // توزيع المهام: تجميع حسب البيئة — كل مهام البيئة تذهب لنفس الفترة
-  const periodTasksMap = new Map<string, TaskRow[]>();
-  const periodHabitMap = new Map<string, boolean>();
-
-  // تجميع المهام حسب البيئة
-  const contextGroups = new Map<string, TaskRow[]>();
-  for (const t of pending) {
-    const ctx = t.context || "Anywhere";
-    contextGroups.set(ctx, [...(contextGroups.get(ctx) ?? []), t]);
-  }
-  // ترتيب: البيئات المحددة أولاً ثم "Anywhere"
-  const sortedContexts = Array.from(contextGroups.entries()).sort((a, b) => {
-    if (a[0] === "Anywhere") return 1;
-    if (b[0] === "Anywhere") return -1;
-    return b[1].length - a[1].length; // الأكثر مهاماً أولاً
-  });
-
-  // الفترات المتاحة للتوزيع (غير موقوفة — نتجاهل الوقت)
-  const availablePeriods = allPeriods.filter(p => !p.blocked);
-
-  // وزّع المهام على الفترات
-  const periodAssignments = new Map<string, TaskRow[]>();
-  const assigned = new Set<string>();
-  const pendingPool = [...pending];
-
-  for (const p of availablePeriods) {
-    const pCtx = periodContexts[p.name];
-    const slots = Math.floor(p.duration / 30);
-    const pt: TaskRow[] = [];
-
-    for (let s = 0; s < slots && pendingPool.some(t => !assigned.has(t.id)); s++) {
-      let pick: TaskRow | undefined;
-      if (pCtx) {
-        // بيئة محددة: فقط مهام نفس البيئة + مهام "أي مكان"
-        pick = pendingPool.find(t => !assigned.has(t.id) && t.context === pCtx)
-            ?? pendingPool.find(t => !assigned.has(t.id) && (t.context === "Anywhere" || t.context === "habit"));
-        // لا fallback — لا نضع مهمة مكتب في فترة مشوار
-      } else {
-        // بدون بيئة: أي مهمة متاحة
-        pick = pendingPool.find(t => !assigned.has(t.id));
+  // ═══ توزيع المهام على الفترات ═══
+  function buildPlan() {
+    // 1. جرّب الترتيب المحفوظ
+    try {
+      const saved = localStorage.getItem("madar_plan_overrides");
+      if (saved && pending.length > 0) {
+        const data = JSON.parse(saved) as Record<string, string[]>;
+        const allIds = new Set([...pending.map(t => t.id), ...habitTasks.map(t => t.id)]);
+        // نظّف: احذف المهام المحذوفة وأضف الجديدة
+        const cleaned: Record<string, string[]> = {};
+        for (const [period, ids] of Object.entries(data)) {
+          cleaned[period] = ids.filter(id => allIds.has(id));
+        }
+        const usedIds = new Set(Object.values(cleaned).flat());
+        const newTasks = pending.filter(t => !usedIds.has(t.id));
+        if (newTasks.length > 0) {
+          const first = allPeriods.find(p => !p.blocked)?.name ?? "";
+          if (first) cleaned[first] = [...(cleaned[first] ?? []), ...newTasks.map(t => t.id)];
+        }
+        // حفظ المُنظّف
+        try { localStorage.setItem("madar_plan_overrides", JSON.stringify(cleaned)); } catch {}
+        // بناء الخطة
+        return allPeriods.map(p => {
+          const isHabit = p.name === habitPeriodName && habitTasks.length > 0;
+          if (p.blocked) return { ...p, tasks: [], habitSlot: false };
+          const ids = cleaned[p.name] ?? [];
+          const mapped = ids.map(id => pending.find(t => t.id === id) ?? habitTasks.find(t => t.id === id)).filter(Boolean) as TaskRow[];
+          const pt = isHabit ? [...habitTasks, ...mapped] : mapped;
+          return { ...p, tasks: pt.length > 0 ? pt : [], habitSlot: isHabit };
+        });
       }
-      if (!pick) break;
-      assigned.add(pick.id);
-      pt.push(pick);
-    }
-    periodAssignments.set(p.name, pt);
+    } catch {}
+
+    // 2. توزيع تلقائي حسب البيئة
+    const assigned = new Set<string>();
+    return allPeriods.map(p => {
+      const isHabit = p.name === habitPeriodName && habitTasks.length > 0;
+      if (p.blocked) return { ...p, tasks: [], habitSlot: false };
+      const pCtx = periodContexts[p.name];
+      const slots = Math.floor(p.duration / 30);
+      const pt: TaskRow[] = [];
+      if (isHabit) pt.push(...habitTasks);
+      for (let s = 0; s < slots; s++) {
+        let pick: TaskRow | undefined;
+        if (pCtx) {
+          // بيئة محددة: فقط نفس البيئة (لا Anywhere حتى)
+          pick = pending.find(t => !assigned.has(t.id) && t.context === pCtx);
+        } else {
+          pick = pending.find(t => !assigned.has(t.id));
+        }
+        if (!pick) break;
+        assigned.add(pick.id);
+        pt.push(pick);
+      }
+      return { ...p, tasks: pt, habitSlot: isHabit };
+    });
   }
 
-  // بناء الخريطة النهائية — المهام تتوزع على كل الفترات
-  for (const period of allPeriods) {
-    const isHabitPeriod = period.name === habitPeriodName && habitTasks.length > 0;
-    periodHabitMap.set(period.name, isHabitPeriod);
-
-    if (period.blocked) { periodTasksMap.set(period.name, []); continue; }
-
-    const pt: TaskRow[] = [];
-    if (isHabitPeriod) pt.push(...habitTasks);
-    pt.push(...(periodAssignments.get(period.name) ?? []));
-    periodTasksMap.set(period.name, pt);
-  }
-
-  // Stateful plan for drag & drop
-  const initialPlan = allPeriods.map(p => ({
-    ...p, tasks: periodTasksMap.get(p.name) ?? [], habitSlot: periodHabitMap.get(p.name) ?? false,
-  }));
+  const initialPlan = buildPlan();
   const [plan, setPlan] = useState(initialPlan);
   const [dragTask, setDragTask] = useState<{ taskId: string; fromPeriod: string } | null>(null);
 
-  // عند تغيير المهام — طبّق الترتيب المحفوظ مع حذف المهام المنجزة
+  // تحديث عند تغيير المهام أو البيئات
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("madar_plan_overrides");
-      if (saved) {
-        const data = JSON.parse(saved) as Record<string, string[]>;
-        const allIds = new Set([...pending.map(t => t.id), ...habitTasks.map(t => t.id)]);
-        // احذف IDs المهام المنجزة/المحذوفة من الترتيب المحفوظ
-        const cleaned: Record<string, string[]> = {};
-        let hasChanges = false;
-        for (const [period, ids] of Object.entries(data)) {
-          cleaned[period] = ids.filter(id => allIds.has(id));
-          if (cleaned[period].length !== ids.length) hasChanges = true;
-        }
-        // أضف المهام الجديدة (غير موجودة في أي فترة) لأول فترة متاحة
-        const assignedIds = new Set(Object.values(cleaned).flat());
-        const unassigned = pending.filter(t => !assignedIds.has(t.id));
-        if (unassigned.length > 0) {
-          const firstPeriod = Object.keys(cleaned).find(k => cleaned[k] !== undefined) ?? allPeriods[0]?.name;
-          if (firstPeriod) cleaned[firstPeriod] = [...(cleaned[firstPeriod] ?? []), ...unassigned.map(t => t.id)];
-          hasChanges = true;
-        }
-        if (hasChanges) {
-          try { localStorage.setItem("madar_plan_overrides", JSON.stringify(cleaned)); } catch {}
-        }
-        // طبّق الترتيب
-        setPlan(initialPlan.map(p => {
-          const ids = cleaned[p.name];
-          if (!ids || ids.length === 0) return p;
-          const mapped = ids.map(id => pending.find(t => t.id === id) ?? habitTasks.find(t => t.id === id)).filter(Boolean) as TaskRow[];
-          return { ...p, tasks: mapped.length > 0 ? mapped : p.tasks };
-        }));
-        return;
-      }
-    } catch {}
-    setPlan(initialPlan);
+    setPlan(buildPlan());
   }, [blockedPeriods.join(","), JSON.stringify(periodContexts), tasks.length, pending.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleDrop(toPeriod: string) {
@@ -1590,7 +1551,7 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
       });
       })()}
       {(() => {
-        const assigned = Array.from(periodTasksMap.values()).flat().filter(t => t.context !== "habit").length;
+        const assigned = plan.flatMap(p => p.tasks).filter(t => t.context !== "habit").length;
         const unassigned = pending.length - assigned;
         return unassigned > 0 ? (
           <div className="rounded-xl p-3" style={{ background: "#FEF3C7", border: "1px solid #F59E0B30" }}>
