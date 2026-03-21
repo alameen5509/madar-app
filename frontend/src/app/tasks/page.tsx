@@ -2550,47 +2550,48 @@ export default function TasksPage() {
       {showCelebration && <CelebrationEffect onDone={() => setShowCelebration(false)} />}
 
       {/* Header */}
-      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-[#E2D5B0] px-8 py-4 pr-16 md:pr-8">
-        <div className="flex items-center justify-between">
+      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-[#E2D5B0] px-4 py-3 pr-14 md:pr-4">
+        {/* الصف الأول: العنوان + التاريخ */}
+        <div className="flex items-center justify-between mb-2">
           <div>
-            <p className="text-[#5E5495] text-xs font-semibold mb-0.5">{hijriDate}</p>
-            <p className="text-[#7C7A8E] text-[11px]">{gregorianDate}</p>
-            <h2 className="text-[#16213E] font-bold text-lg mt-1">أعمال اليوم</h2>
-            <p className="text-[#7C7A8E] text-xs">
-              {loading ? "جارٍ التحميل…" : `${done} من ${total} مكتملة`}
+            <h2 className="text-[#16213E] font-bold text-base">أعمال اليوم</h2>
+            <p className="text-[#7C7A8E] text-[10px]">
+              {loading ? "جارٍ التحميل…" : `${done}/${total} مكتملة`}
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => setShowDialog(true)}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition"
-              style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}
-            >
-              <span>+</span><span>مهمة</span>
-            </button>
-            <button onClick={() => setShowBatch(true)}
-              className="px-3 py-2 rounded-lg text-sm font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
-              متعدد
-            </button>
-            <button onClick={() => setShowQuickFinance(true)}
-              className="px-3 py-2 rounded-lg text-sm font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
-              💰
-            </button>            <button
-              onClick={() => setShowMoodPanel(true)}
-              className="px-3 py-2 rounded-xl text-sm font-semibold transition-all border"
-              style={{
-                background: mood === "low" ? "#FEF3C7" : mood === "good" ? "#D1FAE5" : "#F8F6F0",
-                borderColor: mood === "low" ? "#F59E0B" : mood === "good" ? "#10B981" : "#E2D5B0",
-                color: mood === "low" ? "#92400E" : mood === "good" ? "#065F46" : "#7C7A8E",
-              }}
-            >
-              {mood === "low" ? "😔" : mood === "good" ? "😊" : "🧠"}
-            </button>
-            <button onClick={() => setShowSectionEditor(!showSectionEditor)}
-              className="px-3 py-2 rounded-lg text-sm font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
-              ⚙
-            </button>
+          <div className="text-left">
+            <p className="text-[#5E5495] text-[10px] font-semibold">{hijriDate}</p>
+            <p className="text-[#7C7A8E] text-[9px]">{gregorianDate}</p>
           </div>
+        </div>
+        {/* الصف الثاني: الأزرار */}
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setShowDialog(true)}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white hover:opacity-90 transition"
+            style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
+            + مهمة
+          </button>
+          <button onClick={() => setShowBatch(true)}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
+            متعدد
+          </button>
+          <button onClick={() => setShowQuickFinance(true)}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
+            💰
+          </button>
+          <button onClick={() => setShowMoodPanel(true)}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all border"
+            style={{
+              background: mood === "low" ? "#FEF3C7" : mood === "good" ? "#D1FAE5" : "#F8F6F0",
+              borderColor: mood === "low" ? "#F59E0B" : mood === "good" ? "#10B981" : "#E2D5B0",
+              color: mood === "low" ? "#92400E" : mood === "good" ? "#065F46" : "#7C7A8E",
+            }}>
+            {mood === "low" ? "😔" : mood === "good" ? "😊" : "🧠"}
+          </button>
+          <button onClick={() => setShowSectionEditor(!showSectionEditor)}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
+            ⚙
+          </button>
         </div>
       </header>
 
