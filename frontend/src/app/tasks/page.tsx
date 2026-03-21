@@ -1434,11 +1434,38 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
                   <span className="text-[10px] font-semibold" style={{ color: "#2ABFBF" }}>~{habitDuration} د</span>
                 </div>
               )}
-              {p.tasks.filter((t: TaskRow) => t.context !== "habit").map((t: TaskRow, i: number) => (
+              {p.tasks.filter((t: TaskRow) => t.context !== "habit").map((t: TaskRow, i: number, arr: TaskRow[]) => (
                 <div key={t.id} draggable
                   onDragStart={() => setDragTask({ taskId: t.id, fromPeriod: p.name })}
                   className="flex items-center gap-2 py-1.5 px-1 rounded cursor-grab active:cursor-grabbing hover:opacity-80 transition"
                   style={{ background: i % 2 === 0 ? "transparent" : "var(--bg)" }}>
+                  {/* أزرار ترتيب داخل الفترة */}
+                  <div className="flex flex-col gap-0.5">
+                    <button onClick={(e) => { e.stopPropagation(); if (i === 0) return;
+                      setPlan(prev => {
+                        const next = prev.map(x => ({ ...x, tasks: [...x.tasks] }));
+                        const period = next.find(x => x.name === p.name); if (!period) return prev;
+                        const tasks = period.tasks.filter((x: TaskRow) => x.context !== "habit");
+                        [tasks[i-1], tasks[i]] = [tasks[i], tasks[i-1]];
+                        period.tasks = [...period.tasks.filter((x: TaskRow) => x.context === "habit"), ...tasks];
+                        const overrides: Record<string, string[]> = {}; next.forEach(x => { overrides[x.name] = x.tasks.map((t: TaskRow) => t.id); });
+                        try { localStorage.setItem("madar_plan_overrides", JSON.stringify(overrides)); } catch {}
+                        setManualMode(true); return next;
+                      });
+                    }} className="text-[8px] leading-none" style={{ color: i === 0 ? "transparent" : "var(--muted)" }}>▲</button>
+                    <button onClick={(e) => { e.stopPropagation(); if (i >= arr.length - 1) return;
+                      setPlan(prev => {
+                        const next = prev.map(x => ({ ...x, tasks: [...x.tasks] }));
+                        const period = next.find(x => x.name === p.name); if (!period) return prev;
+                        const tasks = period.tasks.filter((x: TaskRow) => x.context !== "habit");
+                        [tasks[i], tasks[i+1]] = [tasks[i+1], tasks[i]];
+                        period.tasks = [...period.tasks.filter((x: TaskRow) => x.context === "habit"), ...tasks];
+                        const overrides: Record<string, string[]> = {}; next.forEach(x => { overrides[x.name] = x.tasks.map((t: TaskRow) => t.id); });
+                        try { localStorage.setItem("madar_plan_overrides", JSON.stringify(overrides)); } catch {}
+                        setManualMode(true); return next;
+                      });
+                    }} className="text-[8px] leading-none" style={{ color: i >= arr.length - 1 ? "transparent" : "var(--muted)" }}>▼</button>
+                  </div>
                   <span className="text-[10px] w-4" style={{ color: "var(--muted)" }}>{i + 1}</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${P_COLORS[t.priority]}`}>{t.priority}</span>
                   {t.isRecurring && <span className="text-[10px]">🔄</span>}
