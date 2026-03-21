@@ -2586,8 +2586,8 @@ export default function TasksPage() {
             </p>
           </div>
           <div className="text-left">
-            <p className="text-[#5E5495] text-[10px] font-semibold">{hijriDate}</p>
-            <p className="text-[#7C7A8E] text-[9px]">{gregorianDate}</p>
+            <p className="text-[#5E5495] text-sm font-semibold">{hijriDate}</p>
+            <p className="text-[#7C7A8E] text-xs">{gregorianDate}</p>
           </div>
         </div>
         {/* الصف الثاني: الأزرار */}
