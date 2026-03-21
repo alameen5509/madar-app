@@ -742,10 +742,9 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
     return { name: p.name, startMin: p.start, endMin: next.adhan, duration, blocked: blockedPeriods.includes(p.name) };
   }).filter(p => p.duration > 0) : [];
 
-  // إضافة فترة ما بعد العشاء + ما بعد منتصف الليل (موقوفة افتراضياً)
+  // إضافة فترة ما بعد منتصف الليل (موقوفة افتراضياً)
   const ishaEnd = prayers.length > 0 ? prayers[prayers.length - 1].start : 21 * 60;
   const extraPeriods = [
-    { name: "بعد العشاء", startMin: ishaEnd, endMin: 24 * 60, duration: 24 * 60 - ishaEnd, blocked: !blockedPeriods.includes("بعد العشاء_open") },
     { name: "بعد منتصف الليل", startMin: 0, endMin: 2 * 60, duration: 2 * 60, blocked: !blockedPeriods.includes("بعد منتصف الليل_open") },
   ].filter(p => p.duration > 0);
   const allPeriods = [...periods, ...extraPeriods];
@@ -903,7 +902,7 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
                   )}
                   <button onClick={() => {
                     // الفترات الخاصة تعمل بالعكس (موقوفة افتراضياً)
-                    if (p.period === "بعد العشاء" || p.period === "بعد منتصف الليل") {
+                    if (p.period === "بعد منتصف الليل") {
                       onBlockToggle(p.period + "_open");
                     } else { onBlockToggle(p.period); }
                   }}
@@ -1269,17 +1268,17 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     { name: "الظهر", start: 770, adhan: 730 },
     { name: "العصر", start: 930, adhan: 890 },
     { name: "المغرب", start: 1100, adhan: 1060 },
+    { name: "العشاء", start: 1200, adhan: 1160 },
   ];
   const prayerList = prayers.length >= 2 ? prayers : defaultPrayers;
   const allPeriods: { name: string; startMin: number; endMin: number; duration: number; blocked: boolean }[] = [];
   for (let i = 0; i < prayerList.length; i++) {
-    const endMin = i + 1 < prayerList.length ? prayerList[i + 1].adhan : (prayerList[prayerList.length - 1].start + 60);
+    // آخر فترة (العشاء) تمتد حتى 23:00 (1380 دقيقة)
+    const endMin = i + 1 < prayerList.length ? prayerList[i + 1].adhan : 23 * 60;
     const dur = endMin - prayerList[i].start;
     if (dur > 0) allPeriods.push({ name: prayerList[i].name, startMin: prayerList[i].start, endMin, duration: dur, blocked: blockedPeriods.includes(prayerList[i].name) });
   }
-  const ishaEnd = prayerList[prayerList.length - 1].start;
   allPeriods.push(
-    { name: "بعد العشاء", startMin: ishaEnd + 60, endMin: 24 * 60, duration: 24 * 60 - ishaEnd - 60, blocked: !blockedPeriods.includes("بعد العشاء_active") },
     { name: "بعد منتصف الليل", startMin: 0, endMin: 2 * 60, duration: 120, blocked: !blockedPeriods.includes("بعد منتصف الليل_active") },
   );
 
@@ -1425,7 +1424,7 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
         return plan.map((p) => {
         const isPast = p.endMin <= now && p.name !== "بعد منتصف الليل";
         const isCurrent = !isPast && p.startMin <= now && p.endMin > now;
-        const isNight = p.name === "بعد العشاء" || p.name === "بعد منتصف الليل";
+        const isNight = p.name === "بعد منتصف الليل";
 
         const header = (
           <div className="flex items-center justify-between px-4 py-2" style={{ background: isCurrent ? "var(--gold, #D4AF37)08" : "var(--bg)" }}>
@@ -1447,7 +1446,7 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
                   {TASK_CONTEXTS.filter(c => c.key !== "Anywhere").map(c => <option key={c.key} value={c.key}>{c.icon} {c.label}</option>)}
                 </select>
               )}
-              <button onClick={(e) => { e.stopPropagation(); const isNight = p.name === "بعد العشاء" || p.name === "بعد منتصف الليل"; onBlockToggle(isNight ? p.name + "_active" : p.name); }}
+              <button onClick={(e) => { e.stopPropagation(); const isNight = p.name === "بعد منتصف الليل"; onBlockToggle(isNight ? p.name + "_active" : p.name); }}
                 className="text-[11px] px-2 py-1 rounded-lg font-semibold"
                 style={{ background: p.blocked ? "#DC262610" : "var(--bg)", color: p.blocked ? "#DC2626" : "var(--muted)", border: `1px solid ${p.blocked ? "#DC262620" : "var(--card-border)"}` }}>
                 {p.blocked ? "موقوفة" : "إيقاف"}
