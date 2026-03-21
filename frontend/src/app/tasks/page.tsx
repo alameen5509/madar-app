@@ -1276,7 +1276,9 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
     // آخر فترة (العشاء) تمتد حتى 23:00 (1380 دقيقة)
     const endMin = i + 1 < prayerList.length ? prayerList[i + 1].adhan : 23 * 60;
     const dur = endMin - prayerList[i].start;
-    if (dur > 0) allPeriods.push({ name: prayerList[i].name, startMin: prayerList[i].start, endMin, duration: dur, blocked: blockedPeriods.includes(prayerList[i].name) });
+    const isIsha = prayerList[i].name === "العشاء";
+    const isBlocked = isIsha ? !blockedPeriods.includes("العشاء_active") : blockedPeriods.includes(prayerList[i].name);
+    if (dur > 0) allPeriods.push({ name: prayerList[i].name, startMin: prayerList[i].start, endMin, duration: dur, blocked: isBlocked });
   }
   allPeriods.push(
     { name: "بعد منتصف الليل", startMin: 0, endMin: 2 * 60, duration: 120, blocked: !blockedPeriods.includes("بعد منتصف الليل_active") },
@@ -1424,7 +1426,7 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
         return plan.map((p) => {
         const isPast = p.endMin <= now && p.name !== "بعد منتصف الليل";
         const isCurrent = !isPast && p.startMin <= now && p.endMin > now;
-        const isNight = p.name === "بعد منتصف الليل";
+        const isNight = p.name === "العشاء" || p.name === "بعد منتصف الليل";
 
         const header = (
           <div className="flex items-center justify-between px-4 py-2" style={{ background: isCurrent ? "var(--gold, #D4AF37)08" : "var(--bg)" }}>
@@ -1446,7 +1448,7 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
                   {TASK_CONTEXTS.filter(c => c.key !== "Anywhere").map(c => <option key={c.key} value={c.key}>{c.icon} {c.label}</option>)}
                 </select>
               )}
-              <button onClick={(e) => { e.stopPropagation(); const isNight = p.name === "بعد منتصف الليل"; onBlockToggle(isNight ? p.name + "_active" : p.name); }}
+              <button onClick={(e) => { e.stopPropagation(); const isNight = p.name === "العشاء" || p.name === "بعد منتصف الليل"; onBlockToggle(isNight ? p.name + "_active" : p.name); }}
                 className="text-[11px] px-2 py-1 rounded-lg font-semibold"
                 style={{ background: p.blocked ? "#DC262610" : "var(--bg)", color: p.blocked ? "#DC2626" : "var(--muted)", border: `1px solid ${p.blocked ? "#DC262620" : "var(--card-border)"}` }}>
                 {p.blocked ? "موقوفة" : "إيقاف"}
