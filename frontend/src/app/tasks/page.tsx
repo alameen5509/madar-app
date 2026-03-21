@@ -2626,7 +2626,7 @@ export default function TasksPage() {
         )}
 
         {/* ── Focus Start Widget ── */}
-        {!hiddenSections.includes("focus") && <div className="rounded-2xl overflow-hidden shadow-sm bg-white border border-[#E2D5B0]">
+        {!hiddenSections.includes("focus") ? <div className="rounded-2xl overflow-hidden shadow-sm bg-white border border-[#E2D5B0]">
           {/* Period bar */}
           <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-[#F0EDE4]">
             <div className="flex items-center gap-2">
@@ -2710,10 +2710,10 @@ export default function TasksPage() {
               </p>
             )}
           </div>
-        </div>}
+        </div> : null}
 
         {/* Progress bar */}
-        {!hiddenSections.includes("progress") && <div className="bg-white rounded-2xl p-5 border border-[#E2D5B0] shadow-sm">
+        {!hiddenSections.includes("progress") ? <div className="bg-white rounded-2xl p-5 border border-[#E2D5B0] shadow-sm">
           <div className="flex justify-between text-sm mb-2">
             <span className="text-[#7C7A8E]">تقدم اليوم</span>
             <span className="font-bold text-[#5E5495]">{pct}%</span>
@@ -2722,7 +2722,7 @@ export default function TasksPage() {
             <div className="h-full rounded-full transition-all duration-500"
               style={{ width: `${pct}%`, background: "linear-gradient(90deg, #5E5495, #C9A84C)" }} />
           </div>
-        </div>}
+        </div> : null}
 
         {/* PWA Install Prompt */}
         <InstallPWAButton />
