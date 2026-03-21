@@ -1359,8 +1359,8 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   const [plan, setPlan] = useState(initialPlan);
   const [dragTask, setDragTask] = useState<{ taskId: string; fromPeriod: string } | null>(null);
 
-  // Re-compute when blockedPeriods/contexts change
-  useEffect(() => { setPlan(initialPlan); }, [blockedPeriods.join(","), JSON.stringify(periodContexts)]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Re-compute when tasks, blockedPeriods, or contexts change
+  useEffect(() => { setPlan(initialPlan); }, [blockedPeriods.join(","), JSON.stringify(periodContexts), tasks.length, pending.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleDrop(toPeriod: string) {
     if (!dragTask || dragTask.fromPeriod === toPeriod) { setDragTask(null); return; }
