@@ -1360,11 +1360,9 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   }));
   const [plan, setPlan] = useState(initialPlan);
   const [dragTask, setDragTask] = useState<{ taskId: string; fromPeriod: string } | null>(null);
-  const skipNextEffect = useRef(false);
 
   // عند تغيير المهام — طبّق الترتيب المحفوظ مع حذف المهام المنجزة
   useEffect(() => {
-    if (skipNextEffect.current) { skipNextEffect.current = false; return; }
     try {
       const saved = localStorage.getItem("madar_plan_overrides");
       if (saved) {
@@ -1418,7 +1416,6 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
       try { localStorage.setItem("madar_plan_overrides", JSON.stringify(overrides)); } catch {}
       return next;
     });
-    skipNextEffect.current = true;
     setDragTask(null);
   }
 
@@ -1440,7 +1437,6 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
       try { localStorage.setItem("madar_plan_overrides", JSON.stringify(overrides)); } catch {}
       return next;
     });
-    skipNextEffect.current = true;
   }
 
   function fmtTime(min: number): string {
