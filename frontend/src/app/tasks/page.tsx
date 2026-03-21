@@ -2610,20 +2610,18 @@ export default function TasksPage() {
         )}
         </div>
 
-        {/* Weekend banner */}
+        {/* Weekend banner — في الأسفل */}
         {weekend && (
-          <div className="rounded-2xl p-4 border border-blue-200 bg-blue-50">
-            <p className="text-blue-800 text-sm font-semibold">يوم إجازة — مهام العمل مخفية 💼</p>
-            <p className="text-blue-600 text-[11px] mt-1">تظهر فقط المهام الشخصية. مهام العمل ({tasks.filter(t => t.isWork).length}) مخفية تلقائياً</p>
+          <div style={{ order: 90 }} className="rounded-2xl p-4 border border-blue-200 bg-blue-50">
+            <p className="text-blue-800 text-sm font-semibold">يوم إجازة 💼</p>
           </div>
         )}
 
-        {/* Low mood banner */}
+        {/* Low mood banner — في الأسفل */}
         {mood === "low" && (
-          <div className="rounded-2xl p-5 border border-amber-200 bg-amber-50">
+          <div style={{ order: 91 }} className="rounded-2xl p-5 border border-amber-200 bg-amber-50">
             <p className="text-amber-800 text-sm font-semibold mb-1">وضع النفسية المنخفضة مفعّل</p>
             <p className="text-amber-700 text-xs leading-relaxed">{lowMoodMsg}</p>
-            <p className="text-amber-600 text-[11px] mt-2">الجلسات مخففة: ١٥ دقيقة بدل ٢٥</p>
           </div>
         )}
 
@@ -2744,7 +2742,7 @@ export default function TasksPage() {
           const dueSoon = baseTasks.filter(t => !t.done && !isOverdue(t) && t.dueDate && new Date(t.dueDate) >= now && new Date(t.dueDate) <= tomorrow);
           if (overdue.length === 0 && dueSoon.length === 0) return null;
           return (
-            <div className="rounded-xl p-4" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }}>
+            <div className="rounded-xl p-4" style={{ order: 92, background: "#FEF2F2", border: "1px solid #FECACA" }}>
               {overdue.length > 0 && (
                 <div className="mb-2">
                   <p className="text-red-700 text-sm font-bold mb-1">⚠ {overdue.length} مهمة متأخرة</p>
@@ -2809,28 +2807,6 @@ export default function TasksPage() {
             </div>
           </section>
         )}
-
-        {/* Quick add task with Enter */}
-        <div className="bg-white rounded-xl border border-[#E2D5B0] shadow-sm overflow-hidden">
-          <input
-            type="text"
-            placeholder="اكتب مهمة واضغط Enter…"
-            className="w-full px-5 py-3.5 text-sm focus:outline-none bg-transparent"
-            style={{ color: "var(--text)" }}
-            onKeyDown={async (e) => {
-              if (e.key !== "Enter") return;
-              const input = e.currentTarget;
-              const title = input.value.trim();
-              if (!title) return;
-              input.value = "";
-              try {
-                const task = await createTask({ title });
-                setTasks((p) => [toRow(task), ...p]);
-                setShowCelebration(true);
-              } catch {}
-            }}
-          />
-        </div>
 
         {/* Task List */}
         <div style={{ order: sectionOrder.indexOf("tasks"), display: hiddenSections.includes("tasks") ? "none" : undefined }}>
