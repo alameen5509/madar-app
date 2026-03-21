@@ -1358,11 +1358,31 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   const initialPlan = allPeriods.map(p => ({
     ...p, tasks: periodTasksMap.get(p.name) ?? [], habitSlot: periodHabitMap.get(p.name) ?? false,
   }));
-  const [plan, setPlan] = useState(initialPlan);
+  // تطبيق التعديلات اليدوية المحفوظة
+  const savedOverrides = (() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const saved = localStorage.getItem("madar_plan_overrides");
+      if (!saved) return null;
+      const data = JSON.parse(saved) as Record<string, string[]>; // periodName → taskIds
+      // تأكد أن التعديلات لا تزال صالحة (المهام موجودة)
+      const allTaskIds = new Set(pending.map(t => t.id).concat(habitTasks.map(t => t.id)));
+      const valid = Object.values(data).flat().every(id => allTaskIds.has(id));
+      return valid ? data : null;
+    } catch { return null; }
+  })();
+
+  const appliedPlan = savedOverrides ? initialPlan.map(p => {
+    const overrideIds = savedOverrides[p.name];
+    if (!overrideIds) return p;
+    const overrideTasks = overrideIds.map(id => pending.find(t => t.id === id) ?? habitTasks.find(t => t.id === id)).filter(Boolean) as TaskRow[];
+    return { ...p, tasks: overrideTasks };
+  }) : initialPlan;
+
+  const [plan, setPlan] = useState(appliedPlan);
   const [dragTask, setDragTask] = useState<{ taskId: string; fromPeriod: string } | null>(null);
 
-  // Re-compute when tasks, blockedPeriods, or contexts change
-  useEffect(() => { setPlan(initialPlan); }, [blockedPeriods.join(","), JSON.stringify(periodContexts), tasks.length, pending.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setPlan(savedOverrides ? appliedPlan : initialPlan); }, [blockedPeriods.join(","), JSON.stringify(periodContexts), tasks.length, pending.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleDrop(toPeriod: string) {
     if (!dragTask || dragTask.fromPeriod === toPeriod) { setDragTask(null); return; }
@@ -1375,6 +1395,10 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
       if (taskIndex < 0) return prev;
       const [task] = from.tasks.splice(taskIndex, 1);
       to.tasks.push(task);
+      // حفظ التعديل اليدوي
+      const overrides: Record<string, string[]> = {};
+      next.forEach(p => { overrides[p.name] = p.tasks.map(t => t.id); });
+      localStorage.setItem("madar_plan_overrides", JSON.stringify(overrides));
       return next;
     });
     setDragTask(null);
