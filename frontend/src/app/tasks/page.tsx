@@ -1755,6 +1755,40 @@ export default function TasksPage() {
   const [showQuickFinance, setShowQuickFinance] = useState(false);
   const [goalsList, setGoalsList] = useState<{ id: string; title: string }[]>([]);
   const [showPlanner, setShowPlanner] = useState(false);
+
+  // ترتيب أقسام الصفحة
+  const DEFAULT_SECTIONS = ["focus", "progress", "summary", "prayers", "tasks", "planner", "future"];
+  const SECTION_LABELS: Record<string, string> = { focus: "⏱ التركيز", progress: "📊 تقدم اليوم", summary: "📋 الملخص", prayers: "🕌 الصلاة", tasks: "✅ المهام", planner: "📋 التخطيط", future: "📅 المستقبلية" };
+  const [sectionOrder, setSectionOrder] = useState<string[]>(DEFAULT_SECTIONS);
+  const [hiddenSections, setHiddenSections] = useState<Set<string>>(new Set());
+  const [showSectionEditor, setShowSectionEditor] = useState(false);
+  const [dragSectionIdx, setDragSectionIdx] = useState<number | null>(null);
+  const [savedOrder, setSavedOrder] = useState<string[] | null>(null);
+
+  // تحميل ترتيب الأقسام من API
+  useEffect(() => {
+    import("@/lib/api").then(({ api: a }) => {
+      a.get("/api/users/me/preferences").then(({ data }) => {
+        if (data?.sectionOrder) { setSectionOrder(data.sectionOrder); setSavedOrder(data.sectionOrder); }
+        if (data?.hiddenSections) setHiddenSections(new Set(data.hiddenSections));
+      }).catch(() => {});
+    });
+  }, []);
+
+  function saveSectionOrder(order: string[], hidden: Set<string>) {
+    setSectionOrder(order);
+    setHiddenSections(hidden);
+    setSavedOrder(order);
+    import("@/lib/api").then(({ api: a }) => {
+      const settings = JSON.parse(localStorage.getItem("madar_settings") ?? "{}");
+      a.put("/api/users/me/preferences", { ...settings, sectionOrder: order, hiddenSections: Array.from(hidden) }).catch(() => {});
+    });
+  }
+
+  function cancelSectionEdit() {
+    if (savedOrder) setSectionOrder(savedOrder);
+    setShowSectionEditor(false);
+  }
   const [blockedPeriods, setBlockedPeriods] = useState<string[]>([]);
   const [taskFilter, setTaskFilter] = useState<"all"|"pending"|"done"|"urgent"|"recurring"|"work">("pending");
   const [transferTask, setTransferTask] = useState<{ id: string; title: string } | null>(null);
@@ -2485,9 +2519,50 @@ export default function TasksPage() {
             >
               {mood === "low" ? "😔" : mood === "good" ? "😊" : "🧠"}
             </button>
+            <button onClick={() => setShowSectionEditor(!showSectionEditor)}
+              className="px-3 py-2 rounded-lg text-sm font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
+              ⚙
+            </button>
           </div>
         </div>
       </header>
+
+      {/* ── محرر ترتيب الأقسام ── */}
+      {showSectionEditor && (
+        <div className="mx-8 mt-3 p-4 rounded-xl border border-[#D4AF37] bg-white shadow-sm fade-up space-y-2">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-bold" style={{ color: "var(--text)" }}>⚙ ترتيب الأقسام</p>
+            <div className="flex gap-2">
+              <button onClick={cancelSectionEdit} className="text-xs px-3 py-1 rounded-lg bg-gray-100 text-[#6B7280]">إلغاء</button>
+              <button onClick={() => { saveSectionOrder(sectionOrder, hiddenSections); setShowSectionEditor(false); }}
+                className="text-xs px-3 py-1 rounded-lg text-white" style={{ background: "#D4AF37" }}>حفظ</button>
+            </div>
+          </div>
+          {sectionOrder.map((sec, idx) => (
+            <div key={sec} draggable
+              onDragStart={() => setDragSectionIdx(idx)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => {
+                if (dragSectionIdx === null || dragSectionIdx === idx) return;
+                const newOrder = [...sectionOrder];
+                const [moved] = newOrder.splice(dragSectionIdx, 1);
+                newOrder.splice(idx, 0, moved);
+                setSectionOrder(newOrder);
+                setDragSectionIdx(null);
+              }}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing transition"
+              style={{ background: dragSectionIdx === idx ? "#D4AF3710" : "var(--bg)", border: `1px solid ${dragSectionIdx === idx ? "#D4AF37" : "var(--card-border)"}` }}>
+              <span className="text-[#9CA3AF] text-xs">⠿</span>
+              <span className="text-sm font-medium flex-1" style={{ color: hiddenSections.has(sec) ? "var(--muted)" : "var(--text)" }}>{SECTION_LABELS[sec] ?? sec}</span>
+              <button onClick={() => setHiddenSections(prev => { const n = new Set(prev); n.has(sec) ? n.delete(sec) : n.add(sec); return n; })}
+                className="text-xs px-2 py-0.5 rounded-lg"
+                style={{ background: hiddenSections.has(sec) ? "#DC262610" : "#3D8C5A10", color: hiddenSections.has(sec) ? "#DC2626" : "#3D8C5A" }}>
+                {hiddenSections.has(sec) ? "مخفي" : "ظاهر"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="px-8 py-6 space-y-5">
 
