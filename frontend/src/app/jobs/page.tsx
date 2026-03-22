@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { GeometricDivider } from "@/components/IslamicPattern";
 import { getCircles, createCircle, updateCircle, deleteCircle, api, type LifeCircle, type CreateCirclePayload } from "@/lib/api";
-import { JobDimensionNode, type JobDim, type JobGoalData } from "@/components/JobTree";
+import { JobDimensionNode, calcJobProgress, calcDimProgress, type JobDim, type JobGoalData } from "@/components/JobTree";
 
 export default function JobsPage() {
   const [circles, setCircles] = useState<LifeCircle[]>([]);
@@ -17,6 +17,8 @@ export default function JobsPage() {
   const [jobDims, setJobDims] = useState<JobDim[]>([]);
   const [jobGoals, setJobGoals] = useState<JobGoalData[]>([]);
   const [addDimName, setAddDimName] = useState("");
+  const [jobTab, setJobTab] = useState<"dims" | "stats">("dims");
+  const [breadcrumb, setBreadcrumb] = useState<{ id: string; name: string; type: "job" | "dim" }[]>([]);
 
   async function loadJobTree(jobId: string) {
     try {
@@ -29,9 +31,11 @@ export default function JobsPage() {
     } catch {}
   }
 
-  function toggleExpand(jobId: string) {
-    if (expandedJob === jobId) { setExpandedJob(null); return; }
+  function toggleExpand(jobId: string, jobName: string) {
+    if (expandedJob === jobId) { setExpandedJob(null); setBreadcrumb([]); return; }
     setExpandedJob(jobId);
+    setBreadcrumb([{ id: jobId, name: jobName, type: "job" }]);
+    setJobTab("dims");
     loadJobTree(jobId);
   }
 
@@ -135,7 +139,7 @@ export default function JobsPage() {
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-lg font-black" style={{ color: "#2D6B9E" }}>{job.progressPercent}%</span>
-                    <button onClick={() => toggleExpand(job.id)}
+                    <button onClick={() => toggleExpand(job.id, job.name)}
                       className="text-[10px] px-3 py-1.5 rounded-lg font-semibold"
                       style={{ background: expandedJob === job.id ? "#2D6B9E" : "#2D6B9E15", color: expandedJob === job.id ? "#fff" : "#2D6B9E" }}>
                       {expandedJob === job.id ? "▲ طي" : "▼ الجوانب"}
@@ -152,38 +156,113 @@ export default function JobsPage() {
                   </div>
                 </div>
 
-                {/* ═══ Dimensions Tree ═══ */}
-                {expandedJob === job.id && (
-                  <div className="px-5 pb-5 border-t" style={{ borderColor: "var(--card-border)" }}>
-                    <div className="pt-4 space-y-1">
-                      {/* Root dimensions */}
-                      {jobDims.filter(d => !d.parentDimensionId).map(d => (
-                        <JobDimensionNode key={d.id} dim={d} allDims={jobDims} allGoals={jobGoals}
-                          level={0} onRefresh={() => loadJobTree(job.id)} />
-                      ))}
+                {/* ═══ Dimensions & Goals Panel ═══ */}
+                {expandedJob === job.id && (() => {
+                  const calcProgress = calcJobProgress(job.id, jobDims, jobGoals);
+                  const rootDims = jobDims.filter(d => !d.parentDimensionId);
 
-                      {/* Add root dimension */}
-                      <div className="flex items-center gap-2 pt-3 mt-2" style={{ borderTop: "1px dashed var(--card-border)" }}>
-                        <input value={addDimName} onChange={e => setAddDimName(e.target.value)}
-                          placeholder="اسم جانب رئيسي جديد…"
-                          onKeyDown={e => { if (e.key === "Enter") addRootDim(job.id); }}
-                          className="flex-1 px-3 py-2 rounded-lg border text-xs focus:outline-none"
-                          style={{ borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" }} />
-                        <button onClick={() => addRootDim(job.id)}
-                          className="px-4 py-2 rounded-lg text-xs font-bold text-white"
-                          style={{ background: "#2D6B9E" }}>
-                          + جانب
+                  return (
+                    <div className="px-5 pb-5 border-t" style={{ borderColor: "var(--card-border)" }}>
+                      {/* Breadcrumb */}
+                      <div className="flex items-center gap-1 pt-3 pb-2 text-[10px] flex-wrap">
+                        <span className="text-[#6B7280]">الوظائف</span>
+                        {breadcrumb.map((b, i) => (
+                          <span key={b.id} className="flex items-center gap-1">
+                            <span className="text-[#6B7280]">←</span>
+                            <button onClick={() => setBreadcrumb(breadcrumb.slice(0, i + 1))}
+                              className="font-semibold hover:underline" style={{ color: "#2D6B9E" }}>{b.name}</button>
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Job progress from dimensions */}
+                      <div className="flex items-center gap-3 mb-3 p-3 rounded-xl" style={{ background: "#2D6B9E08", border: "1px solid #2D6B9E20" }}>
+                        <span className="text-sm font-bold" style={{ color: "#2D6B9E" }}>تقدم الوظيفة</span>
+                        <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "#2D6B9E20" }}>
+                          <div className="h-full rounded-full transition-all" style={{ width: `${calcProgress}%`, background: "#2D6B9E" }} />
+                        </div>
+                        <span className="text-sm font-black" style={{ color: "#2D6B9E" }}>{calcProgress}%</span>
+                      </div>
+
+                      {/* Tabs */}
+                      <div className="flex gap-2 mb-3">
+                        <button onClick={() => setJobTab("dims")}
+                          className="px-3 py-1.5 rounded-lg text-[11px] font-semibold transition"
+                          style={{ background: jobTab === "dims" ? "#2D6B9E" : "#F3F4F6", color: jobTab === "dims" ? "#fff" : "#6B7280" }}>
+                          📁 الجوانب والأهداف ({rootDims.length})
+                        </button>
+                        <button onClick={() => setJobTab("stats")}
+                          className="px-3 py-1.5 rounded-lg text-[11px] font-semibold transition"
+                          style={{ background: jobTab === "stats" ? "#2D6B9E" : "#F3F4F6", color: jobTab === "stats" ? "#fff" : "#6B7280" }}>
+                          📊 إحصائيات
                         </button>
                       </div>
 
-                      {jobDims.length === 0 && (
-                        <p className="text-center text-xs py-4" style={{ color: "var(--muted)" }}>
-                          لا توجد جوانب — أضف أول جانب لهذه الوظيفة
-                        </p>
+                      {/* Dims tab */}
+                      {jobTab === "dims" && (
+                        <div className="space-y-1">
+                          {rootDims.map(d => (
+                            <JobDimensionNode key={d.id} dim={d} allDims={jobDims} allGoals={jobGoals}
+                              level={0} onRefresh={() => loadJobTree(job.id)} />
+                          ))}
+
+                          <div className="flex items-center gap-2 pt-3 mt-2" style={{ borderTop: "1px dashed var(--card-border)" }}>
+                            <input value={addDimName} onChange={e => setAddDimName(e.target.value)}
+                              placeholder="اسم جانب رئيسي جديد…"
+                              onKeyDown={e => { if (e.key === "Enter") addRootDim(job.id); }}
+                              className="flex-1 px-3 py-2 rounded-lg border text-xs focus:outline-none"
+                              style={{ borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" }} />
+                            <button onClick={() => addRootDim(job.id)}
+                              className="px-4 py-2 rounded-lg text-xs font-bold text-white"
+                              style={{ background: "#2D6B9E" }}>
+                              + جانب
+                            </button>
+                          </div>
+
+                          {rootDims.length === 0 && (
+                            <p className="text-center text-xs py-4" style={{ color: "var(--muted)" }}>
+                              لا توجد جوانب — أضف أول جانب لهذه الوظيفة
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Stats tab */}
+                      {jobTab === "stats" && (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="text-center p-3 rounded-xl border" style={{ borderColor: "var(--card-border)" }}>
+                              <p className="text-[10px]" style={{ color: "var(--muted)" }}>الجوانب</p>
+                              <p className="text-xl font-black" style={{ color: "#2D6B9E" }}>{jobDims.length}</p>
+                            </div>
+                            <div className="text-center p-3 rounded-xl border" style={{ borderColor: "var(--card-border)" }}>
+                              <p className="text-[10px]" style={{ color: "var(--muted)" }}>الأهداف</p>
+                              <p className="text-xl font-black" style={{ color: "#D4AF37" }}>{jobGoals.length}</p>
+                            </div>
+                            <div className="text-center p-3 rounded-xl border" style={{ borderColor: "var(--card-border)" }}>
+                              <p className="text-[10px]" style={{ color: "var(--muted)" }}>مكتملة</p>
+                              <p className="text-xl font-black" style={{ color: "#3D8C5A" }}>{jobGoals.filter(g => g.status === "Completed").length}</p>
+                            </div>
+                          </div>
+                          {/* Per-dimension breakdown */}
+                          {rootDims.map(d => {
+                            const dp = calcDimProgress(d.id, jobDims, jobGoals);
+                            return (
+                              <div key={d.id} className="flex items-center gap-3">
+                                <span className="text-sm">{d.icon || "📁"}</span>
+                                <span className="text-xs font-medium flex-1" style={{ color: "var(--text)" }}>{d.name}</span>
+                                <div className="w-24 h-1.5 rounded-full overflow-hidden" style={{ background: `${d.color || "#2D6B9E"}20` }}>
+                                  <div className="h-full rounded-full" style={{ width: `${dp}%`, background: d.color || "#2D6B9E" }} />
+                                </div>
+                                <span className="text-[10px] font-bold w-8" style={{ color: d.color || "#2D6B9E" }}>{dp}%</span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             );
           })}

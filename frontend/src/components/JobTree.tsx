@@ -35,7 +35,37 @@ interface GoalNodeProps {
 }
 
 const DIM_COLORS = ["#2D6B9E", "#5E5495", "#D4AF37", "#3D8C5A", "#DC2626", "#0F3460"];
-const DIM_ICONS = ["📁", "📊", "🎯", "📋", "💡", "🔧", "📈", "🏗️", "🤝", "📐"];
+
+/* ─── Progress Calculation ──────────────────────────────────────────── */
+
+/** Goal progress = its own progress value (set manually or from sub-goals avg) */
+export function calcGoalProgress(goalId: string, allGoals: JobGoalData[]): number {
+  const goal = allGoals.find(g => g.id === goalId);
+  if (!goal) return 0;
+  const subs = allGoals.filter(g => g.parentGoalId === goalId);
+  if (subs.length === 0) return goal.progress;
+  // Average of sub-goals progress
+  const avg = Math.round(subs.reduce((s, sg) => s + calcGoalProgress(sg.id, allGoals), 0) / subs.length);
+  return avg;
+}
+
+/** Dimension progress = average of (direct goals + sub-dimensions) */
+export function calcDimProgress(dimId: string, allDims: JobDim[], allGoals: JobGoalData[]): number {
+  const directGoals = allGoals.filter(g => g.dimensionId === dimId && !g.parentGoalId);
+  const subDims = allDims.filter(d => d.parentDimensionId === dimId);
+  const items: number[] = [];
+  for (const g of directGoals) items.push(calcGoalProgress(g.id, allGoals));
+  for (const d of subDims) items.push(calcDimProgress(d.id, allDims, allGoals));
+  if (items.length === 0) return 0;
+  return Math.round(items.reduce((s, v) => s + v, 0) / items.length);
+}
+
+/** Job progress = average of root dimensions */
+export function calcJobProgress(jobId: string, allDims: JobDim[], allGoals: JobGoalData[]): number {
+  const rootDims = allDims.filter(d => d.jobId === jobId && !d.parentDimensionId);
+  if (rootDims.length === 0) return 0;
+  return Math.round(rootDims.reduce((s, d) => s + calcDimProgress(d.id, allDims, allGoals), 0) / rootDims.length);
+}
 
 /* ─── JobDimensionNode ──────────────────────────────────────────────── */
 
@@ -48,11 +78,7 @@ export function JobDimensionNode({ dim, allDims, allGoals, level, onRefresh }: D
   const goals = allGoals.filter(g => g.dimensionId === dim.id && !g.parentGoalId);
   const hasContent = children.length > 0 || goals.length > 0;
 
-  // Calculate progress: average of direct goals progress
-  const dimGoals = allGoals.filter(g => g.dimensionId === dim.id);
-  const avgProgress = dimGoals.length > 0
-    ? Math.round(dimGoals.reduce((s, g) => s + g.progress, 0) / dimGoals.length)
-    : 0;
+  const avgProgress = calcDimProgress(dim.id, allDims, allGoals);
 
   async function addChild() {
     if (!addName.trim()) return;
@@ -197,6 +223,8 @@ export function JobGoalNode({ goal, allGoals, level, onRefresh, projectNames, ta
     onRefresh();
   }
 
+  const effectiveProgress = calcGoalProgress(goal.id, allGoals);
+
   const priorityBadge = goal.priority >= 4 ? { label: "عالية", bg: "#DC262615", color: "#DC2626" }
     : goal.priority >= 2 ? { label: "متوسطة", bg: "#D4AF3715", color: "#D4AF37" }
     : { label: "منخفضة", bg: "#3D8C5A15", color: "#3D8C5A" };
@@ -225,9 +253,9 @@ export function JobGoalNode({ goal, allGoals, level, onRefresh, projectNames, ta
 
         {/* Progress */}
         <div className="w-12 h-1.5 rounded-full overflow-hidden flex-shrink-0" style={{ background: `${statusColor}20` }}>
-          <div className="h-full rounded-full transition-all" style={{ width: `${goal.progress}%`, background: statusColor }} />
+          <div className="h-full rounded-full transition-all" style={{ width: `${effectiveProgress}%`, background: statusColor }} />
         </div>
-        <span className="text-[10px] font-bold w-8 text-left flex-shrink-0" style={{ color: statusColor }}>{goal.progress}%</span>
+        <span className="text-[10px] font-bold w-8 text-left flex-shrink-0" style={{ color: statusColor }}>{effectiveProgress}%</span>
 
         {/* Due date */}
         {goal.dueDate && (
