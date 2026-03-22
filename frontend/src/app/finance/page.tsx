@@ -131,13 +131,19 @@ interface FinSettings {
 
 /* ═══ Constants ═══════════════════════════════════════════════════════════ */
 
+// الأنواع الأساسية: دخل | مصروف | تحويل
 const TX_TYPES = [
-  { key: "income",       label: "دخل",      icon: "📥", color: "#3D8C5A" },
-  { key: "expense",      label: "مصروف",    icon: "📤", color: "#DC2626" },
-  { key: "debt_payment", label: "سداد دين", icon: "💳", color: "#0F3460" },
-  { key: "installment",  label: "قسط",      icon: "📋", color: "#8C4A3D" },
-  { key: "gift",         label: "هدية",     icon: "🎁", color: "#D4AF37" },
-  { key: "transfer",     label: "تحويل",    icon: "🔄", color: "#6B7280" },
+  { key: "income",   label: "دخل",    icon: "📥", color: "#3D8C5A" },
+  { key: "expense",  label: "مصروف",  icon: "📤", color: "#DC2626" },
+  { key: "transfer", label: "تحويل",  icon: "🔄", color: "#6B7280" },
+] as const;
+
+// أقسام المصروف الفرعية
+const EXPENSE_SUBS = [
+  { key: "expense",      label: "مصروف عام", icon: "📤" },
+  { key: "debt_payment", label: "سداد دين",  icon: "💳" },
+  { key: "installment",  label: "قسط",       icon: "📋" },
+  { key: "gift",         label: "هدية",      icon: "🎁" },
 ] as const;
 
 const DEF_EXP_CATS = ["طعام", "مواصلات", "سكن", "فواتير", "صحة", "تعليم", "ترفيه", "ملابس", "اشتراكات", "صيانة", "تبرعات", "أخرى"];
@@ -1962,15 +1968,28 @@ export default function FinancePage() {
               <button onClick={() => setShowAdd(false)} className="text-[#6B7280] text-sm">✕</button>
             </div>
             <div className="px-6 py-5 space-y-3">
-              <div className="flex gap-1 flex-wrap">
+              {/* النوع الأساسي */}
+              <div className="flex gap-1">
                 {TX_TYPES.map((t) => (
                   <button key={t.key} onClick={() => setFType(t.key as Transaction["type"])}
-                    className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition min-w-[50px]"
-                    style={{ background: fType === t.key ? t.color : "#F3F4F6", color: fType === t.key ? "#fff" : "#6B7280" }}>
+                    className="flex-1 py-2 rounded-lg text-xs font-semibold transition"
+                    style={{ background: fType === t.key || (fType !== "income" && fType !== "transfer" && t.key === "expense") ? t.color : "#F3F4F6", color: fType === t.key || (fType !== "income" && fType !== "transfer" && t.key === "expense") ? "#fff" : "#6B7280" }}>
                     {t.icon} {t.label}
                   </button>
                 ))}
               </div>
+              {/* قسم المصروف الفرعي */}
+              {fType !== "income" && fType !== "transfer" && (
+                <div className="flex gap-1 flex-wrap">
+                  {EXPENSE_SUBS.map((s) => (
+                    <button key={s.key} onClick={() => setFType(s.key as Transaction["type"])}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-medium transition"
+                      style={{ background: fType === s.key ? "#DC2626" : "#FEF2F2", color: fType === s.key ? "#fff" : "#DC2626" }}>
+                      {s.icon} {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <input value={fTitle} onChange={(e) => setFTitle(e.target.value)} placeholder="الوصف"
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
               <input type="text" value={fAmount} onChange={(e) => { if (/^[\d+\-*/. ]*$/.test(e.target.value)) setFAmount(e.target.value); }}
@@ -2043,15 +2062,26 @@ export default function FinancePage() {
               <button onClick={() => setEditTx(null)} className="text-[#6B7280] text-sm">✕</button>
             </div>
             <div className="px-6 py-5 space-y-3">
-              <div className="flex gap-1 flex-wrap">
+              <div className="flex gap-1">
                 {TX_TYPES.map((t) => (
                   <button key={t.key} onClick={() => setEditTx({ ...editTx, type: t.key as Transaction["type"] })}
-                    className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition min-w-[50px]"
-                    style={{ background: editTx.type === t.key ? t.color : "#F3F4F6", color: editTx.type === t.key ? "#fff" : "#6B7280" }}>
+                    className="flex-1 py-2 rounded-lg text-xs font-semibold transition"
+                    style={{ background: editTx.type === t.key || (editTx.type !== "income" && editTx.type !== "transfer" && t.key === "expense") ? t.color : "#F3F4F6", color: editTx.type === t.key || (editTx.type !== "income" && editTx.type !== "transfer" && t.key === "expense") ? "#fff" : "#6B7280" }}>
                     {t.icon} {t.label}
                   </button>
                 ))}
               </div>
+              {editTx.type !== "income" && editTx.type !== "transfer" && (
+                <div className="flex gap-1 flex-wrap">
+                  {EXPENSE_SUBS.map((s) => (
+                    <button key={s.key} onClick={() => setEditTx({ ...editTx, type: s.key as Transaction["type"] })}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-medium transition"
+                      style={{ background: editTx.type === s.key ? "#DC2626" : "#FEF2F2", color: editTx.type === s.key ? "#fff" : "#DC2626" }}>
+                      {s.icon} {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <input value={editTx.title} onChange={(e) => setEditTx({ ...editTx, title: e.target.value })} placeholder="الوصف"
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
               <input type="number" value={editTx.amount} onChange={(e) => setEditTx({ ...editTx, amount: Number(e.target.value) })} placeholder="المبلغ"
