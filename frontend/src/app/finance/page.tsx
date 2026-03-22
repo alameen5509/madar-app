@@ -1250,26 +1250,34 @@ export default function FinancePage() {
             const hasDebts = totalDebtRemaining > 0;
             const totalDebtOriginal = debts.reduce((s, d) => s + d.originalAmount, 0);
             const totalPaidSoFar = debts.reduce((s, d) => s + d.paidSoFar, 0);
+            const paidPct = totalDebtOriginal > 0 ? Math.round(totalPaidSoFar / totalDebtOriginal * 100) : 0;
             const debtTarget = Math.round(income * settings.debtPercent / 100);
             const savTarget = Math.round(income * settings.savingsPercent / 100);
-            // سدادات الشهر الحالي: من المعاملات + التغيير في paidSoFar
-            const monthlyDebtPaid = debtPaid; // من المعاملات المسجلة هذا الشهر
 
-            // نصائح الديون
+            // نصائح الديون — تعتمد على paidSoFar الفعلي
             if (hasDebts && debts.length > 0) {
-              tips.push({ text: `إجمالي الديون: ${totalDebtOriginal.toLocaleString()} — سددت ${totalPaidSoFar.toLocaleString()} (${totalDebtOriginal > 0 ? Math.round(totalPaidSoFar / totalDebtOriginal * 100) : 0}%) — متبقي ${totalDebtRemaining.toLocaleString()}`, icon: "💳", color: "#0F3460", bg: "#EFF6FF" });
+              tips.push({ text: `الديون: ${totalDebtOriginal.toLocaleString()} — سددت ${totalPaidSoFar.toLocaleString()} (${paidPct}%) — متبقي ${totalDebtRemaining.toLocaleString()}`, icon: "💳", color: "#0F3460", bg: "#EFF6FF" });
+              // أصغر دين متبقي (كرة الثلج)
+              const smallest = [...debts].filter(d => d.originalAmount - d.paidSoFar > 0).sort((a, b) => (a.originalAmount - a.paidSoFar) - (b.originalAmount - b.paidSoFar))[0];
+              if (smallest) {
+                const sRemaining = smallest.originalAmount - smallest.paidSoFar;
+                tips.push({ text: `ركّز على "${smallest.creditorName}" — متبقي ${sRemaining.toLocaleString()} فقط`, icon: "🎯", color: "#D4AF37", bg: "#FFFBEB" });
+              }
             }
             if (hasDebts && debtPocketBal > 0) {
-              tips.push({ text: `لديك ${debtPocketBal.toLocaleString()} ريال في محفظة الديون — سدد دينك الآن`, icon: "⚡", color: "#DC2626", bg: "#FEF2F2" });
+              tips.push({ text: `لديك ${debtPocketBal.toLocaleString()} في محفظة الديون جاهز للسداد — سدد الآن`, icon: "⚡", color: "#DC2626", bg: "#FEF2F2" });
             }
-            if (hasDebts && income > 0 && debtTarget > 0 && monthlyDebtPaid < debtTarget) {
-              tips.push({ text: `حصة الديون هذا الشهر: ${debtTarget.toLocaleString()} — سددت ${monthlyDebtPaid.toLocaleString()} — بقي ${(debtTarget - monthlyDebtPaid).toLocaleString()}`, icon: "📊", color: "#D4AF37", bg: "#FFFBEB" });
-            }
-            if (hasDebts && monthlyDebtPaid >= debtTarget && debtTarget > 0) {
-              tips.push({ text: `أحسنت! أتممت حصة الديون لهذا الشهر (${monthlyDebtPaid.toLocaleString()} من ${debtTarget.toLocaleString()}) ✅`, icon: "✅", color: "#3D8C5A", bg: "#F0FDF4" });
+            if (hasDebts && income > 0 && debtTarget > 0) {
+              // حصة الشهر: debtPaid من المعاملات، أو من paidSoFar إذا لم تُسجل معاملات
+              const actualMonthPaid = debtPaid > 0 ? debtPaid : 0;
+              if (actualMonthPaid >= debtTarget) {
+                tips.push({ text: `أحسنت! سددت ${actualMonthPaid.toLocaleString()} من حصة ${debtTarget.toLocaleString()} هذا الشهر ✅`, icon: "✅", color: "#3D8C5A", bg: "#F0FDF4" });
+              } else {
+                tips.push({ text: `حصة الديون الشهرية: ${debtTarget.toLocaleString()} (${settings.debtPercent}% من الدخل)`, icon: "📊", color: "#6B7280", bg: "#F9FAFB" });
+              }
             }
             if (!hasDebts && debts.length > 0) {
-              tips.push({ text: `الحمد لله — سددت جميع ديونك! (${totalPaidSoFar.toLocaleString()} ريال) 🎉`, icon: "🎉", color: "#3D8C5A", bg: "#F0FDF4" });
+              tips.push({ text: `الحمد لله — سددت جميع ديونك! (${totalPaidSoFar.toLocaleString()}) 🎉`, icon: "🎉", color: "#3D8C5A", bg: "#F0FDF4" });
             }
 
             // نصائح الادخار
