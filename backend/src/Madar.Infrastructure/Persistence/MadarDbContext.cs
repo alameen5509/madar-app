@@ -291,7 +291,6 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
         builder.Entity<PrayerLog>(pl => {
             pl.HasKey(x => x.Id);
             pl.Property(x => x.Prayer).HasMaxLength(20).IsRequired();
-            pl.Property(x => x.Status).HasMaxLength(20).IsRequired();
             pl.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
             pl.HasIndex(x => new { x.OwnerId, x.Date, x.Prayer }).IsUnique();
         });
@@ -299,6 +298,7 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
         builder.Entity<PrayerPenalty>(pp => {
             pp.HasKey(x => x.Id);
             pp.Property(x => x.Prayer).HasMaxLength(20).IsRequired();
+            pp.Property(x => x.Reason).HasMaxLength(30).IsRequired();
             pp.Property(x => x.PenaltyType).HasMaxLength(50).IsRequired();
             pp.Property(x => x.PenaltyDetail).HasMaxLength(200);
             pp.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);

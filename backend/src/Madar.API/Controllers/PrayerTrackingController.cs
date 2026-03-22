@@ -24,7 +24,7 @@ public class PrayerTrackingController : BaseController
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var logs = await _db.PrayerLogs
             .Where(p => p.OwnerId == UserId && p.Date == today)
-            .Select(p => new { p.Prayer, p.Status })
+            .Select(p => new { p.Prayer, p.PrayedOnTime, p.PrayedInMosque })
             .ToListAsync(ct);
         return Ok(logs);
     }
@@ -38,98 +38,122 @@ public class PrayerTrackingController : BaseController
         var toDate = DateOnly.Parse(to);
         var logs = await _db.PrayerLogs
             .Where(p => p.OwnerId == UserId && p.Date >= fromDate && p.Date <= toDate)
-            .Select(p => new { p.Date, p.Prayer, p.Status })
+            .Select(p => new { p.Date, p.Prayer, p.PrayedOnTime, p.PrayedInMosque })
             .ToListAsync(ct);
         return Ok(logs);
     }
 
-    // ─── POST mark prayer ───
-    [HttpPost("mark")]
-    public async Task<IActionResult> MarkPrayer([FromBody] MarkPrayerRequest req, CancellationToken ct)
+    // ─── POST toggle on-time or in-mosque ───
+    [HttpPost("toggle")]
+    public async Task<IActionResult> Toggle([FromBody] TogglePrayerRequest req, CancellationToken ct)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var existing = await _db.PrayerLogs
+        var log = await _db.PrayerLogs
             .FirstOrDefaultAsync(p => p.OwnerId == UserId && p.Date == today && p.Prayer == req.Prayer, ct);
 
-        if (existing != null)
+        if (log == null)
         {
-            existing.Status = req.Status;
-        }
-        else
-        {
-            _db.PrayerLogs.Add(new PrayerLog
+            log = new PrayerLog
             {
                 Id = Guid.NewGuid(),
                 OwnerId = UserId,
                 Date = today,
                 Prayer = req.Prayer,
-                Status = req.Status,
-            });
+            };
+            _db.PrayerLogs.Add(log);
         }
 
-        // If marked (not missed), remove any pending penalty for today
-        if (req.Status != "Missed")
+        if (req.Field == "onTime")
+            log.PrayedOnTime = req.Value;
+        else if (req.Field == "inMosque")
+            log.PrayedInMosque = req.Value;
+
+        // If toggled ON, remove matching unfulfilled penalty for today
+        if (req.Value)
         {
+            var reason = req.Field == "onTime" ? "not_on_time" : "not_in_mosque";
             var penalty = await _db.PrayerPenalties
-                .FirstOrDefaultAsync(p => p.OwnerId == UserId && p.Date == today && p.Prayer == req.Prayer && !p.Fulfilled, ct);
+                .FirstOrDefaultAsync(p => p.OwnerId == UserId && p.Date == today
+                    && p.Prayer == req.Prayer && p.Reason == reason && !p.Fulfilled, ct);
             if (penalty != null)
                 _db.PrayerPenalties.Remove(penalty);
         }
 
         await _db.SaveChangesAsync(ct);
-        return Ok(new { success = true });
+        return Ok(new { log.PrayedOnTime, log.PrayedInMosque });
     }
 
-    // ─── POST mark prayer as missed (adds penalty) ───
-    [HttpPost("miss")]
-    public async Task<IActionResult> MissPrayer([FromBody] MissPrayerRequest req, CancellationToken ct)
+    // ─── POST mark prayer time as expired (adds penalties for unchecked fields) ───
+    [HttpPost("expire")]
+    public async Task<IActionResult> ExpirePrayer([FromBody] ExpirePrayerRequest req, CancellationToken ct)
     {
         var date = DateOnly.Parse(req.Date);
-        var existing = await _db.PrayerLogs
+        var log = await _db.PrayerLogs
             .FirstOrDefaultAsync(p => p.OwnerId == UserId && p.Date == date && p.Prayer == req.Prayer, ct);
 
-        if (existing != null)
-            existing.Status = "Missed";
-        else
+        // Get penalty config
+        var settings = await _db.PrayerSettings
+            .FirstOrDefaultAsync(s => s.OwnerId == UserId, ct);
+        Dictionary<string, string>? config = null;
+        if (settings != null)
         {
-            _db.PrayerLogs.Add(new PrayerLog
-            {
-                Id = Guid.NewGuid(),
-                OwnerId = UserId,
-                Date = date,
-                Prayer = req.Prayer,
-                Status = "Missed",
-            });
+            try { config = JsonSerializer.Deserialize<Dictionary<string, string>>(settings.PenaltyConfigJson); }
+            catch { }
         }
 
-        // Add penalty if not already exists
-        var hasPenalty = await _db.PrayerPenalties
-            .AnyAsync(p => p.OwnerId == UserId && p.Date == date && p.Prayer == req.Prayer, ct);
-        if (!hasPenalty)
+        string GetPenaltyType(string prayer, string field)
         {
-            // Get penalty config
-            var settings = await _db.PrayerSettings
-                .FirstOrDefaultAsync(s => s.OwnerId == UserId, ct);
-            var penaltyType = "surah";
-            if (settings != null)
-            {
-                try
-                {
-                    var config = JsonSerializer.Deserialize<Dictionary<string, string>>(settings.PenaltyConfigJson);
-                    if (config != null && config.TryGetValue(req.Prayer, out var pt))
-                        penaltyType = pt;
-                }
-                catch { }
-            }
+            var key = $"{prayer}_{field}";
+            if (config != null && config.TryGetValue(key, out var pt)) return pt;
+            return "surah"; // default
+        }
 
-            _db.PrayerPenalties.Add(new PrayerPenalty
+        bool prayedOnTime = log?.PrayedOnTime ?? false;
+        bool prayedInMosque = log?.PrayedInMosque ?? false;
+
+        // Create log if doesn't exist
+        if (log == null)
+        {
+            log = new PrayerLog
             {
-                Id = Guid.NewGuid(),
-                OwnerId = UserId,
-                Date = date,
-                Prayer = req.Prayer,
-                PenaltyType = penaltyType,
-            });
+                Id = Guid.NewGuid(), OwnerId = UserId,
+                Date = date, Prayer = req.Prayer,
+            };
+            _db.PrayerLogs.Add(log);
+        }
+
+        // Penalty for not on time
+        if (!prayedOnTime)
+        {
+            var exists = await _db.PrayerPenalties.AnyAsync(p =>
+                p.OwnerId == UserId && p.Date == date && p.Prayer == req.Prayer && p.Reason == "not_on_time", ct);
+            if (!exists)
+            {
+                _db.PrayerPenalties.Add(new PrayerPenalty
+                {
+                    Id = Guid.NewGuid(), OwnerId = UserId,
+                    Date = date, Prayer = req.Prayer,
+                    Reason = "not_on_time",
+                    PenaltyType = GetPenaltyType(req.Prayer, "time"),
+                });
+            }
+        }
+
+        // Penalty for not in mosque
+        if (!prayedInMosque)
+        {
+            var exists = await _db.PrayerPenalties.AnyAsync(p =>
+                p.OwnerId == UserId && p.Date == date && p.Prayer == req.Prayer && p.Reason == "not_in_mosque", ct);
+            if (!exists)
+            {
+                _db.PrayerPenalties.Add(new PrayerPenalty
+                {
+                    Id = Guid.NewGuid(), OwnerId = UserId,
+                    Date = date, Prayer = req.Prayer,
+                    Reason = "not_in_mosque",
+                    PenaltyType = GetPenaltyType(req.Prayer, "mosque"),
+                });
+            }
         }
 
         await _db.SaveChangesAsync(ct);
@@ -143,7 +167,7 @@ public class PrayerTrackingController : BaseController
         var penalties = await _db.PrayerPenalties
             .Where(p => p.OwnerId == UserId && !p.Fulfilled)
             .OrderByDescending(p => p.Date)
-            .Select(p => new { p.Id, p.Date, p.Prayer, p.PenaltyType, p.PenaltyDetail })
+            .Select(p => new { p.Id, p.Date, p.Prayer, p.Reason, p.PenaltyType, p.PenaltyDetail })
             .ToListAsync(ct);
         return Ok(penalties);
     }
@@ -200,18 +224,16 @@ public class PrayerTrackingController : BaseController
         var weekAgo = today.AddDays(-6);
 
         var weekLogs = await _db.PrayerLogs
-            .Where(p => p.OwnerId == UserId && p.Date >= weekAgo && p.Date <= today
-                        && p.Prayer != "Duha") // Duha is optional
+            .Where(p => p.OwnerId == UserId && p.Date >= weekAgo && p.Date <= today)
             .ToListAsync(ct);
 
-        var totalPrayers = weekLogs.Count;
-        var onTime = weekLogs.Count(l => l.Status == "OnTime" || l.Status == "InMosque");
-        var inMosque = weekLogs.Count(l => l.Status == "InMosque");
-        var missed = weekLogs.Count(l => l.Status == "Missed");
+        var total = weekLogs.Count;
+        var onTime = weekLogs.Count(l => l.PrayedOnTime);
+        var inMosque = weekLogs.Count(l => l.PrayedInMosque);
 
-        // Longest streak of on-time days
+        // Longest streak of full days (all 5 on time + in mosque)
         var allLogs = await _db.PrayerLogs
-            .Where(p => p.OwnerId == UserId && p.Prayer != "Duha")
+            .Where(p => p.OwnerId == UserId)
             .OrderBy(p => p.Date)
             .ToListAsync(ct);
 
@@ -221,9 +243,9 @@ public class PrayerTrackingController : BaseController
         foreach (var dayGroup in groupedByDate)
         {
             var dayPrayers = dayGroup.ToList();
-            var allOnTime = dayPrayers.All(p => p.Status == "OnTime" || p.Status == "InMosque")
-                            && dayPrayers.Count >= 5;
-            if (allOnTime)
+            var allDone = dayPrayers.All(p => p.PrayedOnTime && p.PrayedInMosque)
+                          && dayPrayers.Count >= 5;
+            if (allDone)
             {
                 if (lastDate == null || dayGroup.Key == lastDate.Value.AddDays(1))
                     currentStreak++;
@@ -243,14 +265,14 @@ public class PrayerTrackingController : BaseController
 
         return Ok(new
         {
-            weekOnTimePercent = totalPrayers == 0 ? 0 : Math.Round((double)onTime / totalPrayers * 100),
-            weekMosquePercent = totalPrayers == 0 ? 0 : Math.Round((double)inMosque / totalPrayers * 100),
+            weekOnTimePercent = total == 0 ? 0 : Math.Round((double)onTime / total * 100),
+            weekMosquePercent = total == 0 ? 0 : Math.Round((double)inMosque / total * 100),
             longestStreak,
             pendingPenalties,
         });
     }
 }
 
-public record MarkPrayerRequest(string Prayer, string Status);
-public record MissPrayerRequest(string Prayer, string Date);
+public record TogglePrayerRequest(string Prayer, string Field, bool Value);
+public record ExpirePrayerRequest(string Prayer, string Date);
 public record UpdatePrayerSettingsRequest(Dictionary<string, string> PenaltyConfig, bool NotificationsEnabled);

@@ -46,12 +46,12 @@ const PRAYERS = [
 ] as const;
 
 type PrayerKey = typeof PRAYERS[number]["key"];
-type PrayerStatus = "None" | "OnTime" | "InMosque" | "Missed";
 
-interface PrayerState { [key: string]: PrayerStatus; }
+interface PrayerLogState { onTime: boolean; inMosque: boolean; expired: boolean; }
+interface PrayerState { [key: string]: PrayerLogState; }
 
 interface Penalty {
-  id: string; date: string; prayer: string;
+  id: string; date: string; prayer: string; reason: string;
   penaltyType: string; penaltyDetail?: string;
 }
 
@@ -120,6 +120,7 @@ function PrayerSection() {
   const [penaltyConfig, setPenaltyConfig] = useState<Record<string, string>>({});
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [showStats, setShowStats] = useState(false);
+  const [showPenalties, setShowPenalties] = useState(true);
 
   // Load salah times
   useEffect(() => {
@@ -143,8 +144,8 @@ function PrayerSection() {
   const loadToday = useCallback(() => {
     api.get("/api/prayer-tracking/today").then(({ data }) => {
       const state: PrayerState = {};
-      for (const log of data as { prayer: string; status: string }[]) {
-        state[log.prayer] = log.status as PrayerStatus;
+      for (const log of data as { prayer: string; prayedOnTime: boolean; prayedInMosque: boolean }[]) {
+        state[log.prayer] = { onTime: log.prayedOnTime, inMosque: log.prayedInMosque, expired: false };
       }
       setPrayerState(state);
     }).catch(() => {});
@@ -171,15 +172,14 @@ function PrayerSection() {
 
   useEffect(() => { loadToday(); loadPenalties(); loadStats(); loadSettings(); }, [loadToday, loadPenalties, loadStats, loadSettings]);
 
-  // Check for missed prayers every minute
+  // Check for expired prayers every minute
   useEffect(() => {
     if (!salahTimes) return;
     const check = () => {
       const now = new Date();
       const nowMins = now.getHours() * 60 + now.getMinutes();
-      const today = now.toISOString().slice(0, 10);
+      const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
 
-      // Prayer end times (next prayer's adhan = end of current)
       const prayerEndMap: Record<string, number> = {
         Fajr:    toMin(salahTimes.shuruq),
         Dhuhr:   toMin(salahTimes.asr),
@@ -190,28 +190,40 @@ function PrayerSection() {
 
       for (const p of PRAYERS) {
         const endTime = prayerEndMap[p.key];
-        if (endTime && nowMins > endTime && !prayerState[p.key]) {
-          // Time passed and no status recorded — mark as missed
-          api.post("/api/prayer-tracking/miss", { prayer: p.key, date: today })
-            .then(() => { loadToday(); loadPenalties(); })
-            .catch(() => {});
+        if (endTime && nowMins > endTime) {
+          const cur = prayerState[p.key];
+          if (!cur || (!cur.onTime && !cur.inMosque && !cur.expired)) {
+            // Time passed — call expire to create penalties for unchecked fields
+            api.post("/api/prayer-tracking/expire", { prayer: p.key, date: today })
+              .then(() => { loadToday(); loadPenalties(); loadStats(); })
+              .catch(() => {});
+            // Mark as expired locally so we don't re-call
+            setPrayerState(prev => ({
+              ...prev,
+              [p.key]: { ...(prev[p.key] ?? { onTime: false, inMosque: false }), expired: true },
+            }));
+          }
         }
       }
     };
     check();
     const interval = setInterval(check, 60_000);
     return () => clearInterval(interval);
-  }, [salahTimes, prayerState, loadToday, loadPenalties]);
+  }, [salahTimes, prayerState, loadToday, loadPenalties, loadStats]);
 
-  async function markPrayer(prayer: string, status: PrayerStatus) {
+  async function togglePrayer(prayer: string, field: "onTime" | "inMosque") {
+    const cur = prayerState[prayer] ?? { onTime: false, inMosque: false, expired: false };
+    const newVal = !(field === "onTime" ? cur.onTime : cur.inMosque);
     // Optimistic
-    setPrayerState(prev => ({ ...prev, [prayer]: status }));
+    setPrayerState(prev => ({
+      ...prev,
+      [prayer]: { ...cur, [field]: newVal },
+    }));
     try {
-      await api.post("/api/prayer-tracking/mark", { prayer, status });
+      await api.post("/api/prayer-tracking/toggle", { prayer, field, value: newVal });
       loadPenalties();
       loadStats();
     } catch {
-      // revert
       loadToday();
     }
   }
@@ -271,30 +283,27 @@ function PrayerSection() {
   }
 
   const prayerLabel = (key: string) => PRAYERS.find(p => p.key === key)?.label ?? key;
-
   const penaltyLabel = (type: string) => PENALTY_TYPES.find(t => t.key === type)?.label ?? type;
+  const reasonLabel = (r: string) => r === "not_on_time" ? "لم تُصلَّ في الوقت" : "لم تُصلَّ في المسجد";
 
   return (
     <>
       {/* ═══ Prayer Cards ═══ */}
       <GeometricDivider label="الصلوات" />
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
         {PRAYERS.map(p => {
-          const status = prayerState[p.key] as PrayerStatus | undefined;
+          const cur = prayerState[p.key] ?? { onTime: false, inMosque: false, expired: false };
           const timeStatus = getPrayerTimeStatus(p.key);
           const timeStr = getPrayerTimeStr(p.key);
-          const isMissed = status === "Missed";
-          const isOnTime = status === "OnTime";
-          const isMosque = status === "InMosque";
-          const isDone = isOnTime || isMosque;
+          const bothDone = cur.onTime && cur.inMosque;
+          const hasIssue = cur.expired && (!cur.onTime || !cur.inMosque);
 
           return (
             <div key={p.key}
               className="bg-white rounded-xl p-4 border shadow-sm transition-all"
               style={{
-                borderColor: isMissed ? "#DC2626" : isDone ? "#3D8C5A" : timeStatus === "current" ? "#D4AF37" : "#E5E7EB",
-                opacity: timeStatus === "future" && !isDone && !isMissed ? 0.6 : 1,
-                background: isMissed ? "#FEF2F2" : isMosque ? "#F0FDF4" : isOnTime ? "#F0FDF4" : "white",
+                borderColor: hasIssue ? "#DC2626" : bothDone ? "#3D8C5A" : timeStatus === "current" ? "#D4AF37" : "#E5E7EB",
+                opacity: timeStatus === "future" && !cur.onTime && !cur.inMosque ? 0.65 : 1,
               }}>
               {/* Prayer name + time */}
               <div className="flex items-center justify-between mb-3">
@@ -305,45 +314,39 @@ function PrayerSection() {
                     {timeStr && <p className="text-[10px] text-[#6B7280]">{timeStr}</p>}
                   </div>
                 </div>
-                {timeStatus === "current" && !isDone && !isMissed && (
+                {timeStatus === "current" && !bothDone && (
                   <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] animate-pulse" />
                 )}
-                {isDone && <span className="text-lg">✅</span>}
-                {isMissed && <span className="text-lg">🔴</span>}
+                {bothDone && <span className="text-lg">🌟</span>}
               </div>
 
-              {/* Action buttons */}
-              {!isDone && !isMissed && (
-                <div className="flex gap-1.5">
-                  <button onClick={() => markPrayer(p.key, "OnTime")}
-                    className="flex-1 py-2 rounded-lg text-[10px] font-bold transition hover:opacity-80"
-                    style={{ background: "#3D8C5A", color: "white" }}>
-                    ✅ في الوقت
-                  </button>
-                  <button onClick={() => markPrayer(p.key, "InMosque")}
-                    className="flex-1 py-2 rounded-lg text-[10px] font-bold transition hover:opacity-80"
-                    style={{ background: "#2C2C54", color: "white" }}>
-                    🕌 في المسجد
-                  </button>
-                </div>
-              )}
+              {/* Two independent toggle buttons */}
+              <div className="flex gap-2">
+                <button onClick={() => togglePrayer(p.key, "onTime")}
+                  className="flex-1 py-2.5 rounded-lg text-[11px] font-bold transition-all"
+                  style={{
+                    background: cur.onTime ? "#3D8C5A" : (cur.expired && !cur.onTime) ? "#FEF2F2" : "#F3F4F6",
+                    color: cur.onTime ? "white" : (cur.expired && !cur.onTime) ? "#DC2626" : "#6B7280",
+                    border: `1.5px solid ${cur.onTime ? "#3D8C5A" : (cur.expired && !cur.onTime) ? "#DC2626" : "#E5E7EB"}`,
+                  }}>
+                  {cur.onTime ? "✅ في الوقت" : (cur.expired && !cur.onTime) ? "🔴 فاتت" : "⏰ في الوقت"}
+                </button>
+                <button onClick={() => togglePrayer(p.key, "inMosque")}
+                  className="flex-1 py-2.5 rounded-lg text-[11px] font-bold transition-all"
+                  style={{
+                    background: cur.inMosque ? "#2C2C54" : (cur.expired && !cur.inMosque) ? "#FEF2F2" : "#F3F4F6",
+                    color: cur.inMosque ? "white" : (cur.expired && !cur.inMosque) ? "#DC2626" : "#6B7280",
+                    border: `1.5px solid ${cur.inMosque ? "#2C2C54" : (cur.expired && !cur.inMosque) ? "#DC2626" : "#E5E7EB"}`,
+                  }}>
+                  {cur.inMosque ? "🕌 في المسجد" : (cur.expired && !cur.inMosque) ? "🔴 لم تُصلَّ" : "🕌 في المسجد"}
+                </button>
+              </div>
 
-              {/* Done label */}
-              {isDone && (
-                <p className="text-center text-xs font-semibold" style={{ color: "#3D8C5A" }}>
-                  {isMosque ? "🕌 صليتها في المسجد" : "✅ صليتها في وقتها"}
+              {/* Status label */}
+              {bothDone && (
+                <p className="text-center text-[10px] font-semibold mt-2" style={{ color: "#3D8C5A" }}>
+                  بارك الله فيك — أتممت الصلاة كاملة
                 </p>
-              )}
-
-              {/* Missed */}
-              {isMissed && (
-                <div className="space-y-1.5">
-                  <p className="text-center text-xs font-semibold text-red-600">فاتت — أضيفت عقوبة</p>
-                  <button onClick={() => markPrayer(p.key, "OnTime")}
-                    className="w-full py-1.5 rounded-lg text-[10px] font-semibold text-[#3D8C5A] bg-green-50 border border-green-200 hover:bg-green-100 transition">
-                    صليتها متأخرة
-                  </button>
-                </div>
               )}
             </div>
           );
@@ -353,29 +356,41 @@ function PrayerSection() {
       {/* ═══ Penalties ═══ */}
       {penalties.length > 0 && (
         <div className="mt-4">
-          <GeometricDivider label={`العقوبات المتراكمة (${penalties.length})`} />
-          <div className="mt-3 space-y-2">
-            {penalties.map(pen => (
-              <div key={pen.id}
-                className="flex items-center gap-3 bg-red-50 rounded-xl px-4 py-3 border border-red-200">
-                <span className="text-xl">⚠️</span>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-red-800">
-                    {prayerLabel(pen.prayer)} — {penaltyLabel(pen.penaltyType)}
-                  </p>
-                  <p className="text-[10px] text-red-500">{pen.date}</p>
+          <button onClick={() => setShowPenalties(!showPenalties)}
+            className="w-full flex items-center justify-between bg-red-50 rounded-xl px-4 py-3 border border-red-200 transition hover:bg-red-100">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">⚠️</span>
+              <span className="text-sm font-bold text-red-800">العقوبات المتراكمة</span>
+            </div>
+            <span className="min-w-[24px] h-6 flex items-center justify-center rounded-full text-[11px] font-bold px-2 bg-red-600 text-white">
+              {penalties.length}
+            </span>
+          </button>
+          {showPenalties && (
+            <div className="mt-2 space-y-2">
+              {penalties.map(pen => (
+                <div key={pen.id}
+                  className="flex items-center gap-3 bg-white rounded-xl px-4 py-3 border border-red-100">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-[#16213E]">
+                      {prayerLabel(pen.prayer)}
+                    </p>
+                    <p className="text-[10px] text-red-500">
+                      {reasonLabel(pen.reason)} — {penaltyLabel(pen.penaltyType)} — {pen.date}
+                    </p>
+                  </div>
+                  <button onClick={() => fulfillPenalty(pen.id)}
+                    className="px-3 py-1.5 rounded-lg text-[10px] font-bold text-white bg-[#3D8C5A] hover:opacity-80 transition whitespace-nowrap">
+                    أديتها ✓
+                  </button>
                 </div>
-                <button onClick={() => fulfillPenalty(pen.id)}
-                  className="px-3 py-1.5 rounded-lg text-[10px] font-bold text-white bg-[#3D8C5A] hover:opacity-80 transition">
-                  أديت العقوبة ✓
-                </button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* ═══ Stats Toggle ═══ */}
+      {/* ═══ Stats & Settings buttons ═══ */}
       <div className="flex gap-2 mt-4">
         <button onClick={() => { setShowStats(!showStats); if (!showStats) loadStats(); }}
           className="px-3 py-1.5 rounded-lg text-xs font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
@@ -424,19 +439,37 @@ function PrayerSection() {
             </div>
           </div>
           {PRAYERS.map(p => (
-            <div key={p.key} className="flex items-center gap-3">
-              <span className="text-sm w-16 text-right font-medium text-[#16213E]">{p.icon} {p.label}</span>
-              <div className="flex gap-1 flex-1 flex-wrap">
-                {PENALTY_TYPES.map(t => (
-                  <button key={t.key} onClick={() => setPenaltyConfig(prev => ({ ...prev, [p.key]: t.key }))}
-                    className="px-2 py-1 rounded-lg text-[10px] font-medium transition"
-                    style={{
-                      background: (penaltyConfig[p.key] ?? "surah") === t.key ? "#2C2C54" : "#F3F4F6",
-                      color: (penaltyConfig[p.key] ?? "surah") === t.key ? "#fff" : "#6B7280",
-                    }}>
-                    {t.label}
-                  </button>
-                ))}
+            <div key={p.key} className="space-y-1.5">
+              <p className="text-xs font-bold text-[#16213E]">{p.icon} {p.label}</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-[#6B7280] w-14">⏰ الوقت:</span>
+                <div className="flex gap-1 flex-1 flex-wrap">
+                  {PENALTY_TYPES.map(t => (
+                    <button key={t.key} onClick={() => setPenaltyConfig(prev => ({ ...prev, [`${p.key}_time`]: t.key }))}
+                      className="px-2 py-0.5 rounded-lg text-[9px] font-medium transition"
+                      style={{
+                        background: (penaltyConfig[`${p.key}_time`] ?? "surah") === t.key ? "#2C2C54" : "#F3F4F6",
+                        color: (penaltyConfig[`${p.key}_time`] ?? "surah") === t.key ? "#fff" : "#6B7280",
+                      }}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-[#6B7280] w-14">🕌 المسجد:</span>
+                <div className="flex gap-1 flex-1 flex-wrap">
+                  {PENALTY_TYPES.map(t => (
+                    <button key={t.key} onClick={() => setPenaltyConfig(prev => ({ ...prev, [`${p.key}_mosque`]: t.key }))}
+                      className="px-2 py-0.5 rounded-lg text-[9px] font-medium transition"
+                      style={{
+                        background: (penaltyConfig[`${p.key}_mosque`] ?? "surah") === t.key ? "#2C2C54" : "#F3F4F6",
+                        color: (penaltyConfig[`${p.key}_mosque`] ?? "surah") === t.key ? "#fff" : "#6B7280",
+                      }}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           ))}

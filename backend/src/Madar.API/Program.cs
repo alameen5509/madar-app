@@ -185,7 +185,8 @@ using (var scope = app.Services.CreateScope())
                 OwnerId CHAR(36) NOT NULL,
                 Date DATE NOT NULL,
                 Prayer VARCHAR(20) NOT NULL,
-                Status VARCHAR(20) NOT NULL DEFAULT 'None',
+                PrayedOnTime TINYINT(1) NOT NULL DEFAULT 0,
+                PrayedInMosque TINYINT(1) NOT NULL DEFAULT 0,
                 CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
                 UNIQUE INDEX IX_PrayerLogs_OwnerId_Date_Prayer (OwnerId, Date, Prayer)
             );
@@ -194,6 +195,7 @@ using (var scope = app.Services.CreateScope())
                 OwnerId CHAR(36) NOT NULL,
                 Date DATE NOT NULL,
                 Prayer VARCHAR(20) NOT NULL,
+                Reason VARCHAR(30) NOT NULL DEFAULT 'not_on_time',
                 PenaltyType VARCHAR(50) NOT NULL DEFAULT 'surah',
                 PenaltyDetail VARCHAR(200) NULL,
                 Fulfilled TINYINT(1) NOT NULL DEFAULT 0,
