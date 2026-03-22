@@ -828,10 +828,16 @@ export default function FinancePage() {
     setPockets(((d.pockets ?? []).length > 0 ? d.pockets! : DEF_POCKETS).map(p => ({
       ...p, type: (pocketTypeMap[p.type] ?? p.type) as Pocket["type"], commitments: p.commitments ?? [],
     })));
-    setTxs((d.transactions ?? []).map(t => ({
-      ...t, type: (typeMap[t.type] ?? t.type) as Transaction["type"],
-      expenseClass: t.expenseClass ? (expClsMap[t.expenseClass] ?? t.expenseClass) as ExpenseClass : undefined,
-    })));
+    setTxs((d.transactions ?? []).map(t => {
+      let type = (typeMap[t.type] ?? t.type) as Transaction["type"];
+      // إصلاح: معاملات سداد الديون المحفوظة خطأ كـ income
+      if (type === "income" && (t.title?.includes("سداد دين") || t.category === "ديون")) {
+        type = "debt_payment";
+      }
+      return { ...t, type, expenseClass: t.expenseClass ? (expClsMap[t.expenseClass] ?? t.expenseClass) as ExpenseClass : undefined };
+    }));
+    // إصلاح الأنواع الخاطئة في الباك إند
+    api.post("/api/finance/fix-debt-types").catch(() => {});
     setDebts(d.debts ?? []);
     setDues((d.dues ?? []).map(du => ({
       ...du, type: (dueTypeMap[du.type] ?? du.type) as RecurringDue["type"],
