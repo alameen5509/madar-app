@@ -368,32 +368,49 @@ function PrayerSection() {
         );
       })()}
 
-      {/* ═══ Penalties — always visible ═══ */}
-      {penalties.length > 0 && (
-        <div className="mt-4 space-y-2">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-lg">⚠️</span>
-            <span className="text-sm font-bold text-red-800">عقوبات عليك ({penalties.length})</span>
-          </div>
-          {penalties.map(pen => (
-            <div key={pen.id}
-              className="flex items-center gap-3 bg-red-50 rounded-xl px-4 py-3.5 border border-red-200 transition-all">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-[#16213E]">
-                  {prayerLabel(pen.prayer)} — {penaltyLabel(pen.penaltyType)}
-                </p>
-                <p className="text-[10px] text-red-500 mt-0.5">
-                  {reasonLabel(pen.reason)} — {pen.date}
-                </p>
-              </div>
-              <button onClick={() => fulfillPenalty(pen.id)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#3D8C5A] hover:bg-[#2d7049] transition whitespace-nowrap shadow-sm">
-                أنجزتها ✓
-              </button>
+      {/* ═══ Penalties — show one at a time like prayer cards ═══ */}
+      {penalties.length > 0 && (() => {
+        const pen = penalties[0]; // show first penalty only
+        const pIcon = PRAYERS.find(pr => pr.key === pen.prayer)?.icon ?? "🕌";
+        return (
+          <div className="mt-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">⚠️</span>
+              <span className="text-sm font-bold text-red-800">
+                عقوبة عليك {penalties.length > 1 ? `(${penalties.length} متبقية)` : ""}
+              </span>
             </div>
-          ))}
-        </div>
-      )}
+            <div className="bg-white rounded-xl p-5 border-2 border-red-300 shadow-sm transition-all">
+              {/* Prayer info */}
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-3xl">{pIcon}</span>
+                <div>
+                  <p className="text-base font-bold text-[#16213E]">{prayerLabel(pen.prayer)}</p>
+                  <p className="text-xs text-red-500">{reasonLabel(pen.reason)} — {pen.date}</p>
+                </div>
+              </div>
+
+              {/* Choose one of 3 penalties */}
+              <p className="text-xs text-[#6B7280] font-semibold mb-2">اختر عقوبتك وأدِّها:</p>
+              <div className="grid grid-cols-3 gap-2">
+                {PENALTY_TYPES.map(t => (
+                  <button key={t.key} onClick={() => fulfillPenalty(pen.id)}
+                    className="py-3.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 border-2"
+                    style={{
+                      background: "linear-gradient(135deg, #2C2C54, #5E5495)",
+                      color: "white",
+                      borderColor: "#2C2C54",
+                    }}>
+                    {t.key === "quran" ? "📖" : t.key === "nafila" ? "🕌" : "📿"}
+                    <br />
+                    <span className="text-[10px] font-medium opacity-90">{t.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ═══ Stats & Settings buttons ═══ */}
       <div className="flex gap-2 mt-4">
