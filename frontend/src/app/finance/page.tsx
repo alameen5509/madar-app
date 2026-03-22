@@ -1226,7 +1226,7 @@ export default function FinancePage() {
             const debtTarget = Math.round(income * settings.debtPercent / 100);
             const savTarget = Math.round(income * settings.savingsPercent / 100);
 
-            // نصائح الديون — تعتمد على paidSoFar الفعلي
+            // نصائح الديون — مصدر واحد: سجلات الديون (paidSoFar)
             if (hasDebts && debts.length > 0) {
               tips.push({ text: `الديون: ${totalDebtOriginal.toLocaleString()} — سددت ${totalPaidSoFar.toLocaleString()} (${paidPct}%) — متبقي ${totalDebtRemaining.toLocaleString()}`, icon: "💳", color: "#0F3460", bg: "#EFF6FF" });
               // أصغر دين متبقي (كرة الثلج)
@@ -1237,13 +1237,14 @@ export default function FinancePage() {
               }
             }
             if (hasDebts && income > 0 && debtTarget > 0) {
-              const monthPaid = debtPaid; // من معاملات debt_payment + installment هذا الشهر
+              // استخدام الأعلى بين المصدرين لتجنب التناقض
+              const monthPaid = Math.max(debtPaid, totalPaidSoFar);
               const remaining = Math.max(0, debtTarget - monthPaid);
               const pctDone = Math.min(100, Math.round(monthPaid / debtTarget * 100));
               if (monthPaid >= debtTarget) {
-                tips.push({ text: `أحسنت! سددت ${monthPaid.toLocaleString()} من حصة ${debtTarget.toLocaleString()} هذا الشهر ✅`, icon: "✅", color: "#3D8C5A", bg: "#F0FDF4" });
+                tips.push({ text: `أحسنت! سددت ${monthPaid.toLocaleString()} من حصة ${debtTarget.toLocaleString()} ✅`, icon: "✅", color: "#3D8C5A", bg: "#F0FDF4" });
               } else {
-                tips.push({ text: `حصة الديون الشهرية: سددت ${monthPaid.toLocaleString()} من ${debtTarget.toLocaleString()} (${pctDone}%) — متبقي ${remaining.toLocaleString()}`, icon: "📊", color: monthPaid > 0 ? "#D4AF37" : "#DC2626", bg: monthPaid > 0 ? "#FFFBEB" : "#FEF2F2" });
+                tips.push({ text: `حصة الديون: سددت ${monthPaid.toLocaleString()} من ${debtTarget.toLocaleString()} (${pctDone}%) — متبقي ${remaining.toLocaleString()}`, icon: "📊", color: monthPaid > 0 ? "#D4AF37" : "#DC2626", bg: monthPaid > 0 ? "#FFFBEB" : "#FEF2F2" });
               }
             }
             if (!hasDebts && debts.length > 0) {
