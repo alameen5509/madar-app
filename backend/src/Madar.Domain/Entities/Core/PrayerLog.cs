@@ -23,7 +23,7 @@ public class PrayerPenalty
     public string Prayer { get; set; } = default!;
     /// <summary>not_on_time, not_in_mosque</summary>
     public string Reason { get; set; } = "not_on_time";
-    public string PenaltyType { get; set; } = "surah";
+    public string PenaltyType { get; set; } = "quran";
     public string? PenaltyDetail { get; set; }
     public bool Fulfilled { get; set; }
     public DateTime? FulfilledAt { get; set; }

@@ -61,11 +61,9 @@ interface PrayerStats {
 }
 
 const PENALTY_TYPES = [
-  { key: "surah",   label: "قراءة سورة" },
-  { key: "rakaat",  label: "ركعتين نافلة" },
-  { key: "dhikr",   label: "ذكر ١٠٠ مرة" },
-  { key: "sadaqa",  label: "صدقة" },
-  { key: "custom",  label: "مخصص" },
+  { key: "quran",   label: "ورد من القرآن" },
+  { key: "nafila",  label: "صلاة نافلة" },
+  { key: "istighfar", label: "استغفار ١٠٠ مرة" },
 ];
 
 function toMin(hhmm: string): number {
@@ -120,7 +118,6 @@ function PrayerSection() {
   const [penaltyConfig, setPenaltyConfig] = useState<Record<string, string>>({});
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [showStats, setShowStats] = useState(false);
-  const [showPenalties, setShowPenalties] = useState(true);
 
   // Load salah times
   useEffect(() => {
@@ -353,40 +350,30 @@ function PrayerSection() {
         })}
       </div>
 
-      {/* ═══ Penalties ═══ */}
+      {/* ═══ Penalties — always visible ═══ */}
       {penalties.length > 0 && (
-        <div className="mt-4">
-          <button onClick={() => setShowPenalties(!showPenalties)}
-            className="w-full flex items-center justify-between bg-red-50 rounded-xl px-4 py-3 border border-red-200 transition hover:bg-red-100">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">⚠️</span>
-              <span className="text-sm font-bold text-red-800">العقوبات المتراكمة</span>
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-lg">⚠️</span>
+            <span className="text-sm font-bold text-red-800">عقوبات عليك ({penalties.length})</span>
+          </div>
+          {penalties.map(pen => (
+            <div key={pen.id}
+              className="flex items-center gap-3 bg-red-50 rounded-xl px-4 py-3.5 border border-red-200 transition-all">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-[#16213E]">
+                  {prayerLabel(pen.prayer)} — {penaltyLabel(pen.penaltyType)}
+                </p>
+                <p className="text-[10px] text-red-500 mt-0.5">
+                  {reasonLabel(pen.reason)} — {pen.date}
+                </p>
+              </div>
+              <button onClick={() => fulfillPenalty(pen.id)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#3D8C5A] hover:bg-[#2d7049] transition whitespace-nowrap shadow-sm">
+                أنجزتها ✓
+              </button>
             </div>
-            <span className="min-w-[24px] h-6 flex items-center justify-center rounded-full text-[11px] font-bold px-2 bg-red-600 text-white">
-              {penalties.length}
-            </span>
-          </button>
-          {showPenalties && (
-            <div className="mt-2 space-y-2">
-              {penalties.map(pen => (
-                <div key={pen.id}
-                  className="flex items-center gap-3 bg-white rounded-xl px-4 py-3 border border-red-100">
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-[#16213E]">
-                      {prayerLabel(pen.prayer)}
-                    </p>
-                    <p className="text-[10px] text-red-500">
-                      {reasonLabel(pen.reason)} — {penaltyLabel(pen.penaltyType)} — {pen.date}
-                    </p>
-                  </div>
-                  <button onClick={() => fulfillPenalty(pen.id)}
-                    className="px-3 py-1.5 rounded-lg text-[10px] font-bold text-white bg-[#3D8C5A] hover:opacity-80 transition whitespace-nowrap">
-                    أديتها ✓
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          ))}
         </div>
       )}
 
@@ -448,8 +435,8 @@ function PrayerSection() {
                     <button key={t.key} onClick={() => setPenaltyConfig(prev => ({ ...prev, [`${p.key}_time`]: t.key }))}
                       className="px-2 py-0.5 rounded-lg text-[9px] font-medium transition"
                       style={{
-                        background: (penaltyConfig[`${p.key}_time`] ?? "surah") === t.key ? "#2C2C54" : "#F3F4F6",
-                        color: (penaltyConfig[`${p.key}_time`] ?? "surah") === t.key ? "#fff" : "#6B7280",
+                        background: (penaltyConfig[`${p.key}_time`] ?? "quran") === t.key ? "#2C2C54" : "#F3F4F6",
+                        color: (penaltyConfig[`${p.key}_time`] ?? "quran") === t.key ? "#fff" : "#6B7280",
                       }}>
                       {t.label}
                     </button>
@@ -463,8 +450,8 @@ function PrayerSection() {
                     <button key={t.key} onClick={() => setPenaltyConfig(prev => ({ ...prev, [`${p.key}_mosque`]: t.key }))}
                       className="px-2 py-0.5 rounded-lg text-[9px] font-medium transition"
                       style={{
-                        background: (penaltyConfig[`${p.key}_mosque`] ?? "surah") === t.key ? "#2C2C54" : "#F3F4F6",
-                        color: (penaltyConfig[`${p.key}_mosque`] ?? "surah") === t.key ? "#fff" : "#6B7280",
+                        background: (penaltyConfig[`${p.key}_mosque`] ?? "quran") === t.key ? "#2C2C54" : "#F3F4F6",
+                        color: (penaltyConfig[`${p.key}_mosque`] ?? "quran") === t.key ? "#fff" : "#6B7280",
                       }}>
                       {t.label}
                     </button>

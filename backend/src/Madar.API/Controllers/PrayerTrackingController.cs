@@ -105,7 +105,7 @@ public class PrayerTrackingController : BaseController
         {
             var key = $"{prayer}_{field}";
             if (config != null && config.TryGetValue(key, out var pt)) return pt;
-            return "surah"; // default
+            return "quran"; // default
         }
 
         bool prayedOnTime = log?.PrayedOnTime ?? false;
