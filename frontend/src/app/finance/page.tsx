@@ -60,7 +60,7 @@ interface Debt {
   createdAt: string;
 }
 
-/** مستحقات مستقبلية (رواتب، فواتير، أقساط) */
+/** التزامات مالية (رواتب، فواتير، أقساط) */
 interface RecurringDue {
   id: string;
   title: string;
@@ -183,7 +183,7 @@ const DEF_ACCOUNTS: Account[] = [
   { id: "a2", name: "نقد", icon: "💰", balance: 0 },
 ];
 const DEF_POCKETS: Pocket[] = [
-  { id: "p1", name: "المصاريف الشخصية", icon: "👤", type: "personal", balance: 0, commitments: [] },
+  { id: "p1", name: "المحفظة الأساسية", icon: "👤", type: "personal", balance: 0, commitments: [] },
   { id: "p2", name: "محفظة الديون", icon: "💳", type: "debt", balance: 0, commitments: [] },
   { id: "p3", name: "محفظة الادخار", icon: "💎", type: "savings", balance: 0, commitments: [] },
 ];
@@ -394,7 +394,7 @@ function Stat({ label, value, color, sub }: { label: string; value: number; colo
   );
 }
 
-/* ═══ Dues Section (مستحقات مالية) ════════════════════════════════════════ */
+/* ═══ Dues Section (التزامات مالية) ════════════════════════════════════════ */
 
 function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onConfirm }: {
   dues: RecurringDue[]; accounts: Account[]; pockets: Pocket[];
@@ -451,7 +451,7 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
       {/* Due Now - needs action */}
       {activeDues.filter(isDueNow).length > 0 && (
         <>
-          <GeometricDivider label="مستحقات الآن — تحتاج تأكيد" />
+          <GeometricDivider label="التزامات الآن — تحتاج تأكيد" />
           <div className="space-y-2">
             {activeDues.filter(isDueNow).map((d) => {
               const meta = DUE_TYPES.find((t) => t.key === d.type);
@@ -504,7 +504,7 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
       {/* Expense dues */}
       <GeometricDivider label="المصاريف الثابتة" />
       <div className="flex items-center justify-between">
-        <p className="text-[10px] text-[#6B7280]">فواتير وأقساط ومستحقات</p>
+        <p className="text-[10px] text-[#6B7280]">فواتير وأقساط والتزامات</p>
         <button onClick={() => { setDType("bill"); setShowAdd(true); }} className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style={{ background: "#DC2626" }}>+ فاتورة / قسط</button>
       </div>
       {expenseDues.length === 0 && <p className="text-center text-[#9CA3AF] text-xs py-4">لا توجد مصاريف ثابتة</p>}
@@ -528,7 +528,7 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
       {showAdd && (
         <div className="bg-white rounded-xl p-5 border border-gray-200 fade-up space-y-3">
           <div className="flex items-center justify-between">
-            <p className="font-bold text-sm text-[#16213E]">إضافة مستحق جديد</p>
+            <p className="font-bold text-sm text-[#16213E]">إضافة التزام جديد</p>
             <div className="flex items-center gap-2">
               <button onClick={() => setShowAdd(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6B7280] bg-gray-100">إلغاء</button>
               <button onClick={addDue} className="px-4 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: "#2C2C54" }}>إضافة</button>
@@ -782,7 +782,7 @@ export default function FinancePage() {
     setFinGoals((d.goals ?? []).map(g => ({ ...g, items: g.items ?? [] })));
     setZakatData(d.zakat ?? { hawalDate: "", goldGrams: 0, goldPurchases: [] });
     const cats = (d.settings ?? {}) as Partial<FinSettings>;
-    // جلب الاستقطاعات والمستحقات من preferences
+    // جلب الاستقطاعات والالتزامات من preferences
     api.get("/api/users/me/preferences").then(({ data: prefs }) => {
       setSettings({
         debtPercent: cats.debtPercent ?? 10,
@@ -842,7 +842,7 @@ export default function FinancePage() {
     setSettings(v);
     // حفظ البنود والنسب في finance/settings
     api.put("/api/finance/settings", { debtPercent: v.debtPercent, savingsPercent: v.savingsPercent, expenseCategories: v.expenseCategories, incomeCategories: v.incomeCategories }).catch(() => {});
-    // حفظ الاستقطاعات والمستحقات في preferences
+    // حفظ الاستقطاعات والالتزامات في preferences
     api.put("/api/users/me/preferences", {
       ...JSON.parse(localStorage.getItem("madar_settings") ?? "{}"),
       deductions: v.deductions, receivables: v.receivables,
@@ -871,17 +871,19 @@ export default function FinancePage() {
   }
   function sFinGoals(v: FinGoal[]) { setFinGoals(v); }
 
-  /** تأكيد استلام/دفع مستحق */
+  /** تأكيد استلام/دفع التزام — يخصم من المحفظة الأساسية */
   async function confirmDue(due: RecurringDue) {
     const isIncome = due.type === "salary" || due.type === "expected_income";
     const aid = due.accountId || accounts[0]?.id || null;
-    const pid = due.pocketId || pockets[0]?.id || null;
+    // المحفظة الأساسية (personal) للخصم التلقائي
+    const mainPocket = pockets.find(p => p.type === "personal");
+    const pid = mainPocket?.id || pockets[0]?.id || null;
     const safeAid = aid && String(aid).length > 10 ? aid : null;
     const safePid = pid && String(pid).length > 10 ? pid : null;
     try {
       const { data: newTx } = await api.post("/api/finance/transactions", {
         title: due.title, amount: due.amount, type: isIncome ? "Income" : "Expense",
-        category: due.category ?? (isIncome ? "راتب" : "فواتير"), accountId: safeAid, pocketId: safePid,
+        category: due.category ?? (isIncome ? "راتب" : "التزامات"), accountId: safeAid, pocketId: safePid,
         date: new Date().toISOString().slice(0, 10),
       });
       setTxs(prev => [newTx, ...prev]);
@@ -1027,7 +1029,7 @@ export default function FinancePage() {
   ] as const;
   const MORE_TABS = [
     { key: "accounts",     label: "حسابات" },
-    { key: "dues",         label: "مستحقات" },
+    { key: "dues",         label: "التزامات" },
     { key: "debts",        label: "ديون" },
     { key: "goals",        label: "أهداف" },
     { key: "deductions",   label: "استقطاعات" },
@@ -1133,7 +1135,7 @@ export default function FinancePage() {
           {/* Upcoming dues */}
           {upcomingDues.length > 0 && (
             <div className="bg-amber-50 rounded-xl p-4 border border-amber-200 space-y-2">
-              <p className="text-amber-800 text-sm font-semibold">مستحقات تنتظر التأكيد ({upcomingDues.length})</p>
+              <p className="text-amber-800 text-sm font-semibold">التزامات تنتظر التأكيد ({upcomingDues.length})</p>
               {upcomingDues.slice(0, 3).map((d) => {
                 const isIncome = d.type === "salary" || d.type === "expected_income";
                 return (
@@ -1320,10 +1322,10 @@ export default function FinancePage() {
                     {(p.type === "debt" || p.type === "installment" || p.type === "savings") && (
                       <div className="border-t border-gray-100 px-5 py-3 bg-gray-50/50">
                         <div className="flex items-center justify-between mb-2">
-                          <p className="text-[11px] font-semibold text-[#16213E]">المستحقات</p>
+                          <p className="text-[11px] font-semibold text-[#16213E]">الالتزامات</p>
                           <button onClick={() => setShowAddCommit(p.id)} className="text-[10px] text-[#2C2C54] hover:underline">+ إضافة</button>
                         </div>
-                        {p.commitments.length === 0 && <p className="text-[10px] text-[#9CA3AF]">لا توجد مستحقات</p>}
+                        {p.commitments.length === 0 && <p className="text-[10px] text-[#9CA3AF]">لا توجد التزامات</p>}
                         {p.commitments.map((c) => {
                           const rem = (c.totalAmount ?? 0) - c.paidSoFar;
                           const pct = c.totalAmount ? Math.round(c.paidSoFar / c.totalAmount * 100) : 0;
@@ -1395,7 +1397,7 @@ export default function FinancePage() {
           </section>
         )}
 
-        {/* ═══ Dues (مستحقات) ═══ */}
+        {/* ═══ Dues (التزامات) ═══ */}
         {tab === "dues" && (
           <DuesSection dues={dues} accounts={accounts} pockets={pockets}
             expCats={settings.expenseCategories ?? DEF_EXP_CATS}
