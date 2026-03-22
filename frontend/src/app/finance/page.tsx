@@ -888,28 +888,33 @@ export default function FinancePage() {
   function applyTxEffect(_t: Transaction, _reverse = false) { }
 
   async function addTx() {
-    if (!fTitle.trim() || !fAmount) return;
+    if (!fAmount) return;
     let amt = 0;
     try { amt = Function('"use strict"; return (' + fAmount + ')')(); } catch { amt = Number(fAmount); }
     if (!amt || !isFinite(amt)) return;
     amt = Math.round(amt * 100) / 100;
 
+    // بناء العنوان: الوصف + البند + القسم الفرعي
+    const subLabel = EXPENSE_SUBS.find(s => s.key === fType)?.label;
+    const mainLabel = TX_TYPES.find(t => t.key === fType)?.label ?? subLabel ?? "";
+    const titleParts = [fTitle.trim(), fCat !== "أخرى" ? fCat : "", subLabel && subLabel !== "مصروف عام" ? subLabel : ""].filter(Boolean);
+    const fullTitle = titleParts.length > 0 ? titleParts.join(" · ") : mainLabel;
+
     const aid = fAcct || accounts[0]?.id || null;
     const pid = fPocket || pockets[0]?.id || null;
 
-    // تحويل IDs الفارغة لـ null (الباكند يتوقع GUID أو null)
     const safeAid = aid && aid.length > 10 ? aid : null;
     const safePid = pid && pid.length > 10 ? pid : null;
     try {
       const { data: newTx } = await api.post("/api/finance/transactions", {
-        title: fTitle.trim(), amount: amt, type: fType, category: fCat,
+        title: fullTitle, amount: amt, type: fType, category: fCat,
         expenseClass: fType === "expense" ? fExpCls : null,
         accountId: safeAid, pocketId: safePid, date: fDate,
       });
       const mapped = { ...newTx, type: fType, expenseClass: fType === "expense" ? fExpCls : undefined };
       setTxs(prev => [mapped, ...prev]);
     } catch {
-      setTxs(prev => [{ id: Date.now().toString(), title: fTitle.trim(), amount: amt, type: fType, category: fCat, expenseClass: fType === "expense" ? fExpCls : undefined, accountId: safeAid ?? "", pocketId: safePid ?? "", date: fDate }, ...prev]);
+      setTxs(prev => [{ id: Date.now().toString(), title: fullTitle, amount: amt, type: fType, category: fCat, expenseClass: fType === "expense" ? fExpCls : undefined, accountId: safeAid ?? "", pocketId: safePid ?? "", date: fDate }, ...prev]);
     }
     setFTitle(""); setFAmount(""); setShowAdd(false);
   }
