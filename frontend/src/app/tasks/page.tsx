@@ -1816,6 +1816,23 @@ export default function TasksPage() {
   const [mood, setMood]                  = useState<Mood>(null);
   const [showMoodPanel, setShowMoodPanel] = useState(false);
 
+  /* ── Tasbeeh (مسبحة) ── */
+  const [showTasbeeh, setShowTasbeeh] = useState(false);
+  const [tasbeehCount, setTasbeehCount] = useState(0);
+  const [tasbeehTarget, setTasbeehTarget] = useState(33);
+  const TASBEEH_LIST = [
+    { label: "سبحان الله", target: 33 },
+    { label: "الحمد لله", target: 33 },
+    { label: "الله أكبر", target: 34 },
+    { label: "لا إله إلا الله", target: 100 },
+    { label: "أستغفر الله", target: 100 },
+    { label: "اللهم صلِّ على محمد", target: 100 },
+    { label: "سبحان الله وبحمده", target: 100 },
+    { label: "لا حول ولا قوة إلا بالله", target: 100 },
+  ];
+  const [tasbeehIdx, setTasbeehIdx] = useState(0);
+  const currentDhikr = TASBEEH_LIST[tasbeehIdx];
+
   /* ── Focus task picker + custom durations ── */
   const [showFocusTaskPicker, setShowFocusTaskPicker] = useState(false);
   const [customDurations, setCustomDurations] = useState<Record<string, number>>(() => {
@@ -2623,6 +2640,10 @@ export default function TasksPage() {
             }}>
             {mood === "low" ? "😔" : mood === "good" ? "😊" : "🧠"}
           </button>
+          <button onClick={() => setShowTasbeeh(true)}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
+            📿 مسبحة
+          </button>
           <button onClick={() => setShowSectionEditor(!showSectionEditor)}
             className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
             ⚙
@@ -3175,6 +3196,82 @@ export default function TasksPage() {
       )}
 
       {/* ── Mood Panel ── */}
+      {/* Tasbeeh Dialog */}
+      {showTasbeeh && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-[#1A1830]/60 backdrop-blur-sm" onClick={() => setShowTasbeeh(false)} />
+          <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-sm fade-up select-none">
+            <div className="px-7 pt-7 pb-4 border-b border-[#E2D5B0] flex items-center justify-between">
+              <h2 className="font-bold text-[#1A1830]">📿 المسبحة</h2>
+              <button onClick={() => setShowTasbeeh(false)} className="w-8 h-8 rounded-full flex items-center justify-center text-[#7C7A8E] hover:bg-[#F8F6F0] transition text-sm">✕</button>
+            </div>
+            <div className="px-7 py-6 space-y-5">
+              {/* اختيار الذكر */}
+              <div className="flex flex-wrap gap-2 justify-center">
+                {TASBEEH_LIST.map((d, i) => (
+                  <button key={i} onClick={() => { setTasbeehIdx(i); setTasbeehCount(0); setTasbeehTarget(d.target); }}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all border"
+                    style={{
+                      background: tasbeehIdx === i ? "linear-gradient(135deg, #2C2C54, #D4AF37)" : "#F8F6F0",
+                      color: tasbeehIdx === i ? "white" : "#5E5495",
+                      borderColor: tasbeehIdx === i ? "#D4AF37" : "#E2D5B0",
+                    }}>
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* العداد */}
+              <div className="text-center space-y-2">
+                <p className="text-[#5E5495] text-lg font-bold">{currentDhikr.label}</p>
+                <button
+                  onClick={() => {
+                    if (tasbeehCount < tasbeehTarget) {
+                      setTasbeehCount(tasbeehCount + 1);
+                      if (navigator.vibrate) navigator.vibrate(30);
+                    }
+                  }}
+                  className="w-40 h-40 mx-auto rounded-full flex items-center justify-center transition-all active:scale-95"
+                  style={{
+                    background: tasbeehCount >= tasbeehTarget
+                      ? "linear-gradient(135deg, #10B981, #3D8C5A)"
+                      : "linear-gradient(135deg, #2C2C54, #5E5495)",
+                    boxShadow: "0 8px 32px rgba(44,44,84,0.3)",
+                  }}>
+                  <span className="text-white text-5xl font-bold">{tasbeehCount}</span>
+                </button>
+                <p className="text-[#7C7A8E] text-sm">
+                  {tasbeehCount >= tasbeehTarget ? "✓ تم بحمد الله" : `الهدف: ${tasbeehTarget}`}
+                </p>
+                {/* شريط التقدم */}
+                <div className="w-full h-2 rounded-full bg-[#F0EDE4] overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-200"
+                    style={{
+                      width: `${Math.min((tasbeehCount / tasbeehTarget) * 100, 100)}%`,
+                      background: tasbeehCount >= tasbeehTarget ? "#10B981" : "linear-gradient(90deg, #D4AF37, #5E5495)",
+                    }} />
+                </div>
+              </div>
+
+              {/* أزرار التحكم */}
+              <div className="flex gap-3 justify-center">
+                <button onClick={() => setTasbeehCount(0)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-[#7C7A8E] bg-[#F8F6F0] border border-[#E2D5B0] hover:bg-[#F0EDE4] transition">
+                  إعادة العد
+                </button>
+                {tasbeehCount >= tasbeehTarget && tasbeehIdx < TASBEEH_LIST.length - 1 && (
+                  <button onClick={() => { setTasbeehIdx(tasbeehIdx + 1); setTasbeehCount(0); setTasbeehTarget(TASBEEH_LIST[tasbeehIdx + 1].target); }}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-white transition hover:opacity-90"
+                    style={{ background: "linear-gradient(135deg, #D4AF37, #5E5495)" }}>
+                    التالي: {TASBEEH_LIST[tasbeehIdx + 1].label} ←
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showMoodPanel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-[#1A1830]/60 backdrop-blur-sm" onClick={() => setShowMoodPanel(false)} />
