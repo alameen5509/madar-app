@@ -43,6 +43,12 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
     public DbSet<GoldPurchase> GoldPurchases => Set<GoldPurchase>();
     public DbSet<FinSettings> FinSettings => Set<FinSettings>();
 
+    // Job dimensions & goals
+    public DbSet<JobDimension> JobDimensions => Set<JobDimension>();
+    public DbSet<JobGoal> JobGoals => Set<JobGoal>();
+    public DbSet<JobGoalProject> JobGoalProjects => Set<JobGoalProject>();
+    public DbSet<JobGoalTask> JobGoalTasks => Set<JobGoalTask>();
+
     // Prayer tracking
     public DbSet<PrayerLog> PrayerLogs => Set<PrayerLog>();
     public DbSet<PrayerPenalty> PrayerPenalties => Set<PrayerPenalty>();
@@ -285,6 +291,43 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
             ct.Property(x => x.Notes).HasMaxLength(500);
             ct.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
             ct.HasIndex(x => new { x.OwnerId, x.Phone }).IsUnique();
+        });
+
+        // ═══ Job Dimensions & Goals ═══
+        builder.Entity<JobDimension>(jd => {
+            jd.HasKey(x => x.Id);
+            jd.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            jd.Property(x => x.Icon).HasMaxLength(10);
+            jd.Property(x => x.Color).HasMaxLength(20);
+            jd.HasOne(x => x.Job).WithMany().HasForeignKey(x => x.JobId).OnDelete(DeleteBehavior.Cascade);
+            jd.HasOne(x => x.ParentDimension).WithMany(x => x.SubDimensions).HasForeignKey(x => x.ParentDimensionId).OnDelete(DeleteBehavior.Restrict);
+            jd.HasIndex(x => x.JobId);
+        });
+
+        builder.Entity<JobGoal>(jg => {
+            jg.HasKey(x => x.Id);
+            jg.Property(x => x.Title).HasMaxLength(400).IsRequired();
+            jg.Property(x => x.Description).HasMaxLength(1000);
+            jg.Property(x => x.Status).HasMaxLength(30);
+            jg.Property(x => x.Timeframe).HasMaxLength(50);
+            jg.HasOne(x => x.Job).WithMany().HasForeignKey(x => x.JobId).OnDelete(DeleteBehavior.Cascade);
+            jg.HasOne(x => x.Dimension).WithMany(x => x.Goals).HasForeignKey(x => x.DimensionId).OnDelete(DeleteBehavior.Restrict);
+            jg.HasOne(x => x.ParentGoal).WithMany(x => x.SubGoals).HasForeignKey(x => x.ParentGoalId).OnDelete(DeleteBehavior.Restrict);
+            jg.HasIndex(x => x.DimensionId);
+        });
+
+        builder.Entity<JobGoalProject>(jp => {
+            jp.HasKey(x => x.Id);
+            jp.HasOne(x => x.Goal).WithMany(x => x.Projects).HasForeignKey(x => x.GoalId).OnDelete(DeleteBehavior.Cascade);
+            jp.HasOne(x => x.Project).WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            jp.HasIndex(x => new { x.GoalId, x.ProjectId }).IsUnique();
+        });
+
+        builder.Entity<JobGoalTask>(jt => {
+            jt.HasKey(x => x.Id);
+            jt.HasOne(x => x.Goal).WithMany(x => x.Tasks).HasForeignKey(x => x.GoalId).OnDelete(DeleteBehavior.Cascade);
+            jt.HasOne(x => x.Task).WithMany().HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.Cascade);
+            jt.HasIndex(x => new { x.GoalId, x.TaskId }).IsUnique();
         });
 
         // ═══ Prayer Tracking ═══

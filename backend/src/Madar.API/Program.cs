@@ -180,6 +180,46 @@ using (var scope = app.Services.CreateScope())
     try
     {
         await db.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS JobDimensions (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                JobId CHAR(36) NOT NULL,
+                ParentDimensionId CHAR(36) NULL,
+                Name VARCHAR(200) NOT NULL,
+                Icon VARCHAR(10) NULL,
+                Color VARCHAR(20) NULL,
+                Priority INT NOT NULL DEFAULT 0,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_JobDimensions_JobId (JobId)
+            );
+            CREATE TABLE IF NOT EXISTS JobGoals (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                JobId CHAR(36) NOT NULL,
+                DimensionId CHAR(36) NOT NULL,
+                ParentGoalId CHAR(36) NULL,
+                Title VARCHAR(400) NOT NULL,
+                Description VARCHAR(1000) NULL,
+                DueDate DATETIME(6) NULL,
+                Progress INT NOT NULL DEFAULT 0,
+                Status VARCHAR(30) NOT NULL DEFAULT 'Active',
+                Priority INT NOT NULL DEFAULT 0,
+                Timeframe VARCHAR(50) NULL,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_JobGoals_DimensionId (DimensionId)
+            );
+            CREATE TABLE IF NOT EXISTS JobGoalProjects (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                GoalId CHAR(36) NOT NULL,
+                ProjectId CHAR(36) NOT NULL,
+                UNIQUE INDEX IX_JobGoalProjects_GoalId_ProjectId (GoalId, ProjectId)
+            );
+            CREATE TABLE IF NOT EXISTS JobGoalTasks (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                GoalId CHAR(36) NOT NULL,
+                TaskId CHAR(36) NOT NULL,
+                UNIQUE INDEX IX_JobGoalTasks_GoalId_TaskId (GoalId, TaskId)
+            );");
+
+        await db.Database.ExecuteSqlRawAsync(@"
             CREATE TABLE IF NOT EXISTS PrayerLogs (
                 Id CHAR(36) NOT NULL PRIMARY KEY,
                 OwnerId CHAR(36) NOT NULL,
