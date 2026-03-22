@@ -118,6 +118,7 @@ interface Receivable {
   fromWhom: string;
   dueDate?: string;
   isPaid: boolean;
+  frequency?: "once" | "monthly" | "quarterly" | "yearly";
 }
 
 interface FinSettings {
@@ -752,7 +753,7 @@ export default function FinancePage() {
   // Receivables form
   const [showAddRec, setShowAddRec] = useState(false);
   const [rrTitle, setRrTitle] = useState(""); const [rrAmount, setRrAmount] = useState("");
-  const [rrFrom, setRrFrom] = useState(""); const [rrDate, setRrDate] = useState("");
+  const [rrFrom, setRrFrom] = useState(""); const [rrDate, setRrDate] = useState(""); const [rrFreq, setRrFreq] = useState("once");
   // Gold form
   const [goldForm, setGoldForm] = useState<"buy"|"sell"|null>(null);
   const [gfGrams, setGfGrams] = useState(""); const [gfPrice, setGfPrice] = useState(""); const [gfNotes, setGfNotes] = useState("");
@@ -2009,62 +2010,108 @@ export default function FinancePage() {
           );
         })()}
 
-        {/* ═══ Receivables (مستحقات لي — غير مستلمة) ═══ */}
+        {/* ═══ Receivables (مستحقات لي) ═══ */}
         {tab === "receivables" && (() => {
           const recs = settings.receivables ?? [];
           const unpaid = recs.filter(r => !r.isPaid);
           const paid = recs.filter(r => r.isPaid);
+          const recurring = unpaid.filter(r => r.frequency && r.frequency !== "once");
+          const oneTime = unpaid.filter(r => !r.frequency || r.frequency === "once");
           const totalUnpaid = unpaid.reduce((s, r) => s + r.amount, 0);
+          const monthlyRecurring = recurring.filter(r => r.frequency === "monthly").reduce((s, r) => s + r.amount, 0);
+          const freqLabel = (f?: string) => f === "monthly" ? "شهري" : f === "quarterly" ? "ربع سنوي" : f === "yearly" ? "سنوي" : "مرة واحدة";
 
           return (
             <section className="space-y-5">
               <div className="flex items-center justify-between">
-                <div><p className="text-sm font-bold text-[#16213E]">مبالغ مستحقة لي</p><p className="text-[10px] text-[#6B7280]">أموال عند أشخاص لم تُسلّم بعد</p></div>
-                <button onClick={() => setShowAddRec(true)} className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style={{ background: "#D4AF37" }}>+ مستحق</button>
+                <div><p className="text-sm font-bold text-[#16213E]">مستحقات لي</p><p className="text-[10px] text-[#6B7280]">رواتب ومبالغ عند أشخاص وجهات</p></div>
+                <button onClick={() => setShowAddRec(true)} className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style={{ background: "#D4AF37" }}>+ مستحق جديد</button>
               </div>
 
-              <Stat label="إجمالي المستحق لك" value={totalUnpaid} color="#D4AF37" sub={`${unpaid.length} مستحق`} />
+              <div className="grid grid-cols-3 gap-3">
+                <Stat label="إجمالي المستحق" value={totalUnpaid} color="#D4AF37" sub={`${unpaid.length} مستحق`} />
+                <Stat label="دخل شهري متكرر" value={monthlyRecurring} color="#3D8C5A" sub={`${recurring.filter(r => r.frequency === "monthly").length} مصدر`} />
+                <Stat label="مقطوعة" value={oneTime.reduce((s, r) => s + r.amount, 0)} color="#2D6B9E" sub={`${oneTime.length} مبلغ`} />
+              </div>
 
+              {/* Add form */}
               {showAddRec && (
-                <div className="bg-white rounded-xl p-5 border border-[#D4AF37] shadow-sm fade-up space-y-3">
-                  <input value={rrTitle} onChange={e => setRrTitle(e.target.value)} placeholder="وصف المستحق (مثال: سلفة لأحمد)"
+                <div className="bg-white rounded-xl p-5 border-2 border-[#D4AF37] shadow-sm fade-up space-y-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-bold" style={{ color: "#D4AF37" }}>مستحق جديد</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => setShowAddRec(false)} className="px-3 py-1 rounded-lg text-[10px] text-[#6B7280] bg-gray-100">إلغاء</button>
+                      <button onClick={() => {
+                        if (!rrTitle.trim() || !rrAmount) return;
+                        const r: Receivable = { id: Date.now().toString(), title: rrTitle.trim(), amount: Number(rrAmount), fromWhom: rrFrom.trim(), dueDate: rrDate || undefined, isPaid: false, frequency: (rrFreq as Receivable["frequency"]) || "once" };
+                        sSettings({ ...settings, receivables: [r, ...recs] });
+                        setRrTitle(""); setRrAmount(""); setRrFrom(""); setRrDate(""); setShowAddRec(false);
+                      }} className="px-3 py-1 rounded-lg text-[10px] font-bold text-white" style={{ background: "#D4AF37" }}>إضافة</button>
+                    </div>
+                  </div>
+                  <input value={rrTitle} onChange={e => setRrTitle(e.target.value)} placeholder="الوصف (مثال: راتب شركة X، سلفة أحمد)" autoFocus
                     className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
                   <input type="number" value={rrAmount} onChange={e => setRrAmount(e.target.value)} placeholder="المبلغ"
                     className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
                   <input value={rrFrom} onChange={e => setRrFrom(e.target.value)} placeholder="من عند (الشخص/الجهة)"
                     className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                  <div className="flex gap-1.5">
+                    {([["once","مرة واحدة"],["monthly","شهري"],["quarterly","ربع سنوي"],["yearly","سنوي"]] as const).map(([k, l]) => (
+                      <button key={k} onClick={() => setRrFreq(k)} className="flex-1 py-2 rounded-xl text-[10px] font-semibold transition"
+                        style={{ background: rrFreq === k ? "#D4AF37" : "#F3F4F6", color: rrFreq === k ? "#fff" : "#6B7280" }}>{l}</button>
+                    ))}
+                  </div>
                   <input type="date" value={rrDate} onChange={e => setRrDate(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
-                  <div className="flex gap-2">
-                    <button onClick={() => setShowAddRec(false)} className="flex-1 py-2.5 rounded-xl text-sm text-[#6B7280] bg-gray-100">إلغاء</button>
-                    <button onClick={() => {
-                      if (!rrTitle.trim() || !rrAmount) return;
-                      const r: Receivable = { id: Date.now().toString(), title: rrTitle.trim(), amount: Number(rrAmount), fromWhom: rrFrom.trim(), dueDate: rrDate || undefined, isPaid: false };
-                      sSettings({ ...settings, receivables: [r, ...recs] });
-                      setRrTitle(""); setRrAmount(""); setRrFrom(""); setRrDate(""); setShowAddRec(false);
-                    }} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "#D4AF37" }}>إضافة</button>
-                  </div>
                 </div>
               )}
 
-              {unpaid.length === 0 && !showAddRec && <p className="text-center text-[#9CA3AF] text-xs py-6">لا توجد مبالغ مستحقة — الحمد لله</p>}
+              {/* Recurring receivables */}
+              {recurring.length > 0 && (
+                <>
+                  <GeometricDivider label={`مستحقات متكررة (${recurring.length})`} />
+                  {recurring.map(r => (
+                    <div key={r.id} className="bg-white rounded-xl px-5 py-4 border border-gray-200 flex items-center gap-3">
+                      <span className="text-lg">🔄</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-[#16213E]">{r.title}</p>
+                        <p className="text-[10px] text-[#6B7280]">من: {r.fromWhom} · {freqLabel(r.frequency)}{r.dueDate ? ` · ${new Date(r.dueDate).toLocaleDateString("ar-SA")}` : ""}</p>
+                      </div>
+                      <p className="text-sm font-black text-[#3D8C5A]">{r.amount.toLocaleString()}</p>
+                      <button onClick={async () => {
+                        try { await api.post("/api/finance/transactions", { title: `استلام: ${r.title}`, amount: r.amount, type: "Income", category: "راتب", date: new Date().toISOString().slice(0, 10) }); } catch {}
+                        setTxs(prev => [{ id: Date.now().toString(), title: `استلام: ${r.title}`, amount: r.amount, type: "income", category: "راتب", accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) }, ...prev]);
+                      }} className="text-[10px] px-3 py-1.5 rounded-lg font-bold text-white bg-[#3D8C5A]">استلمت</button>
+                      <button onClick={() => sSettings({ ...settings, receivables: recs.filter(x => x.id !== r.id) })} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
+                    </div>
+                  ))}
+                </>
+              )}
 
-              {unpaid.map(r => (
-                <div key={r.id} className="bg-white rounded-xl px-5 py-4 border border-gray-200 flex items-center gap-3">
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-[#16213E]">{r.title}</p>
-                    <p className="text-[10px] text-[#6B7280]">من: {r.fromWhom}{r.dueDate ? ` · ${new Date(r.dueDate).toLocaleDateString("ar-SA")}` : ""}</p>
-                  </div>
-                  <p className="text-sm font-black text-[#D4AF37]">{r.amount.toLocaleString()}</p>
-                  <button onClick={async () => {
-                    // تم الاستلام — أضف كدخل وحوّل لمستلم
-                    try { await api.post("/api/finance/transactions", { title: `استلام: ${r.title}`, amount: r.amount, type: "Income", category: "أخرى", date: new Date().toISOString().slice(0, 10) }); } catch {}
-                    setTxs(prev => [{ id: Date.now().toString(), title: `استلام: ${r.title}`, amount: r.amount, type: "income", category: "أخرى", accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) }, ...prev]);
-                    sSettings({ ...settings, receivables: recs.map(x => x.id === r.id ? { ...x, isPaid: true } : x) });
-                  }} className="text-[10px] px-3 py-1.5 rounded-lg font-bold text-white bg-[#3D8C5A]">تم الاستلام</button>
-                  <button onClick={() => sSettings({ ...settings, receivables: recs.filter(x => x.id !== r.id) })} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
-                </div>
-              ))}
+              {/* One-time receivables */}
+              {oneTime.length > 0 && (
+                <>
+                  <GeometricDivider label={`مستحقات مقطوعة (${oneTime.length})`} />
+                  {oneTime.map(r => (
+                    <div key={r.id} className="bg-white rounded-xl px-5 py-4 border border-gray-200 flex items-center gap-3">
+                      <span className="text-lg">💰</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-[#16213E]">{r.title}</p>
+                        <p className="text-[10px] text-[#6B7280]">من: {r.fromWhom}{r.dueDate ? ` · ${new Date(r.dueDate).toLocaleDateString("ar-SA")}` : ""}</p>
+                      </div>
+                      <p className="text-sm font-black text-[#D4AF37]">{r.amount.toLocaleString()}</p>
+                      <button onClick={async () => {
+                        try { await api.post("/api/finance/transactions", { title: `استلام: ${r.title}`, amount: r.amount, type: "Income", category: "أخرى", date: new Date().toISOString().slice(0, 10) }); } catch {}
+                        setTxs(prev => [{ id: Date.now().toString(), title: `استلام: ${r.title}`, amount: r.amount, type: "income", category: "أخرى", accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) }, ...prev]);
+                        sSettings({ ...settings, receivables: recs.map(x => x.id === r.id ? { ...x, isPaid: true } : x) });
+                      }} className="text-[10px] px-3 py-1.5 rounded-lg font-bold text-white bg-[#3D8C5A]">تم الاستلام</button>
+                      <button onClick={() => sSettings({ ...settings, receivables: recs.filter(x => x.id !== r.id) })} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {unpaid.length === 0 && !showAddRec && <p className="text-center text-[#9CA3AF] text-xs py-6">لا توجد مبالغ مستحقة — الحمد لله</p>}
 
               {paid.length > 0 && (
                 <>
