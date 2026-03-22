@@ -408,6 +408,8 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
   const [dAcct, setDAcct]     = useState("");
   const [dPocket, setDPocket] = useState("");
   const [dCat, setDCat]       = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [partialAmt, setPartialAmt] = useState("");
 
   function addDue() {
     if (!dTitle.trim() || !dAmount) return;
@@ -480,16 +482,81 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
       {activeDues.length === 0 && <p className="text-center text-[#9CA3AF] text-xs py-4">لا توجد التزامات</p>}
       {activeDues.map((d) => {
         const confirmed = d.lastConfirmedDate?.startsWith(currentMonthStr);
+        const isExpanded = expandedId === d.id;
+        const freqLabel = d.frequency === "monthly" ? "شهري" : d.frequency === "quarterly" ? "ربع سنوي" : d.frequency === "yearly" ? "سنوي" : "مرة واحدة";
         return (
-          <div key={d.id} className={`bg-white rounded-xl px-5 py-4 border border-gray-200 flex items-center gap-3 ${confirmed ? "opacity-50" : ""}`}>
-            <span className="text-lg">{DUE_TYPES.find((t) => t.key === d.type)?.icon}</span>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-[#16213E]">{d.title}</p>
-              <p className="text-[10px] text-[#6B7280]">يوم {d.dueDay} · {d.frequency === "monthly" ? "شهري" : d.frequency === "quarterly" ? "ربع سنوي" : d.frequency === "yearly" ? "سنوي" : "مرة واحدة"}</p>
+          <div key={d.id} className={`bg-white rounded-xl border border-gray-200 transition-all ${confirmed ? "opacity-50" : ""}`}>
+            {/* Row */}
+            <div className="flex items-center gap-3 px-5 py-4 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : d.id)}>
+              <span className="text-lg">{DUE_TYPES.find((t) => t.key === d.type)?.icon}</span>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-[#16213E]">{d.title}</p>
+                <p className="text-[10px] text-[#6B7280]">يوم {d.dueDay} · {freqLabel}</p>
+              </div>
+              <p className="text-sm font-black text-[#DC2626]">{d.amount.toLocaleString()}</p>
+              {confirmed && <span className="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 rounded-full">تم</span>}
+              <span className="text-[10px] text-[#9CA3AF]">{isExpanded ? "▲" : "▼"}</span>
             </div>
-            <p className="text-sm font-black text-[#DC2626]">{d.amount.toLocaleString()}</p>
-            {confirmed && <span className="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 rounded-full">تم</span>}
-            <button onClick={() => onUpdate(dues.filter((x) => x.id !== d.id))} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
+
+            {/* Expanded actions */}
+            {isExpanded && (
+              <div className="px-5 pb-4 space-y-2 border-t border-gray-100 pt-3">
+                <div className="grid grid-cols-2 gap-2">
+                  {/* دفع كامل */}
+                  <button onClick={() => { onConfirm(d); setExpandedId(null); }}
+                    className="py-2.5 rounded-xl text-xs font-bold text-white transition hover:opacity-90"
+                    style={{ background: "#3D8C5A" }}>
+                    ✅ دفع كامل
+                  </button>
+                  {/* سداد مرة واحدة (إنقاص) */}
+                  <button onClick={() => {
+                    const newAmt = d.amount * 0.5;
+                    onUpdate(dues.map(x => x.id === d.id ? { ...x, amount: Math.round(newAmt) } : x));
+                    onConfirm({ ...d, amount: d.amount - Math.round(newAmt) });
+                    setExpandedId(null);
+                  }}
+                    className="py-2.5 rounded-xl text-xs font-bold text-white transition hover:opacity-90"
+                    style={{ background: "#D4AF37" }}>
+                    ↓ إنقاص ودفع نصف
+                  </button>
+                </div>
+
+                {/* سداد جزئي مخصص */}
+                <div className="flex gap-2">
+                  <input type="number" value={partialAmt} onChange={e => setPartialAmt(e.target.value)}
+                    placeholder="مبلغ الدفعة"
+                    className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#D4AF37]" />
+                  <button onClick={() => {
+                    const pay = Number(partialAmt);
+                    if (!pay || pay <= 0) return;
+                    const remaining = d.amount - pay;
+                    if (remaining <= 0) {
+                      // سدد كامل المبلغ أو أكثر
+                      onConfirm(d);
+                      onUpdate(dues.map(x => x.id === d.id ? { ...x, isActive: false } : x));
+                    } else {
+                      onConfirm({ ...d, amount: pay });
+                      onUpdate(dues.map(x => x.id === d.id ? { ...x, amount: remaining } : x));
+                    }
+                    setPartialAmt(""); setExpandedId(null);
+                  }}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-white"
+                    style={{ background: "#2C2C54" }}>
+                    دفع جزئي
+                  </button>
+                </div>
+
+                {/* إلغاء الالتزام */}
+                <button onClick={() => {
+                  if (!confirm(`إلغاء "${d.title}" نهائياً؟`)) return;
+                  onUpdate(dues.filter(x => x.id !== d.id));
+                  setExpandedId(null);
+                }}
+                  className="w-full py-2 rounded-xl text-xs font-medium text-red-500 hover:bg-red-50 transition border border-red-100">
+                  🗑️ إلغاء الالتزام
+                </button>
+              </div>
+            )}
           </div>
         );
       })}
