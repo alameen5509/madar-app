@@ -60,7 +60,7 @@ export function useJobMeta(jobId: string) {
     achievements: { title: string; date: string; description?: string; type?: string }[];
     skills: (string | { name: string; level: number; target: number; plan?: string; fromJob?: boolean })[];
     meetings: { title: string; date: string; notes: string; attendees?: string; actionItems?: { text: string; done: boolean }[] }[];
-    lessons: string[];
+    lessons: (string | { title: string; content?: string; date?: string; category?: string })[];
   }>({ team: [], kpis: [], achievements: [], skills: [], meetings: [], lessons: [] });
 
   useEffect(() => {
