@@ -105,9 +105,10 @@ interface Deduction {
   id: string;
   title: string;
   type: "percent" | "fixed";
-  value: number; // نسبة أو مبلغ
-  source: "all" | string; // "all" = من كل الدخل, أو id مصدر محدد
-  targetPocketId?: string; // المحفظة المستهدفة
+  value: number;
+  source: "all" | string;
+  targetPocketId?: string;
+  paidSoFar: number; // المبلغ المسدد حتى الآن
 }
 
 interface Receivable {
@@ -1708,7 +1709,7 @@ export default function FinancePage() {
                     <button onClick={() => setShowAddDed(false)} className="flex-1 py-2.5 rounded-xl text-sm text-[#6B7280] bg-gray-100">إلغاء</button>
                     <button onClick={() => {
                       if (!ddTitle.trim() || !ddValue) return;
-                      const newDed: Deduction = { id: Date.now().toString(), title: ddTitle.trim(), type: ddType, value: Number(ddValue), source: ddSource };
+                      const newDed: Deduction = { id: Date.now().toString(), title: ddTitle.trim(), type: ddType, value: Number(ddValue), source: ddSource, paidSoFar: 0 };
                       sSettings({ ...settings, deductions: [...deds, newDed] });
                       setDdTitle(""); setDdValue(""); setShowAddDed(false);
                     }} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "#5E5495" }}>إضافة</button>
@@ -1719,15 +1720,50 @@ export default function FinancePage() {
               {deds.length === 0 && !showAddDed && <p className="text-center text-[#9CA3AF] text-xs py-6">لا توجد استقطاعات — أضف لتنظيم دخلك</p>}
               {deds.map(d => {
                 const amount = d.type === "percent" ? Math.round(monthlyIncome * d.value / 100) : d.value;
+                const paid = d.paidSoFar ?? 0;
+                const remaining = Math.max(0, amount - paid);
+                const pct = amount > 0 ? Math.min(100, Math.round((paid / amount) * 100)) : 0;
+                const isDone = remaining <= 0;
                 return (
-                  <div key={d.id} className="bg-white rounded-xl px-5 py-4 border border-gray-200 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ background: "#5E549515" }}>💰</div>
-                    <div className="flex-1">
-                      <p className="text-sm font-bold text-[#16213E]">{d.title}</p>
-                      <p className="text-[10px] text-[#6B7280]">{d.type === "percent" ? `${d.value}% من الدخل` : `${d.value.toLocaleString()} ريال ثابت`}</p>
+                  <div key={d.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div className="px-5 py-3 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ background: isDone ? "#3D8C5A15" : "#5E549515" }}>
+                        {isDone ? "✅" : "💰"}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-[#16213E]">{d.title}</p>
+                        <p className="text-[10px] text-[#6B7280]">{d.type === "percent" ? `${d.value}%` : `${d.value.toLocaleString()}`} · مسدد {paid.toLocaleString()} · متبقي {remaining.toLocaleString()}</p>
+                        <div className="mt-1 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: isDone ? "#3D8C5A" : "#5E5495" }} />
+                        </div>
+                      </div>
+                      <p className="text-sm font-black" style={{ color: isDone ? "#3D8C5A" : "#5E5495" }}>{amount.toLocaleString()}</p>
+                      <button onClick={() => sSettings({ ...settings, deductions: deds.filter(x => x.id !== d.id) })} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
                     </div>
-                    <p className="text-sm font-black text-[#5E5495]">{amount.toLocaleString()}</p>
-                    <button onClick={() => sSettings({ ...settings, deductions: deds.filter(x => x.id !== d.id) })} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
+                    {!isDone && (
+                      <div className="px-5 py-2 border-t border-gray-100 flex gap-2">
+                        <button onClick={async () => {
+                          // سداد كامل
+                          try { await api.post("/api/finance/transactions", { title: `سداد: ${d.title}`, amount: remaining, type: "Expense", category: d.title, date: new Date().toISOString().slice(0, 10) }); } catch {}
+                          setTxs(prev => [{ id: Date.now().toString(), title: `سداد: ${d.title}`, amount: remaining, type: "expense", category: d.title, accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) }, ...prev]);
+                          sSettings({ ...settings, deductions: deds.map(x => x.id === d.id ? { ...x, paidSoFar: amount } : x) });
+                        }} className="flex-1 py-1.5 rounded-lg text-[10px] font-bold text-white bg-[#3D8C5A]">
+                          سداد كامل ({remaining.toLocaleString()})
+                        </button>
+                        <button onClick={() => {
+                          const val = prompt(`سداد جزئي من ${remaining.toLocaleString()} ريال:`);
+                          if (!val) return;
+                          const payAmount = Number(val);
+                          if (!payAmount || payAmount <= 0) return;
+                          const actualPay = Math.min(payAmount, remaining);
+                          api.post("/api/finance/transactions", { title: `سداد جزئي: ${d.title}`, amount: actualPay, type: "Expense", category: d.title, date: new Date().toISOString().slice(0, 10) }).catch(() => {});
+                          setTxs(prev => [{ id: Date.now().toString(), title: `سداد جزئي: ${d.title}`, amount: actualPay, type: "expense", category: d.title, accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) }, ...prev]);
+                          sSettings({ ...settings, deductions: deds.map(x => x.id === d.id ? { ...x, paidSoFar: (x.paidSoFar ?? 0) + actualPay } : x) });
+                        }} className="flex-1 py-1.5 rounded-lg text-[10px] font-bold text-[#5E5495] border border-[#5E549530]">
+                          سداد جزئي
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
