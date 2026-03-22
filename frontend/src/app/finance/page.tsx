@@ -1741,26 +1741,20 @@ export default function FinancePage() {
                       <button onClick={() => sSettings({ ...settings, deductions: deds.filter(x => x.id !== d.id) })} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
                     </div>
                     {!isDone && (
-                      <div className="px-5 py-2 border-t border-gray-100 flex gap-2">
+                      <div className="px-5 py-2 border-t border-gray-100 flex gap-2 items-center">
+                        <input type="number" defaultValue={remaining} min={1} max={remaining}
+                          id={`ded-pay-${d.id}`}
+                          className="flex-1 px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-center focus:outline-none focus:border-[#D4AF37]"
+                          placeholder="المبلغ" />
                         <button onClick={async () => {
-                          // سداد كامل
-                          try { await api.post("/api/finance/transactions", { title: `سداد: ${d.title}`, amount: remaining, type: "Expense", category: d.title, date: new Date().toISOString().slice(0, 10) }); } catch {}
-                          setTxs(prev => [{ id: Date.now().toString(), title: `سداد: ${d.title}`, amount: remaining, type: "expense", category: d.title, accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) }, ...prev]);
-                          sSettings({ ...settings, deductions: deds.map(x => x.id === d.id ? { ...x, paidSoFar: amount } : x) });
-                        }} className="flex-1 py-1.5 rounded-lg text-[10px] font-bold text-white bg-[#3D8C5A]">
-                          سداد كامل ({remaining.toLocaleString()})
-                        </button>
-                        <button onClick={() => {
-                          const val = prompt(`سداد جزئي من ${remaining.toLocaleString()} ريال:`);
-                          if (!val) return;
-                          const payAmount = Number(val);
-                          if (!payAmount || payAmount <= 0) return;
-                          const actualPay = Math.min(payAmount, remaining);
-                          api.post("/api/finance/transactions", { title: `سداد جزئي: ${d.title}`, amount: actualPay, type: "Expense", category: d.title, date: new Date().toISOString().slice(0, 10) }).catch(() => {});
-                          setTxs(prev => [{ id: Date.now().toString(), title: `سداد جزئي: ${d.title}`, amount: actualPay, type: "expense", category: d.title, accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) }, ...prev]);
-                          sSettings({ ...settings, deductions: deds.map(x => x.id === d.id ? { ...x, paidSoFar: (x.paidSoFar ?? 0) + actualPay } : x) });
-                        }} className="flex-1 py-1.5 rounded-lg text-[10px] font-bold text-[#5E5495] border border-[#5E549530]">
-                          سداد جزئي
+                          const input = document.getElementById(`ded-pay-${d.id}`) as HTMLInputElement;
+                          const payAmount = Math.min(Number(input?.value) || remaining, remaining);
+                          if (payAmount <= 0) return;
+                          try { await api.post("/api/finance/transactions", { title: `سداد: ${d.title}`, amount: payAmount, type: "Expense", category: d.title, date: new Date().toISOString().slice(0, 10) }); } catch {}
+                          setTxs(prev => [{ id: Date.now().toString(), title: `سداد: ${d.title}`, amount: payAmount, type: "expense", category: d.title, accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) }, ...prev]);
+                          sSettings({ ...settings, deductions: deds.map(x => x.id === d.id ? { ...x, paidSoFar: (x.paidSoFar ?? 0) + payAmount } : x) });
+                        }} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white bg-[#3D8C5A]">
+                          سداد
                         </button>
                       </div>
                     )}
