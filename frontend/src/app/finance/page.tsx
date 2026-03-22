@@ -1248,21 +1248,28 @@ export default function FinancePage() {
             const debtPocketBal = debtPocket ? calcPocketBal(debtPocket.id) : 0;
             const savPocketBal = savPocket ? calcPocketBal(savPocket.id) : 0;
             const hasDebts = totalDebtRemaining > 0;
+            const totalDebtOriginal = debts.reduce((s, d) => s + d.originalAmount, 0);
+            const totalPaidSoFar = debts.reduce((s, d) => s + d.paidSoFar, 0);
             const debtTarget = Math.round(income * settings.debtPercent / 100);
             const savTarget = Math.round(income * settings.savingsPercent / 100);
+            // سدادات الشهر الحالي: من المعاملات + التغيير في paidSoFar
+            const monthlyDebtPaid = debtPaid; // من المعاملات المسجلة هذا الشهر
 
             // نصائح الديون
+            if (hasDebts && debts.length > 0) {
+              tips.push({ text: `إجمالي الديون: ${totalDebtOriginal.toLocaleString()} — سددت ${totalPaidSoFar.toLocaleString()} (${totalDebtOriginal > 0 ? Math.round(totalPaidSoFar / totalDebtOriginal * 100) : 0}%) — متبقي ${totalDebtRemaining.toLocaleString()}`, icon: "💳", color: "#0F3460", bg: "#EFF6FF" });
+            }
             if (hasDebts && debtPocketBal > 0) {
-              tips.push({ text: `لديك ${debtPocketBal.toLocaleString()} ريال في محفظة الديون — سدد دينك الآن`, icon: "💳", color: "#DC2626", bg: "#FEF2F2" });
+              tips.push({ text: `لديك ${debtPocketBal.toLocaleString()} ريال في محفظة الديون — سدد دينك الآن`, icon: "⚡", color: "#DC2626", bg: "#FEF2F2" });
             }
-            if (hasDebts && income > 0 && debtPaid < debtTarget) {
-              tips.push({ text: `سددت ${debtPaid.toLocaleString()} من ${debtTarget.toLocaleString()} مخصص للديون — بقي ${(debtTarget - debtPaid).toLocaleString()}`, icon: "📊", color: "#D4AF37", bg: "#FFFBEB" });
+            if (hasDebts && income > 0 && debtTarget > 0 && monthlyDebtPaid < debtTarget) {
+              tips.push({ text: `حصة الديون هذا الشهر: ${debtTarget.toLocaleString()} — سددت ${monthlyDebtPaid.toLocaleString()} — بقي ${(debtTarget - monthlyDebtPaid).toLocaleString()}`, icon: "📊", color: "#D4AF37", bg: "#FFFBEB" });
             }
-            if (hasDebts && debtPaid >= debtTarget && debtTarget > 0) {
-              tips.push({ text: `أحسنت! أتممت سداد حصة الديون لهذا الشهر ✅`, icon: "✅", color: "#3D8C5A", bg: "#F0FDF4" });
+            if (hasDebts && monthlyDebtPaid >= debtTarget && debtTarget > 0) {
+              tips.push({ text: `أحسنت! أتممت حصة الديون لهذا الشهر (${monthlyDebtPaid.toLocaleString()} من ${debtTarget.toLocaleString()}) ✅`, icon: "✅", color: "#3D8C5A", bg: "#F0FDF4" });
             }
             if (!hasDebts && debts.length > 0) {
-              tips.push({ text: `الحمد لله — سددت جميع ديونك! 🎉`, icon: "🎉", color: "#3D8C5A", bg: "#F0FDF4" });
+              tips.push({ text: `الحمد لله — سددت جميع ديونك! (${totalPaidSoFar.toLocaleString()} ريال) 🎉`, icon: "🎉", color: "#3D8C5A", bg: "#F0FDF4" });
             }
 
             // نصائح الادخار
