@@ -66,7 +66,7 @@ interface RecurringDue {
   title: string;
   amount: number;
   type: "salary" | "bill" | "installment" | "expected_income" | "expected_expense" | "nafaqa" | "rent" | "subscription" | "insurance";
-  frequency: "monthly" | "yearly" | "once";
+  frequency: "monthly" | "quarterly" | "yearly" | "once";
   dueDay: number; // يوم الشهر
   dueMonth?: number; // للسنوي
   accountId?: string;
@@ -428,7 +428,9 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
   const activeDues = dues.filter((d) => d.isActive && d.type !== "salary" && d.type !== "expected_income");
 
   function isDueNow(d: RecurringDue): boolean {
-    if (d.frequency === "yearly" && d.dueMonth !== today.getMonth() + 1) return false;
+    const currentMonth = today.getMonth() + 1;
+    if (d.frequency === "yearly" && d.dueMonth !== currentMonth) return false;
+    if (d.frequency === "quarterly" && ![3, 6, 9, 12].includes(currentMonth)) return false;
     const confirmed = d.lastConfirmedDate?.startsWith(currentMonthStr);
     return !confirmed && todayDay >= d.dueDay;
   }
@@ -483,7 +485,7 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
             <span className="text-lg">{DUE_TYPES.find((t) => t.key === d.type)?.icon}</span>
             <div className="flex-1">
               <p className="text-sm font-medium text-[#16213E]">{d.title}</p>
-              <p className="text-[10px] text-[#6B7280]">يوم {d.dueDay} · {d.frequency === "monthly" ? "شهري" : d.frequency === "yearly" ? "سنوي" : "مرة واحدة"}</p>
+              <p className="text-[10px] text-[#6B7280]">يوم {d.dueDay} · {d.frequency === "monthly" ? "شهري" : d.frequency === "quarterly" ? "ربع سنوي" : d.frequency === "yearly" ? "سنوي" : "مرة واحدة"}</p>
             </div>
             <p className="text-sm font-black text-[#DC2626]">{d.amount.toLocaleString()}</p>
             {confirmed && <span className="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 rounded-full">تم</span>}
@@ -516,7 +518,7 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
           <input type="number" value={dAmount} onChange={(e) => setDAmount(e.target.value)} placeholder="المبلغ"
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
           <div className="flex gap-2">
-            {([["monthly","شهري"],["yearly","سنوي"],["once","مرة واحدة"]] as const).map(([k, l]) => (
+            {([["monthly","شهري"],["quarterly","ربع سنوي"],["yearly","سنوي"],["once","مرة واحدة"]] as const).map(([k, l]) => (
               <button key={k} onClick={() => setDFreq(k)} className="flex-1 py-1.5 rounded-lg text-xs font-medium"
                 style={{ background: dFreq === k ? "#2C2C54" : "#F3F4F6", color: dFreq === k ? "#fff" : "#6B7280" }}>{l}</button>
             ))}
@@ -732,7 +734,7 @@ export default function FinancePage() {
     const expClsMap: Record<string, string> = { Essential: "essential", Luxury: "luxury", Improvement: "improvement" };
     const pocketTypeMap: Record<string, string> = { Personal: "personal", Debt: "debt", Savings: "savings", Installment: "installment", Emergency: "emergency" };
     const dueTypeMap: Record<string, string> = { Salary: "salary", Bill: "bill", Installment: "installment", ExpectedIncome: "expected_income", ExpectedExpense: "expected_expense", Nafaqa: "nafaqa", Rent: "rent", Subscription: "subscription", Insurance: "insurance" };
-    const dueFreqMap: Record<string, string> = { Monthly: "monthly", Yearly: "yearly", Once: "once" };
+    const dueFreqMap: Record<string, string> = { Monthly: "monthly", Quarterly: "quarterly", Yearly: "yearly", Once: "once" };
 
     setAccounts((d.accounts ?? []).length > 0 ? d.accounts! : DEF_ACCOUNTS);
     setPockets(((d.pockets ?? []).length > 0 ? d.pockets! : DEF_POCKETS).map(p => ({
@@ -1015,8 +1017,9 @@ export default function FinancePage() {
     if (!d.isActive) return false;
     if (d.type === "salary" || d.type === "expected_income") return false;
     const confirmedThisMonth = d.lastConfirmedDate?.startsWith(`${today.getFullYear()}-${String(currentMonth).padStart(2, "0")}`);
-    if (confirmedThisMonth && d.frequency === "monthly") return false;
+    if (confirmedThisMonth && (d.frequency === "monthly" || d.frequency === "quarterly")) return false;
     if (d.frequency === "yearly" && d.dueMonth !== currentMonth) return false;
+    if (d.frequency === "quarterly" && ![3, 6, 9, 12].includes(currentMonth)) return false;
     return true;
   });
 
