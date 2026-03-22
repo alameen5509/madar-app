@@ -326,9 +326,16 @@ export function NewTaskDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-[#1A1830]/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto fade-up">
-        <div className="flex items-center justify-between px-7 pt-7 pb-4 border-b border-[#E2D5B0]">
+        <div className="flex items-center justify-between px-7 pt-7 pb-3 border-b border-[#E2D5B0]">
           <h2 className="font-bold text-[#1A1830]">مهمة جديدة</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-[#7C7A8E] hover:bg-[#F8F6F0] transition text-sm">✕</button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={onClose} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#7C7A8E] bg-[#F8F6F0] border border-[#E2D5B0] hover:bg-[#F0EDE4] transition">إلغاء</button>
+            <button type="button" onClick={(e) => { const form = (e.target as HTMLElement).closest("[role=dialog]")?.querySelector("form"); form?.requestSubmit(); }} disabled={loading}
+              className="px-4 py-1.5 rounded-lg text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-60"
+              style={{ background: "linear-gradient(135deg, #5E5495, #C9A84C)" }}>
+              {loading ? "جارٍ الإضافة…" : "إضافة"}
+            </button>
+          </div>
         </div>
         <form onSubmit={handleSubmit} className="px-7 py-6 space-y-5">
           <div>
@@ -525,17 +532,6 @@ export function NewTaskDialog({
           )}
 
           {error && <p className="text-red-400 text-sm bg-red-50 border border-red-100 rounded-lg px-4 py-2.5">{error}</p>}
-          <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-[#7C7A8E] bg-[#F8F6F0] border border-[#E2D5B0] hover:bg-[#F0EDE4] transition">
-              إلغاء
-            </button>
-            <button type="submit" disabled={loading}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60"
-              style={{ background: "linear-gradient(135deg, #5E5495, #C9A84C)" }}>
-              {loading ? "جارٍ الإضافة…" : "إضافة المهمة"}
-            </button>
-          </div>
         </form>
       </div>
     </div>
