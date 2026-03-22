@@ -1329,7 +1329,12 @@ export default function FinancePage() {
                     </summary>
                     <div className="mt-1 space-y-1">
                       {dayTxs.map(t => {
-                        const meta = TX_TYPES.find(x => x.key === t.type) ?? TX_TYPES[0];
+                        const FULL_TYPES: Record<string, { icon: string; color: string }> = {
+                          income: { icon: "📥", color: "#3D8C5A" }, expense: { icon: "📤", color: "#DC2626" },
+                          transfer: { icon: "🔄", color: "#6B7280" }, debt_payment: { icon: "💳", color: "#0F3460" },
+                          installment: { icon: "📋", color: "#8C4A3D" }, gift: { icon: "🎁", color: "#5E5495" },
+                        };
+                        const meta = FULL_TYPES[t.type] ?? { icon: "📤", color: "#DC2626" };
                         return (
                           <div key={t.id} className="flex items-center gap-3 bg-white rounded-xl px-4 py-3 border border-gray-200">
                             <span className="text-lg">{meta.icon}</span>
