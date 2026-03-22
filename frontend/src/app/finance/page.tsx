@@ -1741,21 +1741,41 @@ export default function FinancePage() {
                       <button onClick={() => sSettings({ ...settings, deductions: deds.filter(x => x.id !== d.id) })} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
                     </div>
                     {!isDone && (
-                      <div className="px-5 py-2 border-t border-gray-100 flex gap-2 items-center">
-                        <input type="number" defaultValue={remaining} min={1} max={remaining}
-                          id={`ded-pay-${d.id}`}
-                          className="flex-1 px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-center focus:outline-none focus:border-[#D4AF37]"
-                          placeholder="المبلغ" />
-                        <button onClick={async () => {
-                          const input = document.getElementById(`ded-pay-${d.id}`) as HTMLInputElement;
-                          const payAmount = Math.min(Number(input?.value) || remaining, remaining);
-                          if (payAmount <= 0) return;
-                          try { await api.post("/api/finance/transactions", { title: `سداد: ${d.title}`, amount: payAmount, type: "Expense", category: d.title, date: new Date().toISOString().slice(0, 10) }); } catch {}
-                          setTxs(prev => [{ id: Date.now().toString(), title: `سداد: ${d.title}`, amount: payAmount, type: "expense", category: d.title, accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) }, ...prev]);
-                          sSettings({ ...settings, deductions: deds.map(x => x.id === d.id ? { ...x, paidSoFar: (x.paidSoFar ?? 0) + payAmount } : x) });
-                        }} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white bg-[#3D8C5A]">
-                          سداد
-                        </button>
+                      <div className="px-5 py-2 border-t border-gray-100 space-y-2">
+                        <div className="flex gap-1 flex-wrap">
+                          {TX_TYPES.filter(t => t.key !== "income" && t.key !== "transfer").map(t => (
+                            <button key={t.key} id={`ded-type-${d.id}-${t.key}`}
+                              onClick={(e) => {
+                                document.querySelectorAll(`[id^="ded-type-${d.id}-"]`).forEach(el => (el as HTMLElement).style.background = "#F3F4F6");
+                                (e.currentTarget as HTMLElement).style.background = t.color; (e.currentTarget as HTMLElement).style.color = "#fff";
+                                (e.currentTarget as HTMLElement).dataset.selected = "true";
+                              }}
+                              className="px-2 py-1 rounded-lg text-[9px] font-semibold"
+                              style={{ background: t.key === "expense" ? t.color : "#F3F4F6", color: t.key === "expense" ? "#fff" : "#6B7280" }}>
+                              {t.icon} {t.label}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex gap-2 items-center">
+                          <input type="number" defaultValue={remaining} min={1} max={remaining}
+                            id={`ded-pay-${d.id}`}
+                            className="flex-1 px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-center focus:outline-none focus:border-[#D4AF37]"
+                            placeholder="المبلغ" />
+                          <button onClick={async () => {
+                            const input = document.getElementById(`ded-pay-${d.id}`) as HTMLInputElement;
+                            const payAmount = Math.min(Number(input?.value) || remaining, remaining);
+                            if (payAmount <= 0) return;
+                            // اكتشف النوع المختار
+                            const selectedBtn = document.querySelector(`[id^="ded-type-${d.id}-"][data-selected="true"]`);
+                            const txType = selectedBtn?.id?.split("-").pop() ?? "expense";
+                            const typeMap: Record<string, string> = { expense: "Expense", debt_payment: "DebtPayment", installment: "Installment", gift: "Gift" };
+                            try { await api.post("/api/finance/transactions", { title: `سداد: ${d.title}`, amount: payAmount, type: typeMap[txType] ?? "Expense", category: d.title, date: new Date().toISOString().slice(0, 10) }); } catch {}
+                            setTxs(prev => [{ id: Date.now().toString(), title: `سداد: ${d.title}`, amount: payAmount, type: txType as Transaction["type"], category: d.title, accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) }, ...prev]);
+                            sSettings({ ...settings, deductions: deds.map(x => x.id === d.id ? { ...x, paidSoFar: (x.paidSoFar ?? 0) + payAmount } : x) });
+                          }} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white bg-[#3D8C5A]">
+                            سداد
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
