@@ -1,9 +1,10 @@
 "use client";
 
 import { use, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import JobPageShell, { useJobData } from "@/components/JobPageShell";
-import { JobDimensionNode, calcDimProgress } from "@/components/JobTree";
+import { calcDimProgress } from "@/components/JobTree";
 
 export default function DimensionsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -23,7 +24,7 @@ export default function DimensionsPage({ params }: { params: Promise<{ id: strin
 
   return (
     <JobPageShell jobId={id}>
-      {/* Top bar — add button */}
+      {/* Header + add */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <p className="text-sm font-bold" style={{ color: "var(--text)" }}>الجوانب والأهداف</p>
@@ -36,7 +37,7 @@ export default function DimensionsPage({ params }: { params: Promise<{ id: strin
         </button>
       </div>
 
-      {/* Inline add form */}
+      {/* Add form */}
       {showAdd && (
         <div className="flex items-center gap-2 mb-4 p-4 rounded-xl border fade-up" style={{ background: "var(--card)", borderColor: "#2D6B9E40" }}>
           <input value={addName} onChange={e => setAddName(e.target.value)}
@@ -50,36 +51,52 @@ export default function DimensionsPage({ params }: { params: Promise<{ id: strin
         </div>
       )}
 
-      {/* Dimension summary cards */}
-      {rootDims.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-5">
-          {rootDims.map(d => {
-            const dp = calcDimProgress(d.id, dims, goals);
-            const dimGoals = goals.filter(g => g.dimensionId === d.id);
-            const subDims = dims.filter(sd => sd.parentDimensionId === d.id);
-            return (
-              <div key={d.id} className="rounded-xl p-3 border" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm">{d.icon || "📁"}</span>
-                  <span className="text-[11px] font-bold flex-1 truncate" style={{ color: "var(--text)" }}>{d.name}</span>
-                  <span className="text-[10px] font-black" style={{ color: d.color || "#2D6B9E" }}>{dp}%</span>
+      {/* Dimension cards — clickable to navigate */}
+      <div className="space-y-3">
+        {rootDims.map(d => {
+          const dp = calcDimProgress(d.id, dims, goals);
+          const dimGoals = goals.filter(g => g.dimensionId === d.id && !g.parentGoalId);
+          const subDims = dims.filter(sd => sd.parentDimensionId === d.id);
+          const color = d.color || "#2D6B9E";
+          return (
+            <Link key={d.id} href={`/jobs/${id}/dimensions/${d.id}`}
+              className="group block rounded-2xl p-5 border transition-all hover:shadow-lg hover:border-[#2D6B9E]"
+              style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+              <div className="flex items-center gap-4 mb-3">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                  style={{ background: color + "12" }}>{d.icon || "📁"}</div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold" style={{ color: "var(--text)" }}>{d.name}</p>
+                  <p className="text-[10px]" style={{ color: "var(--muted)" }}>
+                    {subDims.length} جانب فرعي · {dimGoals.length} هدف
+                  </p>
                 </div>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: `${d.color || "#2D6B9E"}15` }}>
-                  <div className="h-full rounded-full" style={{ width: `${dp}%`, background: d.color || "#2D6B9E" }} />
-                </div>
-                <p className="text-[9px] mt-1.5" style={{ color: "var(--muted)" }}>{dimGoals.length} هدف · {subDims.length} فرعي</p>
+                <span className="text-lg font-black" style={{ color }}>{dp}%</span>
               </div>
-            );
-          })}
-        </div>
-      )}
+              <div className="h-2 rounded-full overflow-hidden mb-2" style={{ background: color + "15" }}>
+                <div className="h-full rounded-full transition-all" style={{ width: `${dp}%`, background: color }} />
+              </div>
 
-      {/* Tree */}
-      <div className="space-y-1">
-        {rootDims.map(d => (
-          <JobDimensionNode key={d.id} dim={d} allDims={dims} allGoals={goals}
-            level={0} onRefresh={refresh} />
-        ))}
+              {/* Preview: first 3 goals */}
+              {dimGoals.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  {dimGoals.slice(0, 3).map(g => (
+                    <div key={g.id} className="flex items-center gap-2 text-[10px]">
+                      <span>🎯</span>
+                      <span className="flex-1 truncate" style={{ color: "var(--muted)" }}>{g.title}</span>
+                      <span className="font-bold" style={{ color: g.progress >= 100 ? "#3D8C5A" : "#6B7280" }}>{g.progress}%</span>
+                    </div>
+                  ))}
+                  {dimGoals.length > 3 && (
+                    <p className="text-[9px]" style={{ color: "var(--muted)" }}>و {dimGoals.length - 3} أهداف أخرى...</p>
+                  )}
+                </div>
+              )}
+
+              <p className="text-[10px] mt-3 font-semibold group-hover:translate-x-[-4px] transition-transform" style={{ color }}>فتح الجانب ←</p>
+            </Link>
+          );
+        })}
       </div>
 
       {rootDims.length === 0 && !showAdd && (
