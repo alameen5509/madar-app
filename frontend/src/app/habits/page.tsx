@@ -359,6 +359,13 @@ export default function HabitsPage() {
         {/* Add form */}
         {showAdd && (
           <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm fade-up space-y-3">
+            <div className="flex items-center justify-between mb-1">
+              <p className="font-bold text-sm text-[#16213E]">عادة جديدة</p>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setShowAdd(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6B7280] bg-gray-100">إلغاء</button>
+                <button onClick={addHabit} className="px-4 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: "#2C2C54" }}>إضافة</button>
+              </div>
+            </div>
             <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="اسم العادة…"
               onKeyDown={(e) => { if (e.key === "Enter") addHabit(); }}
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
@@ -379,10 +386,6 @@ export default function HabitsPage() {
                 </button>
               ))}
             </div>
-            <div className="flex gap-2">
-              <button onClick={addHabit} className="px-5 py-2 rounded-xl text-sm font-bold text-white" style={{ background: "#2C2C54" }}>إضافة</button>
-              <button onClick={() => setShowAdd(false)} className="px-5 py-2 rounded-xl text-sm text-[#6B7280]">إلغاء</button>
-            </div>
           </div>
         )}
 
@@ -397,6 +400,13 @@ export default function HabitsPage() {
                     {/* Edit mode */}
                     {editId === h.id ? (
                       <div className="bg-white rounded-xl px-5 py-4 border-2 border-[#D4AF37] space-y-3 fade-up">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="font-bold text-xs text-[#16213E]">تعديل العادة</p>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => setEditId(null)} className="px-3 py-1 rounded-lg text-[10px] font-semibold text-[#6B7280] bg-gray-100">إلغاء</button>
+                            <button onClick={saveEdit} className="px-3 py-1 rounded-lg text-[10px] font-bold text-white" style={{ background: "#2C2C54" }}>حفظ</button>
+                          </div>
+                        </div>
                         <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
                           onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditId(null); }}
                           className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]"
@@ -418,12 +428,8 @@ export default function HabitsPage() {
                             </button>
                           ))}
                         </div>
-                        <div className="flex gap-2">
-                          <button onClick={saveEdit} className="px-4 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: "#2C2C54" }}>حفظ</button>
-                          <button onClick={() => setEditId(null)} className="px-4 py-1.5 rounded-lg text-xs text-[#6B7280]">إلغاء</button>
-                          <button onClick={() => { resetStreak(h.id); setEditId(null); }}
-                            className="px-4 py-1.5 rounded-lg text-xs text-red-500 hover:bg-red-50">إعادة تعيين السلسلة</button>
-                        </div>
+                        <button onClick={() => { resetStreak(h.id); setEditId(null); }}
+                          className="w-full py-1.5 rounded-lg text-xs text-red-500 hover:bg-red-50 transition">إعادة تعيين السلسلة</button>
                       </div>
                     ) : (
                       <div

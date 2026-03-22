@@ -359,7 +359,13 @@ function DebtSection({ debts, onUpdate }: { debts: Debt[]; onUpdate: (d: Debt[])
       {/* Add debt form */}
       {showAdd && (
         <div className="bg-white rounded-xl p-5 border border-gray-200 fade-up space-y-3">
-          <p className="font-bold text-sm text-[#16213E]">إضافة دين جديد</p>
+          <div className="flex items-center justify-between">
+            <p className="font-bold text-sm text-[#16213E]">إضافة دين جديد</p>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowAdd(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6B7280] bg-gray-100">إلغاء</button>
+              <button onClick={addDebt} className="px-4 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: "#2C2C54" }}>إضافة</button>
+            </div>
+          </div>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="اسم الدائن *"
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
           <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="رقم الجوال (اختياري)" type="tel"
@@ -370,10 +376,6 @@ function DebtSection({ debts, onUpdate }: { debts: Debt[]; onUpdate: (d: Debt[])
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
           <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ملاحظات (اختياري)"
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
-          <div className="flex gap-2">
-            <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 rounded-xl text-sm text-[#6B7280] bg-gray-100">إلغاء</button>
-            <button onClick={addDebt} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "#2C2C54" }}>إضافة الدين</button>
-          </div>
         </div>
       )}
     </section>
@@ -525,7 +527,13 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
       {/* Add due form */}
       {showAdd && (
         <div className="bg-white rounded-xl p-5 border border-gray-200 fade-up space-y-3">
-          <p className="font-bold text-sm text-[#16213E]">إضافة مستحق جديد</p>
+          <div className="flex items-center justify-between">
+            <p className="font-bold text-sm text-[#16213E]">إضافة مستحق جديد</p>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowAdd(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6B7280] bg-gray-100">إلغاء</button>
+              <button onClick={addDue} className="px-4 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: "#2C2C54" }}>إضافة</button>
+            </div>
+          </div>
           <div className="flex gap-1 flex-wrap">
             {DUE_TYPES.map((t) => (
               <button key={t.key} onClick={() => setDType(t.key as RecurringDue["type"])}
@@ -557,10 +565,6 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
               <button key={c} onClick={() => setDCat(c)} className="px-2 py-1 rounded-lg text-[10px] font-medium"
                 style={{ background: dCat === c ? "#2C2C54" : "#F3F4F6", color: dCat === c ? "#fff" : "#6B7280" }}>{c}</button>
             ))}
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 rounded-xl text-sm text-[#6B7280] bg-gray-100">إلغاء</button>
-            <button onClick={addDue} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "#2C2C54" }}>إضافة</button>
           </div>
         </div>
       )}
@@ -1973,7 +1977,11 @@ export default function FinancePage() {
           <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto fade-up">
             <div className="flex items-center justify-between px-6 pt-6 pb-3 border-b border-gray-200">
               <h3 className="font-bold text-[#16213E]">معاملة جديدة</h3>
-              <button onClick={() => setShowAdd(false)} className="text-[#6B7280] text-sm">✕</button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setShowAdd(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6B7280] bg-gray-100">إلغاء</button>
+                <button onClick={addTx} className="px-4 py-1.5 rounded-lg text-xs font-bold text-white"
+                  style={{ background: TX_TYPES.find((t) => t.key === fType)?.color ?? "#2C2C54" }}>إضافة</button>
+              </div>
             </div>
             <div className="px-6 py-5 space-y-3">
               {/* النوع الأساسي */}
@@ -2053,8 +2061,6 @@ export default function FinancePage() {
               <input type="date" value={fDate} onChange={(e) => setFDate(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
 
-              <button onClick={addTx} className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
-                style={{ background: TX_TYPES.find((t) => t.key === fType)?.color ?? "#2C2C54" }}>إضافة</button>
             </div>
           </div>
         </div>
@@ -2067,7 +2073,10 @@ export default function FinancePage() {
           <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto fade-up">
             <div className="flex items-center justify-between px-6 pt-6 pb-3 border-b border-gray-200">
               <h3 className="font-bold text-[#16213E]">تعديل المعاملة</h3>
-              <button onClick={() => setEditTx(null)} className="text-[#6B7280] text-sm">✕</button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setEditTx(null)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6B7280] bg-gray-100">إلغاء</button>
+                <button onClick={saveEditTx} className="px-4 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: "#D4AF37" }}>حفظ</button>
+              </div>
             </div>
             <div className="px-6 py-5 space-y-3">
               <div className="flex gap-1">
@@ -2124,10 +2133,6 @@ export default function FinancePage() {
               )}
               <input type="date" value={editTx.date} onChange={(e) => setEditTx({ ...editTx, date: e.target.value })}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
-              <div className="flex gap-2">
-                <button onClick={() => setEditTx(null)} className="flex-1 py-2.5 rounded-xl text-sm text-[#6B7280] bg-gray-100">إلغاء</button>
-                <button onClick={saveEditTx} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "#D4AF37" }}>حفظ التعديل</button>
-              </div>
             </div>
           </div>
         </div>

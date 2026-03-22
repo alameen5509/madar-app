@@ -368,7 +368,14 @@ function NewProjectDialog({ circles, onClose, onCreated }: {
       <div className="relative z-10 rounded-2xl shadow-2xl w-full max-w-md" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
         <div className="px-6 pt-6 pb-3 border-b flex items-center justify-between" style={{ borderColor: "var(--card-border)" }}>
           <h3 className="font-bold" style={{ color: "var(--text)", fontSize: 18 }}>مشروع جديد</h3>
-          <button onClick={onClose} style={{ color: "var(--muted)" }}>✕</button>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: "var(--bg)", color: "var(--muted)" }}>إلغاء</button>
+            <button onClick={handleCreate} disabled={creating || !title.trim() || !rated}
+              className="px-4 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-40"
+              style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
+              {creating ? "جارٍ الإنشاء..." : "إنشاء"}
+            </button>
+          </div>
         </div>
         <div className="px-6 py-5 space-y-4">
           {/* Templates */}
@@ -455,13 +462,7 @@ function NewProjectDialog({ circles, onClose, onCreated }: {
             {!rated && <p className="text-[10px] text-center" style={{ color: "#DC2626" }}>يجب تقييم جميع المعايير لإنشاء المشروع</p>}
           </div>
 
-          <div className="flex gap-2 pt-1">
-            <button onClick={handleCreate} disabled={creating || !title.trim() || !rated}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-40"
-              style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
-              {creating ? "جارٍ الإنشاء..." : "إنشاء المشروع"}
-            </button>
-            <button onClick={() => {
+          <button onClick={() => {
               if (!title.trim()) return;
               const templates = JSON.parse(localStorage.getItem("madar_project_templates") ?? "[]");
               templates.push({ name: title.trim(), desc: desc.trim(), isTech });
@@ -469,12 +470,10 @@ function NewProjectDialog({ circles, onClose, onCreated }: {
               alert("تم حفظ القالب ✓");
             }}
               disabled={!title.trim()}
-              className="px-4 py-2.5 rounded-xl text-sm font-semibold border disabled:opacity-40"
+              className="w-full py-2 rounded-xl text-xs font-semibold border disabled:opacity-40 transition hover:bg-[#D4AF3710]"
               style={{ borderColor: "#D4AF37", color: "#D4AF37" }}>
-              حفظ كقالب
+              📋 حفظ كقالب
             </button>
-            <button onClick={onClose} className="px-4 py-2.5 rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button>
-          </div>
         </div>
       </div>
     </div>
@@ -697,8 +696,16 @@ function ProjectDetail({ goal, circle, circles, users, onClose, onRefresh }: {
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/40" onClick={() => setShowEdit(false)} />
             <div className="relative z-10 rounded-2xl shadow-2xl w-full max-w-md" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
-              <div className="px-6 pt-6 pb-3 border-b" style={{ borderColor: "var(--card-border)" }}>
+              <div className="px-6 pt-6 pb-3 border-b flex items-center justify-between" style={{ borderColor: "var(--card-border)" }}>
                 <h3 className="font-bold" style={{ color: "var(--text)", fontSize: 18 }}>تعديل المشروع</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setShowEdit(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: "var(--bg)", color: "var(--muted)" }}>إلغاء</button>
+                  <button onClick={handleSaveEdit} disabled={saving}
+                    className="px-4 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-40"
+                    style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
+                    {saving ? "جارٍ الحفظ..." : "حفظ"}
+                  </button>
+                </div>
               </div>
               <div className="px-6 py-5 space-y-4">
                 <input value={editTitle} onChange={e => setEditTitle(e.target.value)}
@@ -707,14 +714,6 @@ function ProjectDetail({ goal, circle, circles, users, onClose, onRefresh }: {
                   className="w-full px-4 py-2.5 rounded-xl border text-sm resize-none focus:outline-none" style={inputStyle} />
                 <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle} />
-                <div className="flex gap-2">
-                  <button onClick={handleSaveEdit} disabled={saving}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-40"
-                    style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
-                    {saving ? "جارٍ الحفظ..." : "حفظ"}
-                  </button>
-                  <button onClick={() => setShowEdit(false)} className="px-4 py-2.5 rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button>
-                </div>
               </div>
             </div>
           </div>

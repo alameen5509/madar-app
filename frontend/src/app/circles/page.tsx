@@ -277,7 +277,11 @@ export default function CirclesPage() {
             style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
             <div className="flex items-center justify-between px-6 pt-6 pb-3" style={{ borderBottom: "1px solid var(--card-border)" }}>
               <h3 className="font-bold" style={{ color: "var(--text)" }}>دائرة حياة جديدة</h3>
-              <button onClick={() => setShowNew(false)} style={{ color: "var(--muted)" }}>✕</button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setShowNew(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: "var(--bg)", color: "var(--muted)" }}>إلغاء</button>
+                <button onClick={handleCreate} className="px-4 py-1.5 rounded-lg text-xs font-bold text-white"
+                  style={{ background: `linear-gradient(135deg, ${newColor}, #C9A84C)` }}>إنشاء</button>
+              </div>
             </div>
             <div className="px-6 py-5 space-y-4">
               <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="اسم الدائرة (مثال: الصحة، العمل، العائلة)"
@@ -303,12 +307,6 @@ export default function CirclesPage() {
                       style={{ background: c, border: newColor === c ? "3px solid var(--text)" : "2px solid transparent", transform: newColor === c ? "scale(1.2)" : "scale(1)" }} />
                   ))}
                 </div>
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => setShowNew(false)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
-                  style={{ background: "var(--bg)", color: "var(--muted)" }}>إلغاء</button>
-                <button onClick={handleCreate} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white"
-                  style={{ background: `linear-gradient(135deg, ${newColor}, #C9A84C)` }}>إنشاء الدائرة</button>
               </div>
             </div>
           </div>

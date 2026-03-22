@@ -74,8 +74,16 @@ export default function UsersPage() {
 
         {showAddContact && (
           <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm fade-up space-y-3">
-            <p className="font-bold text-sm text-[#16213E]">إضافة جهة اتصال</p>
-            <p className="text-[10px] text-[#6B7280]">اسم + رقم جوال — للتواصل السريع وربط بالمهام</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-bold text-sm text-[#16213E]">إضافة جهة اتصال</p>
+                <p className="text-[10px] text-[#6B7280]">اسم + رقم جوال — للتواصل السريع وربط بالمهام</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => { setShowAddContact(false); setAddError(""); setAddSuccess(""); }} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6B7280] bg-gray-100">إلغاء</button>
+                <button onClick={addContact} className="px-4 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: "#2ABFBF" }}>إضافة</button>
+              </div>
+            </div>
             <input value={newContactName} onChange={(e) => setNewContactName(e.target.value)} placeholder="الاسم"
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#2ABFBF]" />
             <input type="tel" value={newContactPhone} onChange={(e) => setNewContactPhone(e.target.value)} placeholder="رقم الجوال (مثال: 0512345678)"
@@ -84,10 +92,6 @@ export default function UsersPage() {
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#2ABFBF]" />
             {addError && <p className="text-red-400 text-xs">{addError}</p>}
             {addSuccess && <p className="text-green-600 text-xs bg-green-50 rounded-lg px-3 py-2">{addSuccess}</p>}
-            <div className="flex gap-2">
-              <button onClick={() => { setShowAddContact(false); setAddError(""); setAddSuccess(""); }} className="flex-1 py-2.5 rounded-xl text-sm text-[#6B7280] bg-gray-100">إلغاء</button>
-              <button onClick={addContact} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "#2ABFBF" }}>إضافة</button>
-            </div>
           </div>
         )}
 

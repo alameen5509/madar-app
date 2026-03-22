@@ -656,7 +656,14 @@ function QuickFinanceDialog({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-sm fade-up p-5 space-y-3">
-        <h3 className="font-bold text-[#16213E] text-center">إدخال سريع</h3>
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-bold text-[#16213E]">إدخال سريع</h3>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6B7280] bg-gray-100">إلغاء</button>
+            <button onClick={save} className="px-4 py-1.5 rounded-lg text-xs font-bold text-white"
+              style={{ background: type === "expense" ? "#DC2626" : "#3D8C5A" }}>حفظ</button>
+          </div>
+        </div>
         <div className="flex gap-2">
           <button onClick={() => setType("expense")} className="flex-1 py-2 rounded-lg text-sm font-semibold"
             style={{ background: type === "expense" ? "#DC2626" : "#F3F4F6", color: type === "expense" ? "#fff" : "#6B7280" }}>مصروف</button>
@@ -699,8 +706,6 @@ function QuickFinanceDialog({ onClose }: { onClose: () => void }) {
         <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="الوصف (اختياري)"
           onKeyDown={(e) => { if (e.key === "Enter") save(); }}
           className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
-        <button onClick={save} className="w-full py-3 rounded-xl text-sm font-bold text-white"
-          style={{ background: type === "expense" ? "#DC2626" : "#3D8C5A" }}>حفظ</button>
       </div>
     </div>
   );
@@ -984,7 +989,14 @@ function BatchTaskDialog({ onClose, onCreated }: {
       <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-lg fade-up">
         <div className="flex items-center justify-between px-7 pt-7 pb-4 border-b border-gray-200">
           <h2 className="font-bold text-[#16213E]">إدخال مهام متعددة</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-[#6B7280] hover:bg-gray-100 transition text-sm">✕</button>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6B7280] bg-gray-100">إلغاء</button>
+            <button onClick={handleSubmit} disabled={loading}
+              className="px-4 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-60"
+              style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
+              {loading ? "جارٍ الإضافة…" : "إضافة الكل"}
+            </button>
+          </div>
         </div>
         <div className="px-7 py-6 space-y-4">
           <p className="text-xs text-[#6B7280]">اكتب كل مهمة في سطر منفصل:</p>
@@ -993,14 +1005,6 @@ function BatchTaskDialog({ onClose, onCreated }: {
             className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm bg-gray-50 resize-none focus:outline-none focus:border-[#D4AF37] transition font-medium leading-relaxed" />
           <p className="text-[11px] text-[#9CA3AF]">{text.split("\n").filter((l) => l.trim()).length} مهمة</p>
           {error && <p className="text-red-400 text-sm">{error}</p>}
-          <div className="flex gap-3">
-            <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-[#6B7280] bg-gray-100 border border-gray-200">إلغاء</button>
-            <button onClick={handleSubmit} disabled={loading}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-60"
-              style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
-              {loading ? "جارٍ الإضافة…" : "إضافة الكل"}
-            </button>
-          </div>
         </div>
       </div>
     </div>
@@ -1072,7 +1076,14 @@ function EditTaskDialog({ task, onClose, onSaved }: {
         style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
         <div className="flex items-center justify-between px-6 pt-6 pb-3" style={{ borderBottom: "1px solid var(--card-border)" }}>
           <h3 className="font-bold" style={{ color: "var(--text)" }}>✏️ تعديل المهمة</h3>
-          <button onClick={onClose} style={{ color: "var(--muted)" }}>✕</button>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: "var(--bg)", color: "var(--muted)" }}>إلغاء</button>
+            <button onClick={save} disabled={loading}
+              className="px-4 py-1.5 rounded-lg text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-60"
+              style={{ background: "linear-gradient(135deg, #5E5495, #C9A84C)" }}>
+              {loading ? "جارٍ الحفظ…" : assignEmail ? "تعيين وحفظ" : "حفظ"}
+            </button>
+          </div>
         </div>
         <div className="px-6 py-5 space-y-4">
           <div>
@@ -1167,15 +1178,6 @@ function EditTaskDialog({ task, onClose, onSaved }: {
             {assignEmail && <p className="text-[10px] mt-1" style={{ color: "#D4AF37" }}>سيتم إرسال المهمة للشخص وإلغاؤها من قائمتك</p>}
           </div>
           {error && <p className="text-red-400 text-xs">{error}</p>}
-          <div className="flex gap-3">
-            <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
-              style={{ background: "var(--bg)", color: "var(--muted)" }}>إلغاء</button>
-            <button onClick={save} disabled={loading}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-60"
-              style={{ background: "linear-gradient(135deg, #5E5495, #C9A84C)" }}>
-              {loading ? "جارٍ الحفظ…" : assignEmail ? "تعيين وحفظ" : "حفظ التعديلات"}
-            </button>
-          </div>
           <button onClick={async () => {
             if (!confirm("حذف هذه المهمة نهائياً؟")) return;
             try { await api.delete(`/api/tasks/${task.id}`); onSaved(); onClose(); } catch {}
