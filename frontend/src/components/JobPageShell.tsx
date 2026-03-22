@@ -58,7 +58,7 @@ export function useJobMeta(jobId: string) {
     team: { name: string; role: string; position?: string; notes?: string; lastContact?: string; partnerType?: string; sharePercent?: string; status?: string; skills?: string; company?: string; projects?: string }[];
     kpis: { title: string; description?: string; target: string; current: string; period?: string; history?: { date: string; value: string }[] }[];
     achievements: { title: string; date: string; description?: string; type?: string }[];
-    skills: string[];
+    skills: (string | { name: string; level: number; target: number; plan?: string; fromJob?: boolean })[];
     meetings: { title: string; date: string; notes: string }[];
     lessons: string[];
   }>({ team: [], kpis: [], achievements: [], skills: [], meetings: [], lessons: [] });
