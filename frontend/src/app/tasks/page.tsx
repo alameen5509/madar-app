@@ -2618,7 +2618,7 @@ export default function TasksPage() {
             className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
             متعدد
           </button>
-          <button onClick={() => setShowQuickFinance(true)}
+          <button onClick={() => { window.location.href = "/finance?add=1"; }}
             className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
             💰
           </button>

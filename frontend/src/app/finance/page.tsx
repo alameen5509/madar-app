@@ -647,7 +647,10 @@ export default function FinancePage() {
   const [goldPrice, setGoldPriceRaw] = useState<number>(0);
   function setGoldPrice(v: number) { setGoldPriceRaw(v); if (v > 0) save("mfin_gold_price", v); }
   const [tab, setTab] = useState<"overview" | "transactions" | "accounts" | "pockets" | "debts" | "dues" | "goals" | "deductions" | "receivables" | "gold" | "zakat" | "settings">("overview");
-  const [showAdd, setShowAdd] = useState(false);
+  const [showAdd, setShowAdd] = useState(() => {
+    if (typeof window !== "undefined") return new URLSearchParams(window.location.search).get("add") === "1";
+    return false;
+  });
   const [month, setMonth]     = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; });
 
   // Add form
