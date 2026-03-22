@@ -114,7 +114,8 @@ public class FinanceController : ControllerBase
                 AccountId = t.AccountId != null && idMap.TryGetValue(t.AccountId, out var aid) ? aid : null,
                 PocketId = t.PocketId != null && idMap.TryGetValue(t.PocketId, out var pid) ? pid : null,
             };
-            if (Enum.TryParse<FinTransactionType>(t.Type, true, out var tt)) tx.Type = tt;
+            var nt = t.Type?.Replace("_", "") ?? "Expense";
+            if (Enum.TryParse<FinTransactionType>(nt, true, out var tt)) tx.Type = tt;
             if (t.ExpenseClass != null && Enum.TryParse<ExpenseClass>(t.ExpenseClass, true, out var ec)) tx.ExpenseClass = ec;
             _db.FinTransactions.Add(tx);
         }
@@ -208,7 +209,8 @@ public class FinanceController : ControllerBase
             Id = Guid.NewGuid(), OwnerId = UserId, Title = req.Title, Amount = req.Amount, Category = req.Category ?? "أخرى",
             Date = DateTime.TryParse(req.Date, out var d) ? d : DateTime.UtcNow, AccountId = req.AccountId, PocketId = req.PocketId,
         };
-        if (Enum.TryParse<FinTransactionType>(req.Type, true, out var tt)) tx.Type = tt;
+        var normalizedType = req.Type?.Replace("_", "") ?? "Expense";
+        if (Enum.TryParse<FinTransactionType>(normalizedType, true, out var tt)) tx.Type = tt;
         if (req.ExpenseClass != null && Enum.TryParse<ExpenseClass>(req.ExpenseClass, true, out var ec)) tx.ExpenseClass = ec;
         _db.FinTransactions.Add(tx);
         await _db.SaveChangesAsync(ct);
@@ -222,7 +224,8 @@ public class FinanceController : ControllerBase
         if (tx is null) return NotFound();
         tx.Title = req.Title; tx.Amount = req.Amount; tx.Category = req.Category ?? tx.Category;
         if (DateTime.TryParse(req.Date, out var d)) tx.Date = d;
-        if (Enum.TryParse<FinTransactionType>(req.Type, true, out var tt)) tx.Type = tt;
+        var normalizedType = req.Type?.Replace("_", "") ?? tx.Type.ToString();
+        if (Enum.TryParse<FinTransactionType>(normalizedType, true, out var tt)) tx.Type = tt;
         if (req.ExpenseClass != null && Enum.TryParse<ExpenseClass>(req.ExpenseClass, true, out var ec)) tx.ExpenseClass = ec;
         tx.AccountId = req.AccountId; tx.PocketId = req.PocketId;
         await _db.SaveChangesAsync(ct);
