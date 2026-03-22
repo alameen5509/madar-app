@@ -287,68 +287,86 @@ function PrayerSection() {
     <>
       {/* ═══ Prayer Cards ═══ */}
       <GeometricDivider label="الصلوات" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
-        {PRAYERS.map(p => {
-          const cur = prayerState[p.key] ?? { onTime: false, inMosque: false, expired: false };
-          const timeStatus = getPrayerTimeStatus(p.key);
-          const timeStr = getPrayerTimeStr(p.key);
-          const bothDone = cur.onTime && cur.inMosque;
-          const hasIssue = cur.expired && (!cur.onTime || !cur.inMosque);
+      {(() => {
+        const visible = PRAYERS.filter(p => {
+          const cur = prayerState[p.key];
+          if (!cur) return true; // no data yet — show
+          if (cur.onTime && cur.inMosque) return false; // both done — hide
+          if (cur.expired) return false; // time passed — hide (penalties already added)
+          return true;
+        });
+        const done = PRAYERS.length - visible.length;
 
-          return (
-            <div key={p.key}
-              className="bg-white rounded-xl p-4 border shadow-sm transition-all"
-              style={{
-                borderColor: hasIssue ? "#DC2626" : bothDone ? "#3D8C5A" : timeStatus === "current" ? "#D4AF37" : "#E5E7EB",
-                opacity: timeStatus === "future" && !cur.onTime && !cur.inMosque ? 0.65 : 1,
-              }}>
-              {/* Prayer name + time */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{p.icon}</span>
-                  <div>
-                    <p className="text-sm font-bold text-[#16213E]">{p.label}</p>
-                    {timeStr && <p className="text-[10px] text-[#6B7280]">{timeStr}</p>}
-                  </div>
-                </div>
-                {timeStatus === "current" && !bothDone && (
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] animate-pulse" />
-                )}
-                {bothDone && <span className="text-lg">🌟</span>}
-              </div>
-
-              {/* Two independent toggle buttons */}
-              <div className="flex gap-2">
-                <button onClick={() => togglePrayer(p.key, "onTime")}
-                  className="flex-1 py-2.5 rounded-lg text-[11px] font-bold transition-all"
-                  style={{
-                    background: cur.onTime ? "#3D8C5A" : (cur.expired && !cur.onTime) ? "#FEF2F2" : "#F3F4F6",
-                    color: cur.onTime ? "white" : (cur.expired && !cur.onTime) ? "#DC2626" : "#6B7280",
-                    border: `1.5px solid ${cur.onTime ? "#3D8C5A" : (cur.expired && !cur.onTime) ? "#DC2626" : "#E5E7EB"}`,
-                  }}>
-                  {cur.onTime ? "✅ في الوقت" : (cur.expired && !cur.onTime) ? "🔴 فاتت" : "⏰ في الوقت"}
-                </button>
-                <button onClick={() => togglePrayer(p.key, "inMosque")}
-                  className="flex-1 py-2.5 rounded-lg text-[11px] font-bold transition-all"
-                  style={{
-                    background: cur.inMosque ? "#2C2C54" : (cur.expired && !cur.inMosque) ? "#FEF2F2" : "#F3F4F6",
-                    color: cur.inMosque ? "white" : (cur.expired && !cur.inMosque) ? "#DC2626" : "#6B7280",
-                    border: `1.5px solid ${cur.inMosque ? "#2C2C54" : (cur.expired && !cur.inMosque) ? "#DC2626" : "#E5E7EB"}`,
-                  }}>
-                  {cur.inMosque ? "🕌 في المسجد" : (cur.expired && !cur.inMosque) ? "🔴 لم تُصلَّ" : "🕌 في المسجد"}
-                </button>
-              </div>
-
-              {/* Status label */}
-              {bothDone && (
-                <p className="text-center text-[10px] font-semibold mt-2" style={{ color: "#3D8C5A" }}>
-                  بارك الله فيك — أتممت الصلاة كاملة
+        return (
+          <>
+            {/* Done summary */}
+            {done > 0 && (
+              <div className="flex items-center gap-2 mt-3 px-1">
+                <span className="text-sm">🌟</span>
+                <p className="text-xs text-[#3D8C5A] font-semibold">
+                  {done === PRAYERS.length
+                    ? "بارك الله فيك — أتممت جميع الصلوات اليوم"
+                    : `${done} من ${PRAYERS.length} صلوات مكتملة`}
                 </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              </div>
+            )}
+
+            {/* Active prayer cards */}
+            {visible.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
+                {visible.map(p => {
+                  const cur = prayerState[p.key] ?? { onTime: false, inMosque: false, expired: false };
+                  const timeStatus = getPrayerTimeStatus(p.key);
+                  const timeStr = getPrayerTimeStr(p.key);
+
+                  return (
+                    <div key={p.key}
+                      className="bg-white rounded-xl p-4 border shadow-sm transition-all"
+                      style={{
+                        borderColor: timeStatus === "current" ? "#D4AF37" : "#E5E7EB",
+                        opacity: timeStatus === "future" ? 0.65 : 1,
+                      }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{p.icon}</span>
+                          <div>
+                            <p className="text-sm font-bold text-[#16213E]">{p.label}</p>
+                            {timeStr && <p className="text-[10px] text-[#6B7280]">{timeStr}</p>}
+                          </div>
+                        </div>
+                        {timeStatus === "current" && (
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] animate-pulse" />
+                        )}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button onClick={() => togglePrayer(p.key, "onTime")}
+                          className="flex-1 py-2.5 rounded-lg text-[11px] font-bold transition-all"
+                          style={{
+                            background: cur.onTime ? "#3D8C5A" : "#F3F4F6",
+                            color: cur.onTime ? "white" : "#6B7280",
+                            border: `1.5px solid ${cur.onTime ? "#3D8C5A" : "#E5E7EB"}`,
+                          }}>
+                          {cur.onTime ? "✅ في الوقت" : "⏰ في الوقت"}
+                        </button>
+                        <button onClick={() => togglePrayer(p.key, "inMosque")}
+                          className="flex-1 py-2.5 rounded-lg text-[11px] font-bold transition-all"
+                          style={{
+                            background: cur.inMosque ? "#2C2C54" : "#F3F4F6",
+                            color: cur.inMosque ? "white" : "#6B7280",
+                            border: `1.5px solid ${cur.inMosque ? "#2C2C54" : "#E5E7EB"}`,
+                          }}>
+                          {cur.inMosque ? "🕌 في المسجد" : "🕌 في المسجد"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {/* ═══ Penalties — always visible ═══ */}
       {penalties.length > 0 && (
