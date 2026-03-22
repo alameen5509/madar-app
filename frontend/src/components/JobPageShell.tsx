@@ -97,11 +97,25 @@ export default function JobPageShell({ jobId, children }: { jobId: string; child
       {/* Header */}
       <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b px-6 py-4 pr-14 md:pr-6" style={{ borderColor: "var(--card-border)" }}>
         {/* Breadcrumb */}
-        <div className="flex items-center gap-1 text-[10px] mb-2">
-          <Link href="/jobs" className="hover:underline" style={{ color: "var(--muted)" }}>الوظائف</Link>
-          <span style={{ color: "var(--muted)" }}>←</span>
-          <span className="font-semibold" style={{ color: "#2D6B9E" }}>{job.name}</span>
-        </div>
+        {(() => {
+          const base = `/jobs/${jobId}`;
+          const activeNav = NAV.find(n => n.key && pathname === base + n.key);
+          return (
+            <div className="flex items-center gap-1 text-[10px] mb-2">
+              <Link href="/jobs" className="hover:underline" style={{ color: "var(--muted)" }}>الوظائف</Link>
+              <span style={{ color: "var(--muted)" }}>←</span>
+              {activeNav ? (
+                <>
+                  <Link href={base} className="hover:underline" style={{ color: "var(--muted)" }}>{job.name}</Link>
+                  <span style={{ color: "var(--muted)" }}>←</span>
+                  <span className="font-semibold" style={{ color: "#2D6B9E" }}>{activeNav.icon} {activeNav.label}</span>
+                </>
+              ) : (
+                <span className="font-semibold" style={{ color: "#2D6B9E" }}>{job.name}</span>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Job info */}
         <div className="flex items-center gap-4">
