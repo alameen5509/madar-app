@@ -188,7 +188,7 @@ const DEF_POCKETS: Pocket[] = [
 
 /* ═══ Debt Section ════════════════════════════════════════════════════════ */
 
-function DebtSection({ debts, onUpdate }: { debts: Debt[]; onUpdate: (d: Debt[]) => void }) {
+function DebtSection({ debts, onUpdate, onPayment }: { debts: Debt[]; onUpdate: (d: Debt[]) => void; onPayment?: (debtName: string, amount: number) => void }) {
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName]       = useState("");
   const [phone, setPhone]     = useState("");
@@ -218,7 +218,10 @@ function DebtSection({ debts, onUpdate }: { debts: Debt[]; onUpdate: (d: Debt[])
 
   function payDebt() {
     if (!payId || !payAmt) return;
-    onUpdate(debts.map((d) => d.id === payId ? { ...d, paidSoFar: d.paidSoFar + Number(payAmt) } : d));
+    const amt = Number(payAmt);
+    const debt = debts.find(d => d.id === payId);
+    onUpdate(debts.map((d) => d.id === payId ? { ...d, paidSoFar: d.paidSoFar + amt } : d));
+    if (onPayment && debt) onPayment(debt.creditorName, amt);
     setPayId(null); setPayAmt("");
   }
 
@@ -957,6 +960,37 @@ export default function FinancePage() {
       });
       const mapped = { ...newTx, type: fType, expenseClass: fType === "expense" ? fExpCls : undefined };
       setTxs(prev => [mapped, ...prev]);
+
+      // ═══ توزيع تلقائي عند الدخل ═══
+      if (fType === "income" && amt > 0) {
+        const debtPocket = pockets.find(p => p.type === "debt");
+        const savPocket = pockets.find(p => p.type === "savings");
+        const hasDebts = debts.some(d => d.originalAmount - d.paidSoFar > 0);
+
+        // تحويل نسبة الديون
+        if (hasDebts && settings.debtPercent > 0 && debtPocket) {
+          const debtAmt = Math.round(amt * settings.debtPercent / 100);
+          if (debtAmt > 0) {
+            api.post("/api/finance/transactions", {
+              title: `تحويل تلقائي لمحفظة الديون (${settings.debtPercent}%)`,
+              amount: debtAmt, type: "transfer", category: "ديون",
+              pocketId: debtPocket.id, date: fDate,
+            }).then(({ data: dtx }) => setTxs(prev => [{ ...dtx, type: "transfer" }, ...prev])).catch(() => {});
+          }
+        }
+
+        // تحويل نسبة الادخار
+        if (settings.savingsPercent > 0 && savPocket) {
+          const savAmt = Math.round(amt * settings.savingsPercent / 100);
+          if (savAmt > 0) {
+            api.post("/api/finance/transactions", {
+              title: `تحويل تلقائي لمحفظة الادخار (${settings.savingsPercent}%)`,
+              amount: savAmt, type: "transfer", category: "ادخار",
+              pocketId: savPocket.id, date: fDate,
+            }).then(({ data: stx }) => setTxs(prev => [{ ...stx, type: "transfer" }, ...prev])).catch(() => {});
+          }
+        }
+      }
     } catch {
       setTxs(prev => [{ id: Date.now().toString(), title: fullTitle, amount: amt, type: fType, category: fCat, expenseClass: fType === "expense" ? fExpCls : undefined, accountId: safeAid ?? "", pocketId: safePid ?? "", date: fDate }, ...prev]);
     }
@@ -1187,12 +1221,73 @@ export default function FinancePage() {
             </div>
           )}
 
+          {/* ═══ النصائح الذكية ═══ */}
+          {(() => {
+            const tips: { text: string; icon: string; color: string; bg: string }[] = [];
+            const debtPocket = pockets.find(p => p.type === "debt");
+            const savPocket = pockets.find(p => p.type === "savings");
+            const debtPocketBal = debtPocket ? calcPocketBal(debtPocket.id) : 0;
+            const savPocketBal = savPocket ? calcPocketBal(savPocket.id) : 0;
+            const hasDebts = totalDebtRemaining > 0;
+            const debtTarget = Math.round(income * settings.debtPercent / 100);
+            const savTarget = Math.round(income * settings.savingsPercent / 100);
+
+            // نصائح الديون
+            if (hasDebts && debtPocketBal > 0) {
+              tips.push({ text: `لديك ${debtPocketBal.toLocaleString()} ريال في محفظة الديون — سدد دينك الآن`, icon: "💳", color: "#DC2626", bg: "#FEF2F2" });
+            }
+            if (hasDebts && income > 0 && debtPaid < debtTarget) {
+              tips.push({ text: `سددت ${debtPaid.toLocaleString()} من ${debtTarget.toLocaleString()} مخصص للديون — بقي ${(debtTarget - debtPaid).toLocaleString()}`, icon: "📊", color: "#D4AF37", bg: "#FFFBEB" });
+            }
+            if (hasDebts && debtPaid >= debtTarget && debtTarget > 0) {
+              tips.push({ text: `أحسنت! أتممت سداد حصة الديون لهذا الشهر ✅`, icon: "✅", color: "#3D8C5A", bg: "#F0FDF4" });
+            }
+            if (!hasDebts && debts.length > 0) {
+              tips.push({ text: `الحمد لله — سددت جميع ديونك! 🎉`, icon: "🎉", color: "#3D8C5A", bg: "#F0FDF4" });
+            }
+
+            // نصائح الادخار
+            if (savPocketBal > 0) {
+              tips.push({ text: `رصيد الادخار: ${savPocketBal.toLocaleString()} ريال — استمر!`, icon: "💎", color: "#D4AF37", bg: "#FFFBEB" });
+            }
+            if (income > 0 && settings.savingsPercent > 0 && savPocketBal < savTarget) {
+              tips.push({ text: `هدف الادخار: ${savTarget.toLocaleString()} ريال — ادّخرت ${savPocketBal.toLocaleString()} حتى الآن`, icon: "🎯", color: "#2D6B9E", bg: "#EFF6FF" });
+            }
+
+            // نصائح عامة
+            if (expense > income && income > 0) {
+              tips.push({ text: `مصاريفك (${expense.toLocaleString()}) تجاوزت دخلك (${income.toLocaleString()}) — راجع مصاريفك`, icon: "⚠️", color: "#DC2626", bg: "#FEF2F2" });
+            }
+            if (income > 0 && expense < income * 0.5) {
+              tips.push({ text: `ممتاز! مصاريفك أقل من نصف دخلك`, icon: "👏", color: "#3D8C5A", bg: "#F0FDF4" });
+            }
+            if (upcomingDues.length > 0) {
+              const duesTotal = upcomingDues.reduce((s, d) => s + d.amount, 0);
+              tips.push({ text: `لديك ${upcomingDues.length} التزام بقيمة ${duesTotal.toLocaleString()} ينتظر الدفع`, icon: "📋", color: "#D4AF37", bg: "#FFFBEB" });
+            }
+
+            if (tips.length === 0) return null;
+            return (
+              <div className="space-y-2">
+                <p className="text-xs font-bold" style={{ color: "var(--muted)" }}>💡 نصائح ذكية</p>
+                {tips.map((t, i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-xl px-4 py-3 border"
+                    style={{ background: t.bg, borderColor: t.color + "30" }}>
+                    <span className="text-lg">{t.icon}</span>
+                    <p className="text-xs font-medium flex-1" style={{ color: t.color }}>{t.text}</p>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
           {/* Deductions */}
           {(settings.debtPercent > 0 || settings.savingsPercent > 0) && (
             <div className="bg-blue-50 rounded-xl p-4 border border-blue-200 space-y-1">
-              <p className="text-blue-800 text-sm font-semibold">الاستقطاعات من الدخل</p>
+              <p className="text-blue-800 text-sm font-semibold">الاستقطاعات من الدخل (تحويل تلقائي)</p>
               {settings.debtPercent > 0 && <p className="text-blue-600 text-xs">💳 ديون: {settings.debtPercent}% = <b>{Math.round(income * settings.debtPercent / 100).toLocaleString()}</b></p>}
               {settings.savingsPercent > 0 && <p className="text-blue-600 text-xs">💎 ادخار: {settings.savingsPercent}% = <b>{Math.round(income * settings.savingsPercent / 100).toLocaleString()}</b></p>}
+              <p className="text-blue-400 text-[9px] mt-1">يُحوَّل تلقائياً عند إضافة معاملة دخل</p>
             </div>
           )}
 
@@ -1439,7 +1534,16 @@ export default function FinancePage() {
         )}
 
         {/* ═══ Debts ═══ */}
-        {tab === "debts" && (<DebtSection debts={debts} onUpdate={sDebts} />)}
+        {tab === "debts" && (<DebtSection debts={debts} onUpdate={sDebts} onPayment={(debtName, amount) => {
+          // تسجيل معاملة سداد من محفظة الديون
+          const debtPocket = pockets.find(p => p.type === "debt");
+          const safePid = debtPocket?.id && debtPocket.id.length > 10 ? debtPocket.id : null;
+          api.post("/api/finance/transactions", {
+            title: `سداد دين: ${debtName}`, amount, type: "debt_payment",
+            category: "ديون", pocketId: safePid,
+            date: new Date().toISOString().slice(0, 10),
+          }).then(({ data: tx }) => setTxs(prev => [{ ...tx, type: "debt_payment" }, ...prev])).catch(() => {});
+        }} />)}
 
         {/* ═══ Goals (أهداف مالية) ═══ */}
         {tab === "goals" && (
