@@ -1990,12 +1990,12 @@ export default function FinancePage() {
                   ))}
                 </div>
               )}
-              <input value={fTitle} onChange={(e) => setFTitle(e.target.value)} placeholder="الوصف"
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
               <input type="text" value={fAmount} onChange={(e) => { if (/^[\d+\-*/. ]*$/.test(e.target.value)) setFAmount(e.target.value); }}
                 onBlur={() => { try { const r = Function('"use strict"; return (' + fAmount + ')')(); if (typeof r === "number" && isFinite(r)) setFAmount(String(Math.round(r*100)/100)); } catch {} }}
                 placeholder="المبلغ (يدعم حسابات: 500+300)"
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base font-bold text-center focus:outline-none focus:border-[#D4AF37]" autoFocus />
+              <input value={fTitle} onChange={(e) => setFTitle(e.target.value)} placeholder="الوصف (اختياري)"
+                className="w-full px-4 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
 
               {/* Account selection */}
               <div>
