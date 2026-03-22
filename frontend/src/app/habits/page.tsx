@@ -292,8 +292,7 @@ function PrayerSection() {
           const cur = prayerState[p.key];
           if (!cur) return true; // no data yet — show
           if (cur.onTime && cur.inMosque) return false; // both done — hide
-          if (cur.expired) return false; // time passed — hide (penalties already added)
-          return true;
+          return true; // expired but not both done — keep visible
         });
         const done = PRAYERS.length - visible.length;
 
@@ -323,8 +322,9 @@ function PrayerSection() {
                     <div key={p.key}
                       className="bg-white rounded-xl p-4 border shadow-sm transition-all"
                       style={{
-                        borderColor: timeStatus === "current" ? "#D4AF37" : "#E5E7EB",
-                        opacity: timeStatus === "future" ? 0.65 : 1,
+                        borderColor: cur.expired && (!cur.onTime || !cur.inMosque) ? "#DC2626" : timeStatus === "current" ? "#D4AF37" : "#E5E7EB",
+                        opacity: timeStatus === "future" && !cur.onTime && !cur.inMosque ? 0.65 : 1,
+                        background: cur.expired && (!cur.onTime || !cur.inMosque) ? "#FEF2F2" : "white",
                       }}>
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
@@ -343,20 +343,20 @@ function PrayerSection() {
                         <button onClick={() => togglePrayer(p.key, "onTime")}
                           className="flex-1 py-2.5 rounded-lg text-[11px] font-bold transition-all"
                           style={{
-                            background: cur.onTime ? "#3D8C5A" : "#F3F4F6",
-                            color: cur.onTime ? "white" : "#6B7280",
-                            border: `1.5px solid ${cur.onTime ? "#3D8C5A" : "#E5E7EB"}`,
+                            background: cur.onTime ? "#3D8C5A" : cur.expired ? "#FEE2E2" : "#F3F4F6",
+                            color: cur.onTime ? "white" : cur.expired ? "#DC2626" : "#6B7280",
+                            border: `1.5px solid ${cur.onTime ? "#3D8C5A" : cur.expired ? "#DC2626" : "#E5E7EB"}`,
                           }}>
-                          {cur.onTime ? "✅ في الوقت" : "⏰ في الوقت"}
+                          {cur.onTime ? "✅ في الوقت" : cur.expired ? "🔴 فاتت" : "⏰ في الوقت"}
                         </button>
                         <button onClick={() => togglePrayer(p.key, "inMosque")}
                           className="flex-1 py-2.5 rounded-lg text-[11px] font-bold transition-all"
                           style={{
-                            background: cur.inMosque ? "#2C2C54" : "#F3F4F6",
-                            color: cur.inMosque ? "white" : "#6B7280",
-                            border: `1.5px solid ${cur.inMosque ? "#2C2C54" : "#E5E7EB"}`,
+                            background: cur.inMosque ? "#2C2C54" : cur.expired ? "#FEE2E2" : "#F3F4F6",
+                            color: cur.inMosque ? "white" : cur.expired ? "#DC2626" : "#6B7280",
+                            border: `1.5px solid ${cur.inMosque ? "#2C2C54" : cur.expired ? "#DC2626" : "#E5E7EB"}`,
                           }}>
-                          {cur.inMosque ? "🕌 في المسجد" : "🕌 في المسجد"}
+                          {cur.inMosque ? "🕌 في المسجد" : cur.expired ? "🔴 فاتت" : "🕌 في المسجد"}
                         </button>
                       </div>
                     </div>
