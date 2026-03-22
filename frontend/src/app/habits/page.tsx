@@ -39,7 +39,6 @@ const DEFAULT_HABITS: Habit[] = [
 
 const PRAYERS = [
   { key: "Fajr",    label: "الفجر",   icon: "🌅" },
-  { key: "Duha",    label: "الضحى",   icon: "☀️" },
   { key: "Dhuhr",   label: "الظهر",   icon: "🌤️" },
   { key: "Asr",     label: "العصر",   icon: "🌇" },
   { key: "Maghrib", label: "المغرب",  icon: "🌆" },
@@ -183,7 +182,6 @@ function PrayerSection() {
       // Prayer end times (next prayer's adhan = end of current)
       const prayerEndMap: Record<string, number> = {
         Fajr:    toMin(salahTimes.shuruq),
-        Duha:    toMin(salahTimes.dhuhr),
         Dhuhr:   toMin(salahTimes.asr),
         Asr:     toMin(salahTimes.maghrib),
         Maghrib: toMin(salahTimes.isha),
@@ -241,7 +239,6 @@ function PrayerSection() {
 
     const adhanMap: Record<string, number> = {
       Fajr: toMin(salahTimes.fajr),
-      Duha: toMin(salahTimes.shuruq) + 15,
       Dhuhr: toMin(salahTimes.dhuhr),
       Asr: toMin(salahTimes.asr),
       Maghrib: toMin(salahTimes.maghrib),
@@ -249,7 +246,6 @@ function PrayerSection() {
     };
     const endMap: Record<string, number> = {
       Fajr: toMin(salahTimes.shuruq),
-      Duha: toMin(salahTimes.dhuhr),
       Dhuhr: toMin(salahTimes.asr),
       Asr: toMin(salahTimes.maghrib),
       Maghrib: toMin(salahTimes.isha),
@@ -267,7 +263,7 @@ function PrayerSection() {
   function getPrayerTimeStr(prayerKey: string): string {
     if (!salahTimes) return "";
     const map: Record<string, string> = {
-      Fajr: salahTimes.fajr, Duha: salahTimes.shuruq,
+      Fajr: salahTimes.fajr,
       Dhuhr: salahTimes.dhuhr, Asr: salahTimes.asr,
       Maghrib: salahTimes.maghrib, Isha: salahTimes.isha,
     };
@@ -427,7 +423,7 @@ function PrayerSection() {
               <button onClick={saveSettings} className="px-4 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: "#2C2C54" }}>حفظ</button>
             </div>
           </div>
-          {PRAYERS.filter(p => p.key !== "Duha").map(p => (
+          {PRAYERS.map(p => (
             <div key={p.key} className="flex items-center gap-3">
               <span className="text-sm w-16 text-right font-medium text-[#16213E]">{p.icon} {p.label}</span>
               <div className="flex gap-1 flex-1 flex-wrap">
