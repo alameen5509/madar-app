@@ -149,14 +149,12 @@ const EXPENSE_SUBS = [
 const DEF_EXP_CATS = ["طعام", "مواصلات", "سكن", "فواتير", "صحة", "تعليم", "ترفيه", "ملابس", "اشتراكات", "صيانة", "تبرعات", "أخرى"];
 const DEF_INC_CATS = ["راتب", "عمل حر", "استثمار", "مكافأة", "إيجار", "أخرى"];
 const DUE_TYPES = [
-  { key: "salary",           label: "راتب",        icon: "💼", color: "#3D8C5A" },
   { key: "bill",             label: "فاتورة",      icon: "📄", color: "#DC2626" },
   { key: "installment",      label: "قسط",         icon: "📋", color: "#8C4A3D" },
   { key: "nafaqa",           label: "نفقة",        icon: "👨‍👩‍👧", color: "#5E5495" },
   { key: "rent",             label: "إيجار",       icon: "🏠", color: "#0F3460" },
   { key: "subscription",     label: "اشتراك",      icon: "📱", color: "#2D6B9E" },
   { key: "insurance",        label: "تأمين",       icon: "🛡️", color: "#6B7280" },
-  { key: "expected_income",  label: "دخل متوقع",   icon: "📥", color: "#0F3460" },
   { key: "expected_expense", label: "مصروف متوقع", icon: "📤", color: "#D4AF37" },
 ] as const;
 const EXP_CLS: Record<ExpenseClass, { label: string; color: string; icon: string }> = {
@@ -404,7 +402,7 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
   const [showAdd, setShowAdd] = useState(false);
   const [dTitle, setDTitle]   = useState("");
   const [dAmount, setDAmount] = useState("");
-  const [dType, setDType]     = useState<RecurringDue["type"]>("salary");
+  const [dType, setDType]     = useState<RecurringDue["type"]>("bill");
   const [dFreq, setDFreq]     = useState<RecurringDue["frequency"]>("monthly");
   const [dDay, setDDay]       = useState("27");
   const [dAcct, setDAcct]     = useState("");
@@ -427,9 +425,7 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
   const todayDay = today.getDate();
   const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
 
-  const activeDues = dues.filter((d) => d.isActive);
-  const incomeDues = activeDues.filter((d) => d.type === "salary" || d.type === "expected_income");
-  const expenseDues = activeDues.filter((d) => d.type !== "salary" && d.type !== "expected_income");
+  const activeDues = dues.filter((d) => d.isActive && d.type !== "salary" && d.type !== "expected_income");
 
   function isDueNow(d: RecurringDue): boolean {
     if (d.frequency === "yearly" && d.dueMonth !== today.getMonth() + 1) return false;
@@ -437,16 +433,12 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
     return !confirmed && todayDay >= d.dueDay;
   }
 
-  const totalMonthlyIncome = incomeDues.filter(d => d.frequency === "monthly").reduce((s, d) => s + d.amount, 0);
-  const totalMonthlyExpense = expenseDues.filter(d => d.frequency === "monthly").reduce((s, d) => s + d.amount, 0);
+  const totalMonthly = activeDues.filter(d => d.frequency === "monthly").reduce((s, d) => s + d.amount, 0);
 
   return (
     <section className="space-y-5">
       {/* Summary */}
-      <div className="grid grid-cols-2 gap-3">
-        <Stat label="دخل شهري متوقع" value={totalMonthlyIncome} color="#3D8C5A" />
-        <Stat label="مصاريف شهرية ثابتة" value={totalMonthlyExpense} color="#DC2626" />
-      </div>
+      <Stat label="التزامات شهرية" value={totalMonthly} color="#DC2626" />
 
       {/* Due Now - needs action */}
       {activeDues.filter(isDueNow).length > 0 && (
@@ -455,10 +447,9 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
           <div className="space-y-2">
             {activeDues.filter(isDueNow).map((d) => {
               const meta = DUE_TYPES.find((t) => t.key === d.type);
-              const isIncome = d.type === "salary" || d.type === "expected_income";
               return (
                 <div key={d.id} className="bg-white rounded-xl px-5 py-4 border-2 shadow-sm"
-                  style={{ borderColor: isIncome ? "#3D8C5A" : "#DC2626" }}>
+                  style={{ borderColor: "#DC2626" }}>
                   <div className="flex items-center gap-3">
                     <span className="text-xl">{meta?.icon}</span>
                     <div className="flex-1">
@@ -467,8 +458,8 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
                     </div>
                     <button onClick={() => onConfirm(d)}
                       className="px-4 py-2 rounded-xl text-xs font-bold text-white transition hover:opacity-90"
-                      style={{ background: isIncome ? "#3D8C5A" : "#DC2626" }}>
-                      {isIncome ? "تم الاستلام" : "تم الدفع"}
+                      style={{ background: "#DC2626" }}>
+                      تم الدفع
                     </button>
                   </div>
                 </div>
@@ -478,37 +469,14 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
         </>
       )}
 
-      {/* Income dues */}
-      <GeometricDivider label="الدخل المتوقع" />
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] text-[#6B7280]">رواتب ودخل متكرر</p>
-        <button onClick={() => { setDType("salary"); setShowAdd(true); }} className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style={{ background: "#3D8C5A" }}>+ راتب / دخل</button>
-      </div>
-      {incomeDues.length === 0 && <p className="text-center text-[#9CA3AF] text-xs py-4">لا توجد مصادر دخل مجدولة</p>}
-      {incomeDues.map((d) => {
-        const confirmed = d.lastConfirmedDate?.startsWith(currentMonthStr);
-        return (
-          <div key={d.id} className={`bg-white rounded-xl px-5 py-4 border border-gray-200 flex items-center gap-3 ${confirmed ? "opacity-50" : ""}`}>
-            <span className="text-lg">{DUE_TYPES.find((t) => t.key === d.type)?.icon}</span>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-[#16213E]">{d.title}</p>
-              <p className="text-[10px] text-[#6B7280]">يوم {d.dueDay} · {d.frequency === "monthly" ? "شهري" : d.frequency === "yearly" ? "سنوي" : "مرة واحدة"}</p>
-            </div>
-            <p className="text-sm font-black text-[#3D8C5A]">{d.amount.toLocaleString()}</p>
-            {confirmed && <span className="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 rounded-full">تم</span>}
-            <button onClick={() => onUpdate(dues.filter((x) => x.id !== d.id))} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
-          </div>
-        );
-      })}
-
-      {/* Expense dues */}
-      <GeometricDivider label="المصاريف الثابتة" />
+      {/* All dues */}
+      <GeometricDivider label="الالتزامات" />
       <div className="flex items-center justify-between">
         <p className="text-[10px] text-[#6B7280]">فواتير وأقساط والتزامات</p>
-        <button onClick={() => { setDType("bill"); setShowAdd(true); }} className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style={{ background: "#DC2626" }}>+ فاتورة / قسط</button>
+        <button onClick={() => { setDType("bill"); setShowAdd(true); }} className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style={{ background: "#DC2626" }}>+ التزام جديد</button>
       </div>
-      {expenseDues.length === 0 && <p className="text-center text-[#9CA3AF] text-xs py-4">لا توجد مصاريف ثابتة</p>}
-      {expenseDues.map((d) => {
+      {activeDues.length === 0 && <p className="text-center text-[#9CA3AF] text-xs py-4">لا توجد التزامات</p>}
+      {activeDues.map((d) => {
         const confirmed = d.lastConfirmedDate?.startsWith(currentMonthStr);
         return (
           <div key={d.id} className={`bg-white rounded-xl px-5 py-4 border border-gray-200 flex items-center gap-3 ${confirmed ? "opacity-50" : ""}`}>
@@ -543,7 +511,7 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
               </button>
             ))}
           </div>
-          <input value={dTitle} onChange={(e) => setDTitle(e.target.value)} placeholder="مثال: راتب الشركة، فاتورة الكهرباء…"
+          <input value={dTitle} onChange={(e) => setDTitle(e.target.value)} placeholder="مثال: فاتورة الكهرباء، إيجار الشقة…"
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
           <input type="number" value={dAmount} onChange={(e) => setDAmount(e.target.value)} placeholder="المبلغ"
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
@@ -561,7 +529,7 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
             {accounts.map((a) => <option key={a.id} value={a.id}>{a.icon} {a.name}</option>)}
           </select>
           <div className="flex gap-1.5 flex-wrap">
-            {(dType === "salary" || dType === "expected_income" ? incCats : expCats).map((c) => (
+            {expCats.map((c) => (
               <button key={c} onClick={() => setDCat(c)} className="px-2 py-1 rounded-lg text-[10px] font-medium"
                 style={{ background: dCat === c ? "#2C2C54" : "#F3F4F6", color: dCat === c ? "#fff" : "#6B7280" }}>{c}</button>
             ))}
@@ -871,19 +839,17 @@ export default function FinancePage() {
   }
   function sFinGoals(v: FinGoal[]) { setFinGoals(v); }
 
-  /** تأكيد استلام/دفع التزام — يخصم من المحفظة الأساسية */
+  /** تأكيد دفع التزام — يخصم من المحفظة الأساسية */
   async function confirmDue(due: RecurringDue) {
-    const isIncome = due.type === "salary" || due.type === "expected_income";
     const aid = due.accountId || accounts[0]?.id || null;
-    // المحفظة الأساسية (personal) للخصم التلقائي
     const mainPocket = pockets.find(p => p.type === "personal");
     const pid = mainPocket?.id || pockets[0]?.id || null;
     const safeAid = aid && String(aid).length > 10 ? aid : null;
     const safePid = pid && String(pid).length > 10 ? pid : null;
     try {
       const { data: newTx } = await api.post("/api/finance/transactions", {
-        title: due.title, amount: due.amount, type: isIncome ? "Income" : "Expense",
-        category: due.category ?? (isIncome ? "راتب" : "التزامات"), accountId: safeAid, pocketId: safePid,
+        title: due.title, amount: due.amount, type: "Expense",
+        category: due.category ?? "التزامات", accountId: safeAid, pocketId: safePid,
         date: new Date().toISOString().slice(0, 10),
       });
       setTxs(prev => [newTx, ...prev]);
@@ -1047,6 +1013,7 @@ export default function FinancePage() {
   const currentMonth = today.getMonth() + 1;
   const upcomingDues = dues.filter((d) => {
     if (!d.isActive) return false;
+    if (d.type === "salary" || d.type === "expected_income") return false;
     const confirmedThisMonth = d.lastConfirmedDate?.startsWith(`${today.getFullYear()}-${String(currentMonth).padStart(2, "0")}`);
     if (confirmedThisMonth && d.frequency === "monthly") return false;
     if (d.frequency === "yearly" && d.dueMonth !== currentMonth) return false;
@@ -1136,20 +1103,16 @@ export default function FinancePage() {
           {upcomingDues.length > 0 && (
             <div className="bg-amber-50 rounded-xl p-4 border border-amber-200 space-y-2">
               <p className="text-amber-800 text-sm font-semibold">التزامات تنتظر التأكيد ({upcomingDues.length})</p>
-              {upcomingDues.slice(0, 3).map((d) => {
-                const isIncome = d.type === "salary" || d.type === "expected_income";
-                return (
+              {upcomingDues.slice(0, 3).map((d) => (
                   <div key={d.id} className="flex items-center gap-2">
                     <span className="text-xs">{DUE_TYPES.find((t) => t.key === d.type)?.icon}</span>
                     <span className="text-xs text-[#16213E] flex-1">{d.title} — يوم {d.dueDay}</span>
-                    <span className="text-xs font-bold" style={{ color: isIncome ? "#3D8C5A" : "#DC2626" }}>{d.amount.toLocaleString()}</span>
-                    <button onClick={() => confirmDue(d)} className="text-[10px] px-2 py-1 rounded-lg font-bold text-white"
-                      style={{ background: isIncome ? "#3D8C5A" : "#DC2626" }}>
-                      {isIncome ? "استلمت" : "دفعت"}
+                    <span className="text-xs font-bold text-[#DC2626]">{d.amount.toLocaleString()}</span>
+                    <button onClick={() => confirmDue(d)} className="text-[10px] px-2 py-1 rounded-lg font-bold text-white bg-[#DC2626]">
+                      دفعت
                     </button>
                   </div>
-                );
-              })}
+              ))}
               {upcomingDues.length > 3 && <button onClick={() => setTab("dues")} className="text-[10px] text-amber-700 hover:underline">عرض الكل →</button>}
             </div>
           )}
