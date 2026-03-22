@@ -1946,11 +1946,22 @@ export default function FinancePage() {
                 </select>
               </div>
 
-              <div className="flex gap-1.5 flex-wrap">
+              <div className="flex gap-1.5 flex-wrap items-center">
                 {(fType === "income" ? (settings.incomeCategories ?? DEF_INC_CATS) : (settings.expenseCategories ?? DEF_EXP_CATS)).map((c) => (
                   <button key={c} onClick={() => setFCat(c)} className="px-2 py-1 rounded-lg text-[10px] font-medium"
                     style={{ background: fCat === c ? "#2C2C54" : "#F3F4F6", color: fCat === c ? "#fff" : "#6B7280" }}>{c}</button>
                 ))}
+                <input type="text" placeholder="+ بند جديد" className="px-2 py-1 rounded-lg text-[10px] border border-dashed border-gray-300 w-20 focus:outline-none focus:border-[#D4AF37]"
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    const val = (e.target as HTMLInputElement).value.trim();
+                    if (!val) return;
+                    const key = fType === "income" ? "incomeCategories" : "expenseCategories";
+                    const current = settings[key] ?? (fType === "income" ? DEF_INC_CATS : DEF_EXP_CATS);
+                    if (!current.includes(val)) sSettings({ ...settings, [key]: [...current, val] });
+                    setFCat(val);
+                    (e.target as HTMLInputElement).value = "";
+                  }} />
               </div>
 
               {fType === "expense" && (
