@@ -242,6 +242,26 @@ public class FinanceController : ControllerBase
         return Ok(new { message = "تم الحذف" });
     }
 
+    // ═══ Fix: correct wrongly saved debt_payment transactions ═══
+    [HttpPost("fix-debt-types")]
+    public async Task<IActionResult> FixDebtTypes(CancellationToken ct)
+    {
+        // Find transactions with title starting with "سداد دين" that are wrongly saved as Income
+        var wrong = await _db.FinTransactions
+            .Where(t => t.OwnerId == UserId && t.Type == FinTransactionType.Income && t.Title.Contains("سداد دين"))
+            .ToListAsync(ct);
+        foreach (var tx in wrong) tx.Type = FinTransactionType.DebtPayment;
+
+        // Also fix any with category "ديون" saved as Income
+        var wrong2 = await _db.FinTransactions
+            .Where(t => t.OwnerId == UserId && t.Type == FinTransactionType.Income && t.Category == "ديون")
+            .ToListAsync(ct);
+        foreach (var tx in wrong2) tx.Type = FinTransactionType.DebtPayment;
+
+        await _db.SaveChangesAsync(ct);
+        return Ok(new { corrected = wrong.Count + wrong2.Count });
+    }
+
     // ═══ CRUD: Debts ═══
     [HttpPost("debts")]
     public async Task<IActionResult> CreateDebt([FromBody] CreateDebtReq req, CancellationToken ct)
