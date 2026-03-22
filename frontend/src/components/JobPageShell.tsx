@@ -56,7 +56,7 @@ export function useJobData(jobId: string) {
 export function useJobMeta(jobId: string) {
   const [meta, setMetaState] = useState<{
     team: { name: string; role: string; position?: string; notes?: string; lastContact?: string; partnerType?: string; sharePercent?: string; status?: string; skills?: string; company?: string; projects?: string }[];
-    kpis: { title: string; target: string; current: string }[];
+    kpis: { title: string; description?: string; target: string; current: string; period?: string; history?: { date: string; value: string }[] }[];
     achievements: { title: string; date: string }[];
     skills: string[];
     meetings: { title: string; date: string; notes: string }[];
