@@ -2594,33 +2594,29 @@ export default function TasksPage() {
 
       {/* Header */}
       <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-[#E2D5B0] px-4 py-3 pr-14 md:pr-4">
-        {/* الصف الأول: العنوان + التاريخ */}
+        {/* الصف الأول: الأزرار الرئيسية + التاريخ */}
         <div className="flex items-center justify-between mb-2">
-          <div>
-            <h2 className="text-[#16213E] font-bold text-base">أعمال اليوم</h2>
-            <p className="text-[#7C7A8E] text-[10px]">
-              {loading ? "جارٍ التحميل…" : `${done}/${total} مكتملة`}
-            </p>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowDialog(true)}
+              className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold text-white hover:opacity-90 transition"
+              style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
+              + مهمة
+            </button>
+            <button onClick={() => { window.location.href = "/finance?add=1"; }}
+              className="px-3 py-2 rounded-lg text-xs font-bold transition border border-[#3D8C5A] text-[#3D8C5A] hover:bg-[#3D8C5A] hover:text-white">
+              💰 معاملة
+            </button>
           </div>
           <div className="text-left">
             <p className="text-[#5E5495] text-sm font-semibold">{hijriDate}</p>
             <p className="text-[#7C7A8E] text-xs">{gregorianDate}</p>
           </div>
         </div>
-        {/* الصف الثاني: الأزرار */}
+        {/* الصف الثاني: أزرار ثانوية */}
         <div className="flex items-center gap-1.5">
-          <button onClick={() => setShowDialog(true)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white hover:opacity-90 transition"
-            style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
-            + مهمة
-          </button>
           <button onClick={() => setShowBatch(true)}
             className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
             متعدد
-          </button>
-          <button onClick={() => { window.location.href = "/finance?add=1"; }}
-            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
-            💰
           </button>
           <button onClick={() => setShowMoodPanel(true)}
             className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all border"
