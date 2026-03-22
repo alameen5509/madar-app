@@ -1529,11 +1529,11 @@ export default function FinancePage() {
 
         {/* ═══ Debts ═══ */}
         {tab === "debts" && (<DebtSection debts={debts} onUpdate={sDebts} onPayment={(debtName, amount) => {
-          // تسجيل معاملة سداد من محفظة الديون
-          const debtPocket = pockets.find(p => p.type === "debt");
-          const safePid = debtPocket?.id && debtPocket.id.length > 10 ? debtPocket.id : null;
+          // تسجيل معاملة سداد — يخصم من المحفظة الأساسية
+          const mainPocket = pockets.find(p => p.type === "personal");
+          const safePid = mainPocket?.id && mainPocket.id.length > 10 ? mainPocket.id : null;
           api.post("/api/finance/transactions", {
-            title: `سداد دين: ${debtName}`, amount, type: "debt_payment",
+            title: `سداد دين: ${debtName}`, amount, type: "DebtPayment",
             category: "ديون", pocketId: safePid,
             date: new Date().toISOString().slice(0, 10),
           }).then(({ data: tx }) => setTxs(prev => [{ ...tx, type: "debt_payment" }, ...prev])).catch(() => {});
