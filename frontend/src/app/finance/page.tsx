@@ -183,8 +183,6 @@ const DEF_ACCOUNTS: Account[] = [
 ];
 const DEF_POCKETS: Pocket[] = [
   { id: "p1", name: "المحفظة الأساسية", icon: "👤", type: "personal", balance: 0, commitments: [] },
-  { id: "p2", name: "محفظة الديون", icon: "💳", type: "debt", balance: 0, commitments: [] },
-  { id: "p3", name: "محفظة الادخار", icon: "💎", type: "savings", balance: 0, commitments: [] },
 ];
 
 /* ═══ Debt Section ════════════════════════════════════════════════════════ */
@@ -981,36 +979,6 @@ export default function FinancePage() {
       const mapped = { ...newTx, type: fType, expenseClass: fType === "expense" ? fExpCls : undefined };
       setTxs(prev => [mapped, ...prev]);
 
-      // ═══ توزيع تلقائي عند الدخل ═══
-      if (fType === "income" && amt > 0) {
-        const debtPocket = pockets.find(p => p.type === "debt");
-        const savPocket = pockets.find(p => p.type === "savings");
-        const hasDebts = debts.some(d => d.originalAmount - d.paidSoFar > 0);
-
-        // تحويل نسبة الديون
-        if (hasDebts && settings.debtPercent > 0 && debtPocket) {
-          const debtAmt = Math.round(amt * settings.debtPercent / 100);
-          if (debtAmt > 0) {
-            api.post("/api/finance/transactions", {
-              title: `تحويل تلقائي لمحفظة الديون (${settings.debtPercent}%)`,
-              amount: debtAmt, type: "transfer", category: "ديون",
-              pocketId: debtPocket.id, date: fDate,
-            }).then(({ data: dtx }) => setTxs(prev => [{ ...dtx, type: "transfer" }, ...prev])).catch(() => {});
-          }
-        }
-
-        // تحويل نسبة الادخار
-        if (settings.savingsPercent > 0 && savPocket) {
-          const savAmt = Math.round(amt * settings.savingsPercent / 100);
-          if (savAmt > 0) {
-            api.post("/api/finance/transactions", {
-              title: `تحويل تلقائي لمحفظة الادخار (${settings.savingsPercent}%)`,
-              amount: savAmt, type: "transfer", category: "ادخار",
-              pocketId: savPocket.id, date: fDate,
-            }).then(({ data: stx }) => setTxs(prev => [{ ...stx, type: "transfer" }, ...prev])).catch(() => {});
-          }
-        }
-      }
     } catch {
       setTxs(prev => [{ id: Date.now().toString(), title: fullTitle, amount: amt, type: fType, category: fCat, expenseClass: fType === "expense" ? fExpCls : undefined, accountId: safeAid ?? "", pocketId: safePid ?? "", date: fDate }, ...prev]);
     }
@@ -1208,7 +1176,7 @@ export default function FinancePage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Stat label="الرصيد الكلي" value={totalAcctBal} color="#2C2C54" sub="واردة - صادرة" />
             <Stat label="إجمالي الوارد" value={allIncome} color="#3D8C5A" sub={`${txs.filter(t=>t.type==="income").length} معاملة`} />
-            <Stat label="محفظة الادخار" value={savingsBalance} color="#D4AF37" />
+            <Stat label="الذهب" value={zakatData.goldGrams * (goldPrice || 310)} color="#D4AF37" sub={`${zakatData.goldGrams} جرام`} />
             <Stat label="ديون متبقية" value={totalDebtRemaining} color="#DC2626" />
           </div>
           {/* معاملات الشهر المختار */}
@@ -1244,10 +1212,7 @@ export default function FinancePage() {
           {/* ═══ النصائح الذكية ═══ */}
           {(() => {
             const tips: { text: string; icon: string; color: string; bg: string }[] = [];
-            const debtPocket = pockets.find(p => p.type === "debt");
-            const savPocket = pockets.find(p => p.type === "savings");
-            const debtPocketBal = debtPocket ? calcPocketBal(debtPocket.id) : 0;
-            const savPocketBal = savPocket ? calcPocketBal(savPocket.id) : 0;
+            const goldValue = zakatData.goldGrams * (goldPrice || 310);
             const hasDebts = totalDebtRemaining > 0;
             const totalDebtOriginal = debts.reduce((s, d) => s + d.originalAmount, 0);
             const totalPaidSoFar = debts.reduce((s, d) => s + d.paidSoFar, 0);
@@ -1265,9 +1230,6 @@ export default function FinancePage() {
                 tips.push({ text: `ركّز على "${smallest.creditorName}" — متبقي ${sRemaining.toLocaleString()} فقط`, icon: "🎯", color: "#D4AF37", bg: "#FFFBEB" });
               }
             }
-            if (hasDebts && debtPocketBal > 0) {
-              tips.push({ text: `لديك ${debtPocketBal.toLocaleString()} في محفظة الديون جاهز للسداد — سدد الآن`, icon: "⚡", color: "#DC2626", bg: "#FEF2F2" });
-            }
             if (hasDebts && income > 0 && debtTarget > 0) {
               const monthPaid = debtPaid; // من معاملات debt_payment + installment هذا الشهر
               const remaining = Math.max(0, debtTarget - monthPaid);
@@ -1282,12 +1244,12 @@ export default function FinancePage() {
               tips.push({ text: `الحمد لله — سددت جميع ديونك! (${totalPaidSoFar.toLocaleString()}) 🎉`, icon: "🎉", color: "#3D8C5A", bg: "#F0FDF4" });
             }
 
-            // نصائح الادخار
-            if (savPocketBal > 0) {
-              tips.push({ text: `رصيد الادخار: ${savPocketBal.toLocaleString()} ريال — استمر!`, icon: "💎", color: "#D4AF37", bg: "#FFFBEB" });
+            // نصائح الذهب (الادخار)
+            if (zakatData.goldGrams > 0) {
+              tips.push({ text: `ادخارك في الذهب: ${zakatData.goldGrams} جرام = ${goldValue.toLocaleString()} ريال`, icon: "🪙", color: "#D4AF37", bg: "#FFFBEB" });
             }
-            if (income > 0 && settings.savingsPercent > 0 && savPocketBal < savTarget) {
-              tips.push({ text: `هدف الادخار: ${savTarget.toLocaleString()} ريال — ادّخرت ${savPocketBal.toLocaleString()} حتى الآن`, icon: "🎯", color: "#2D6B9E", bg: "#EFF6FF" });
+            if (income > 0 && zakatData.goldGrams === 0) {
+              tips.push({ text: `ابدأ بالادخار في الذهب — اشترِ من قسم الذهب`, icon: "💎", color: "#2D6B9E", bg: "#EFF6FF" });
             }
 
             // نصائح عامة
@@ -1317,15 +1279,6 @@ export default function FinancePage() {
             );
           })()}
 
-          {/* Deductions */}
-          {(settings.debtPercent > 0 || settings.savingsPercent > 0) && (
-            <div className="bg-blue-50 rounded-xl p-4 border border-blue-200 space-y-1">
-              <p className="text-blue-800 text-sm font-semibold">الاستقطاعات من الدخل (تحويل تلقائي)</p>
-              {settings.debtPercent > 0 && <p className="text-blue-600 text-xs">💳 ديون: {settings.debtPercent}% = <b>{Math.round(income * settings.debtPercent / 100).toLocaleString()}</b></p>}
-              {settings.savingsPercent > 0 && <p className="text-blue-600 text-xs">💎 ادخار: {settings.savingsPercent}% = <b>{Math.round(income * settings.savingsPercent / 100).toLocaleString()}</b></p>}
-              <p className="text-blue-400 text-[9px] mt-1">يُحوَّل تلقائياً عند إضافة معاملة دخل</p>
-            </div>
-          )}
 
           {/* Expense classification */}
           {expense > 0 && (
@@ -1729,19 +1682,14 @@ export default function FinancePage() {
               setZakatData(prev => ({ ...prev, goldGrams: prev.goldGrams + grams, goldPurchases: [purchase, ...prev.goldPurchases] }));
             }
 
-            // ربط بمحفظة الادخار: شراء = خصم من الادخار، بيع = إضافة للادخار
-            const savPocket = pockets.find(pp => pp.type === "savings");
-            const safePid = savPocket?.id && savPocket.id.length > 10 ? savPocket.id : null;
-            if (safePid) {
-              api.post("/api/finance/transactions", {
-                title: isSell ? `بيع ذهب: ${Math.abs(g)} جرام` : `شراء ذهب: ${g} جرام`,
-                amount: totalCost,
-                type: isSell ? "income" : "expense",
-                category: isSell ? "بيع ذهب" : "شراء ذهب",
-                pocketId: safePid,
-                date: todayStr,
-              }).then(({ data: tx }) => setTxs(prev => [{ ...tx, type: isSell ? "income" : "expense" }, ...prev])).catch(() => {});
-            }
+            // تسجيل معاملة شراء/بيع ذهب
+            api.post("/api/finance/transactions", {
+              title: isSell ? `بيع ذهب: ${Math.abs(g)} جرام` : `شراء ذهب: ${g} جرام`,
+              amount: totalCost,
+              type: isSell ? "income" : "expense",
+              category: isSell ? "بيع ذهب" : "شراء ذهب",
+              date: todayStr,
+            }).then(({ data: tx }) => setTxs(prev => [{ ...tx, type: isSell ? "income" : "expense" }, ...prev])).catch(() => {});
 
             setGoldForm(null); setGfGrams(""); setGfPrice(""); setGfNotes("");
           }
@@ -1749,25 +1697,18 @@ export default function FinancePage() {
           return (
             <section className="space-y-5">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Stat label="سعر الجرام الآن" value={goldPrice || 552} color="#D4AF37" sub="ريال / 24 قيراط" />
+                <Stat label="سعر الجرام (عيار 24)" value={goldPrice || 310} color="#D4AF37" sub="ريال · سعر عالمي مباشر" />
                 <Stat label="إجمالي الذهب" value={zakatData.goldGrams} color="#D4AF37" sub="جرام" />
                 <Stat label="القيمة الحالية" value={goldValue} color="#D4AF37" sub="ريال" />
                 <Stat label={goldProfit >= 0 ? "الربح" : "الخسارة"} value={Math.abs(goldProfit)} color={goldProfit >= 0 ? "#3D8C5A" : "#DC2626"} sub="ريال" />
               </div>
 
-              {/* ربط الادخار بالذهب */}
-              {(() => {
-                const savPocket = pockets.find(pp => pp.type === "savings");
-                const savBal = savPocket ? calcPocketBal(savPocket.id) : 0;
-                const canBuyGrams = goldPrice > 0 ? Math.floor(savBal / goldPrice * 10) / 10 : 0;
-                return (
-                  <div className="bg-amber-50 rounded-xl p-4 border border-amber-200 space-y-1">
-                    <p className="text-amber-800 text-sm font-bold">💎 محفظة الادخار → ذهب</p>
-                    <p className="text-amber-700 text-xs">رصيد الادخار: <b>{savBal.toLocaleString()}</b> ريال {canBuyGrams > 0 ? `— يمكنك شراء ~${canBuyGrams} جرام` : ""}</p>
-                    <p className="text-amber-500 text-[9px]">عند شراء ذهب يُخصم تلقائياً من محفظة الادخار · وعند البيع يُضاف إليها</p>
-                  </div>
-                );
-              })()}
+              {/* ملخص الادخار بالذهب */}
+              <div className="bg-amber-50 rounded-xl p-4 border border-amber-200 space-y-1">
+                <p className="text-amber-800 text-sm font-bold">💎 الادخار = ذهب</p>
+                <p className="text-amber-700 text-xs">رصيدك: <b>{zakatData.goldGrams} جرام</b> = <b>{goldValue.toLocaleString()}</b> ريال</p>
+                <p className="text-amber-500 text-[9px]">كل ادخارك في الذهب — اشترِ أو بِع من هنا</p>
+              </div>
 
               {goldPrice > 0 && avgBuyPrice > 0 && goldPrice < avgBuyPrice && (
                 <div className="bg-green-50 rounded-xl p-4 border border-green-200">
