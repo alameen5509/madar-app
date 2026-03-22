@@ -767,7 +767,25 @@ export default function FinancePage() {
     })));
     setFinGoals((d.goals ?? []).map(g => ({ ...g, items: g.items ?? [] })));
     setZakatData(d.zakat ?? { hawalDate: "", goldGrams: 0, goldPurchases: [] });
-    if (d.settings) setSettings({ ...d.settings, expenseCategories: d.settings.expenseCategories ?? DEF_EXP_CATS, incomeCategories: d.settings.incomeCategories ?? DEF_INC_CATS, deductions: d.settings.deductions ?? [], receivables: d.settings.receivables ?? [] });
+    const cats = (d.settings ?? {}) as Partial<FinSettings>;
+    // جلب الاستقطاعات والمستحقات من preferences
+    api.get("/api/users/me/preferences").then(({ data: prefs }) => {
+      setSettings({
+        debtPercent: cats.debtPercent ?? 10,
+        savingsPercent: cats.savingsPercent ?? 10,
+        expenseCategories: (cats.expenseCategories && cats.expenseCategories.length > 0) ? cats.expenseCategories : DEF_EXP_CATS,
+        incomeCategories: (cats.incomeCategories && cats.incomeCategories.length > 0) ? cats.incomeCategories : DEF_INC_CATS,
+        deductions: prefs?.deductions ?? [],
+        receivables: prefs?.receivables ?? [],
+      });
+    }).catch(() => {
+      setSettings({
+        debtPercent: cats.debtPercent ?? 10, savingsPercent: cats.savingsPercent ?? 10,
+        expenseCategories: (cats.expenseCategories && cats.expenseCategories.length > 0) ? cats.expenseCategories : DEF_EXP_CATS,
+        incomeCategories: (cats.incomeCategories && cats.incomeCategories.length > 0) ? cats.incomeCategories : DEF_INC_CATS,
+        deductions: [], receivables: [],
+      });
+    });
   }
 
   function applyLocalStorage() {
@@ -808,7 +826,13 @@ export default function FinancePage() {
   }
   function sSettings(v: FinSettings) {
     setSettings(v);
+    // حفظ البنود والنسب في finance/settings
     api.put("/api/finance/settings", { debtPercent: v.debtPercent, savingsPercent: v.savingsPercent, expenseCategories: v.expenseCategories, incomeCategories: v.incomeCategories }).catch(() => {});
+    // حفظ الاستقطاعات والمستحقات في preferences
+    api.put("/api/users/me/preferences", {
+      ...JSON.parse(localStorage.getItem("madar_settings") ?? "{}"),
+      deductions: v.deductions, receivables: v.receivables,
+    }).catch(() => {});
   }
   function sDebts(v: Debt[]) {
     // اكتشف الفرق وأرسل للـ API
