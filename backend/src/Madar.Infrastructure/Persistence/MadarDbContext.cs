@@ -43,6 +43,11 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
     public DbSet<GoldPurchase> GoldPurchases => Set<GoldPurchase>();
     public DbSet<FinSettings> FinSettings => Set<FinSettings>();
 
+    // Prayer tracking
+    public DbSet<PrayerLog> PrayerLogs => Set<PrayerLog>();
+    public DbSet<PrayerPenalty> PrayerPenalties => Set<PrayerPenalty>();
+    public DbSet<PrayerSettings> PrayerSettings => Set<PrayerSettings>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -280,6 +285,30 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
             ct.Property(x => x.Notes).HasMaxLength(500);
             ct.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
             ct.HasIndex(x => new { x.OwnerId, x.Phone }).IsUnique();
+        });
+
+        // ═══ Prayer Tracking ═══
+        builder.Entity<PrayerLog>(pl => {
+            pl.HasKey(x => x.Id);
+            pl.Property(x => x.Prayer).HasMaxLength(20).IsRequired();
+            pl.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            pl.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+            pl.HasIndex(x => new { x.OwnerId, x.Date, x.Prayer }).IsUnique();
+        });
+
+        builder.Entity<PrayerPenalty>(pp => {
+            pp.HasKey(x => x.Id);
+            pp.Property(x => x.Prayer).HasMaxLength(20).IsRequired();
+            pp.Property(x => x.PenaltyType).HasMaxLength(50).IsRequired();
+            pp.Property(x => x.PenaltyDetail).HasMaxLength(200);
+            pp.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+            pp.HasIndex(x => new { x.OwnerId, x.Fulfilled });
+        });
+
+        builder.Entity<PrayerSettings>(ps => {
+            ps.HasKey(x => x.Id);
+            ps.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+            ps.HasIndex(x => x.OwnerId).IsUnique();
         });
 
         builder.Entity<WatchLinkRequest_Entity>(wlr =>

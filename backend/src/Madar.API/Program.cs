@@ -173,4 +173,46 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+// Auto-create prayer tracking tables if missing
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<Madar.Infrastructure.Persistence.MadarDbContext>();
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS PrayerLogs (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                OwnerId CHAR(36) NOT NULL,
+                Date DATE NOT NULL,
+                Prayer VARCHAR(20) NOT NULL,
+                Status VARCHAR(20) NOT NULL DEFAULT 'None',
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                UNIQUE INDEX IX_PrayerLogs_OwnerId_Date_Prayer (OwnerId, Date, Prayer)
+            );
+            CREATE TABLE IF NOT EXISTS PrayerPenalties (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                OwnerId CHAR(36) NOT NULL,
+                Date DATE NOT NULL,
+                Prayer VARCHAR(20) NOT NULL,
+                PenaltyType VARCHAR(50) NOT NULL DEFAULT 'surah',
+                PenaltyDetail VARCHAR(200) NULL,
+                Fulfilled TINYINT(1) NOT NULL DEFAULT 0,
+                FulfilledAt DATETIME(6) NULL,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_PrayerPenalties_OwnerId_Fulfilled (OwnerId, Fulfilled)
+            );
+            CREATE TABLE IF NOT EXISTS PrayerSettings (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                OwnerId CHAR(36) NOT NULL,
+                PenaltyConfigJson LONGTEXT NOT NULL,
+                NotificationsEnabled TINYINT(1) NOT NULL DEFAULT 1,
+                UNIQUE INDEX IX_PrayerSettings_OwnerId (OwnerId)
+            );");
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Prayer tables auto-create skipped (may already exist)");
+    }
+}
+
 app.Run();
