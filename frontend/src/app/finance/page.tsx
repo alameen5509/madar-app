@@ -1714,15 +1714,33 @@ export default function FinancePage() {
             if (!g || !p) return;
             const isSell = goldForm === "sell";
             const grams = isSell ? -g : g;
-            const notes = (isSell ? "بيع" : "شراء") + (gfNotes ? ` · ${gfNotes}` : "");
+            const totalCost = Math.round(Math.abs(g) * p);
+            const notes = (isSell ? "بيع" : "شراء") + ` ${Math.abs(g)} جرام` + (gfNotes ? ` · ${gfNotes}` : "");
+            const todayStr = new Date().toISOString().slice(0, 10);
+
             try {
-              const { data } = await api.post("/api/finance/zakat/purchases", { grams, pricePerGram: p, date: new Date().toISOString().slice(0, 10), notes });
-              const purchase: GoldPurchase = { id: data.id, grams, pricePerGram: p, totalCost: Math.round(Math.abs(g) * p), date: new Date().toISOString().slice(0, 10), notes };
+              const { data } = await api.post("/api/finance/zakat/purchases", { grams, pricePerGram: p, date: todayStr, notes });
+              const purchase: GoldPurchase = { id: data.id, grams, pricePerGram: p, totalCost, date: todayStr, notes };
               setZakatData(prev => ({ ...prev, goldGrams: data.goldGrams ?? prev.goldGrams + grams, goldPurchases: [purchase, ...prev.goldPurchases] }));
             } catch {
-              const purchase: GoldPurchase = { id: Date.now().toString(), grams, pricePerGram: p, totalCost: Math.round(Math.abs(g) * p), date: new Date().toISOString().slice(0, 10), notes };
+              const purchase: GoldPurchase = { id: Date.now().toString(), grams, pricePerGram: p, totalCost, date: todayStr, notes };
               setZakatData(prev => ({ ...prev, goldGrams: prev.goldGrams + grams, goldPurchases: [purchase, ...prev.goldPurchases] }));
             }
+
+            // ربط بمحفظة الادخار: شراء = خصم من الادخار، بيع = إضافة للادخار
+            const savPocket = pockets.find(pp => pp.type === "savings");
+            const safePid = savPocket?.id && savPocket.id.length > 10 ? savPocket.id : null;
+            if (safePid) {
+              api.post("/api/finance/transactions", {
+                title: isSell ? `بيع ذهب: ${Math.abs(g)} جرام` : `شراء ذهب: ${g} جرام`,
+                amount: totalCost,
+                type: isSell ? "income" : "expense",
+                category: isSell ? "بيع ذهب" : "شراء ذهب",
+                pocketId: safePid,
+                date: todayStr,
+              }).then(({ data: tx }) => setTxs(prev => [{ ...tx, type: isSell ? "income" : "expense" }, ...prev])).catch(() => {});
+            }
+
             setGoldForm(null); setGfGrams(""); setGfPrice(""); setGfNotes("");
           }
 
@@ -1734,6 +1752,20 @@ export default function FinancePage() {
                 <Stat label="القيمة الحالية" value={goldValue} color="#D4AF37" sub="ريال" />
                 <Stat label={goldProfit >= 0 ? "الربح" : "الخسارة"} value={Math.abs(goldProfit)} color={goldProfit >= 0 ? "#3D8C5A" : "#DC2626"} sub="ريال" />
               </div>
+
+              {/* ربط الادخار بالذهب */}
+              {(() => {
+                const savPocket = pockets.find(pp => pp.type === "savings");
+                const savBal = savPocket ? calcPocketBal(savPocket.id) : 0;
+                const canBuyGrams = goldPrice > 0 ? Math.floor(savBal / goldPrice * 10) / 10 : 0;
+                return (
+                  <div className="bg-amber-50 rounded-xl p-4 border border-amber-200 space-y-1">
+                    <p className="text-amber-800 text-sm font-bold">💎 محفظة الادخار → ذهب</p>
+                    <p className="text-amber-700 text-xs">رصيد الادخار: <b>{savBal.toLocaleString()}</b> ريال {canBuyGrams > 0 ? `— يمكنك شراء ~${canBuyGrams} جرام` : ""}</p>
+                    <p className="text-amber-500 text-[9px]">عند شراء ذهب يُخصم تلقائياً من محفظة الادخار · وعند البيع يُضاف إليها</p>
+                  </div>
+                );
+              })()}
 
               {goldPrice > 0 && avgBuyPrice > 0 && goldPrice < avgBuyPrice && (
                 <div className="bg-green-50 rounded-xl p-4 border border-green-200">
