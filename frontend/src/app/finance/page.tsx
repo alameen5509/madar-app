@@ -355,15 +355,33 @@ function DebtSection({ debts, onUpdate, onPayment }: { debts: Debt[]; onUpdate: 
                   )}
 
                   {payId === d.id ? (
-                    <div className="flex gap-2 mt-2">
-                      <input type="number" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} placeholder="مبلغ السداد"
-                        className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
-                      <button onClick={payDebt} className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#3D8C5A]">سدد</button>
-                      <button onClick={() => setPayId(null)} className="px-3 py-2 rounded-lg text-xs text-[#6B7280] bg-gray-100">✕</button>
+                    <div className="space-y-2 mt-2 fade-up">
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => { setPayAmt(String(remaining)); }}
+                          className="py-2.5 rounded-lg text-xs font-bold text-white transition hover:opacity-90"
+                          style={{ background: "#3D8C5A" }}>
+                          ✅ سداد كامل ({remaining.toLocaleString()})
+                        </button>
+                        {d.monthlyPayment > 0 && d.monthlyPayment < remaining && (
+                          <button onClick={() => { setPayAmt(String(d.monthlyPayment)); }}
+                            className="py-2.5 rounded-lg text-xs font-bold text-white transition hover:opacity-90"
+                            style={{ background: "#D4AF37" }}>
+                            📋 القسط ({d.monthlyPayment.toLocaleString()})
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <input type="number" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} placeholder="مبلغ مخصص"
+                          className="flex-1 px-3 py-2.5 rounded-lg border border-gray-200 text-sm text-center font-bold focus:outline-none focus:border-[#D4AF37]" />
+                        <button onClick={payDebt} disabled={!payAmt || Number(payAmt) <= 0}
+                          className="px-5 py-2.5 rounded-lg text-xs font-bold text-white disabled:opacity-40 transition"
+                          style={{ background: "#2C2C54" }}>سدد</button>
+                        <button onClick={() => setPayId(null)} className="px-3 py-2.5 rounded-lg text-xs text-[#6B7280] bg-gray-100">✕</button>
+                      </div>
                     </div>
                   ) : (
-                    <button onClick={() => { setPayId(d.id); setPayAmt(String(d.monthlyPayment || "")); }}
-                      className="w-full py-2 rounded-lg text-xs font-bold text-white mt-1" style={{ background: "#2C2C54" }}>
+                    <button onClick={() => { setPayId(d.id); setPayAmt(""); }}
+                      className="w-full py-2.5 rounded-lg text-xs font-bold text-white mt-1" style={{ background: "#2C2C54" }}>
                       💳 تسجيل سداد
                     </button>
                   )}
