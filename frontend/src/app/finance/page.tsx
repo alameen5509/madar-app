@@ -1268,12 +1268,13 @@ export default function FinancePage() {
               tips.push({ text: `لديك ${debtPocketBal.toLocaleString()} في محفظة الديون جاهز للسداد — سدد الآن`, icon: "⚡", color: "#DC2626", bg: "#FEF2F2" });
             }
             if (hasDebts && income > 0 && debtTarget > 0) {
-              // حصة الشهر: debtPaid من المعاملات، أو من paidSoFar إذا لم تُسجل معاملات
-              const actualMonthPaid = debtPaid > 0 ? debtPaid : 0;
-              if (actualMonthPaid >= debtTarget) {
-                tips.push({ text: `أحسنت! سددت ${actualMonthPaid.toLocaleString()} من حصة ${debtTarget.toLocaleString()} هذا الشهر ✅`, icon: "✅", color: "#3D8C5A", bg: "#F0FDF4" });
+              const monthPaid = debtPaid; // من معاملات debt_payment + installment هذا الشهر
+              const remaining = Math.max(0, debtTarget - monthPaid);
+              const pctDone = Math.min(100, Math.round(monthPaid / debtTarget * 100));
+              if (monthPaid >= debtTarget) {
+                tips.push({ text: `أحسنت! سددت ${monthPaid.toLocaleString()} من حصة ${debtTarget.toLocaleString()} هذا الشهر ✅`, icon: "✅", color: "#3D8C5A", bg: "#F0FDF4" });
               } else {
-                tips.push({ text: `حصة الديون الشهرية: ${debtTarget.toLocaleString()} (${settings.debtPercent}% من الدخل)`, icon: "📊", color: "#6B7280", bg: "#F9FAFB" });
+                tips.push({ text: `حصة الديون الشهرية: سددت ${monthPaid.toLocaleString()} من ${debtTarget.toLocaleString()} (${pctDone}%) — متبقي ${remaining.toLocaleString()}`, icon: "📊", color: monthPaid > 0 ? "#D4AF37" : "#DC2626", bg: monthPaid > 0 ? "#FFFBEB" : "#FEF2F2" });
               }
             }
             if (!hasDebts && debts.length > 0) {
