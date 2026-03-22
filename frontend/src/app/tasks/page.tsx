@@ -1821,11 +1821,11 @@ export default function TasksPage() {
   /* ── Tasbeeh (مسبحة) ── */
   const [showTasbeeh, setShowTasbeeh] = useState(false);
   const [tasbeehCount, setTasbeehCount] = useState(0);
-  const [tasbeehTarget, setTasbeehTarget] = useState(33);
+  const [tasbeehTarget, setTasbeehTarget] = useState(100);
   const TASBEEH_LIST = [
-    { label: "سبحان الله", target: 33 },
-    { label: "الحمد لله", target: 33 },
-    { label: "الله أكبر", target: 34 },
+    { label: "سبحان الله", target: 100 },
+    { label: "الحمد لله", target: 100 },
+    { label: "الله أكبر", target: 100 },
     { label: "لا إله إلا الله", target: 100 },
     { label: "أستغفر الله", target: 100 },
     { label: "اللهم صلِّ على محمد", target: 100 },

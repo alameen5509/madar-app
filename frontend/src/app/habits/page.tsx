@@ -604,7 +604,7 @@ export default function HabitsPage() {
   // Tasbih
   const [showTasbih, setShowTasbih] = useState(false);
   const [tasbihCount, setTasbihCount] = useState(0);
-  const [tasbihTarget, setTasbihTarget] = useState(33);
+  const [tasbihTarget, setTasbihTarget] = useState(100);
   const TASBIH_OPTIONS = ["سبحان الله", "الحمد لله", "الله أكبر", "لا إله إلا الله", "أستغفر الله", "لا حول ولا قوة إلا بالله"];
 
   function tasbihTap() {

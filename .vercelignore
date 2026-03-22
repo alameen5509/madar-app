@@ -1,0 +1,11 @@
+.vs
+.idea
+.next
+backend
+wear
+*.zip
+*.pdf
+app_logs*
+latest_logs
+azure_logs*
+node_modules
