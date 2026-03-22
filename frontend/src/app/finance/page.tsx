@@ -260,8 +260,31 @@ function DebtSection({ debts, onUpdate, onPayment }: { debts: Debt[]; onUpdate: 
       <GeometricDivider label="الديون — من الأقل إلى الأكثر" />
       <div className="flex items-center justify-between">
         <p className="text-[10px] text-[#6B7280]">طريقة كرة الثلج: سدد الأصغر أولاً</p>
-        <button onClick={() => setShowAdd(true)} className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style={{ background: "#2C2C54" }}>+ دين جديد</button>
+        <button onClick={() => setShowAdd(!showAdd)} className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style={{ background: "#2C2C54" }}>+ دين جديد</button>
       </div>
+
+      {/* Add debt form — at top */}
+      {showAdd && (
+        <div className="bg-white rounded-xl p-5 border border-gray-200 fade-up space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="font-bold text-sm text-[#16213E]">إضافة دين جديد</p>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowAdd(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6B7280] bg-gray-100">إلغاء</button>
+              <button onClick={addDebt} className="px-4 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: "#2C2C54" }}>إضافة</button>
+            </div>
+          </div>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="اسم الدائن *" autoFocus
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="رقم الجوال (اختياري)" type="tel"
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+          <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="مبلغ الدين *"
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+          <input type="number" value={monthly} onChange={(e) => setMonthly(e.target.value)} placeholder="القسط الشهري (اختياري)"
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+          <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ملاحظات (اختياري)"
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+        </div>
+      )}
 
       {sorted.length === 0 && (
         <div className="text-center py-12 bg-green-50 rounded-xl border border-green-200">
@@ -357,28 +380,6 @@ function DebtSection({ debts, onUpdate, onPayment }: { debts: Debt[]; onUpdate: 
         );
       })}
 
-      {/* Add debt form */}
-      {showAdd && (
-        <div className="bg-white rounded-xl p-5 border border-gray-200 fade-up space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="font-bold text-sm text-[#16213E]">إضافة دين جديد</p>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setShowAdd(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6B7280] bg-gray-100">إلغاء</button>
-              <button onClick={addDebt} className="px-4 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: "#2C2C54" }}>إضافة</button>
-            </div>
-          </div>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="اسم الدائن *"
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="رقم الجوال (اختياري)" type="tel"
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
-          <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="مبلغ الدين *"
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
-          <input type="number" value={monthly} onChange={(e) => setMonthly(e.target.value)} placeholder="القسط الشهري (اختياري)"
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
-          <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ملاحظات (اختياري)"
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
-        </div>
-      )}
     </section>
   );
 }
