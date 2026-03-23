@@ -788,6 +788,8 @@ export default function FinancePage() {
   const [showSaveForm, setShowSaveForm] = useState<string | null>(null);
   const [sfAmount, setSfAmount] = useState("");
   const [showItemForm, setShowItemForm] = useState<string | null>(null);
+  const [editGoalId, setEditGoalId] = useState<string | null>(null);
+  const [egTitle, setEgTitle] = useState(""); const [egAmount, setEgAmount] = useState(""); const [egDeadline, setEgDeadline] = useState(""); const [egSaved, setEgSaved] = useState("");
   const [ifName, setIfName] = useState(""); const [ifCost, setIfCost] = useState("");
   const [showMoreTabs, setShowMoreTabs] = useState(false);
   // Gold alert
@@ -1643,11 +1645,35 @@ export default function FinancePage() {
               const monthlyNeeded = daysLeft && daysLeft > 0 ? Math.round((target - g.savedSoFar) / Math.max(1, Math.ceil(daysLeft / 30))) : 0;
               return (
                 <div key={g.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                  {editGoalId === g.id ? (
+                    <div className="px-5 py-4 space-y-2 fade-up">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs font-bold" style={{ color: "#D4AF37" }}>تعديل الهدف</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => setEditGoalId(null)} className="px-3 py-1 rounded-lg text-[10px] text-[#6B7280] bg-gray-100">إلغاء</button>
+                          <button onClick={() => {
+                            sFinGoals(finGoals.map(x => x.id === g.id ? { ...x, title: egTitle.trim() || x.title, targetAmount: Number(egAmount) || x.targetAmount, deadline: egDeadline || x.deadline, savedSoFar: Number(egSaved) || x.savedSoFar } : x));
+                            setEditGoalId(null);
+                          }} className="px-3 py-1 rounded-lg text-[10px] font-bold text-white" style={{ background: "#D4AF37" }}>حفظ</button>
+                        </div>
+                      </div>
+                      <input value={egTitle} onChange={e => setEgTitle(e.target.value)} placeholder="اسم الهدف"
+                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                      <input type="number" value={egAmount} onChange={e => setEgAmount(e.target.value)} placeholder="المبلغ المستهدف"
+                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                      <input type="number" value={egSaved} onChange={e => setEgSaved(e.target.value)} placeholder="المدّخر حتى الآن"
+                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                      <input type="date" value={egDeadline} onChange={e => setEgDeadline(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                    </div>
+                  ) : (
                   <div className="px-5 py-4">
                     <div className="flex items-center justify-between mb-2">
                       <p className="font-bold text-sm text-[#16213E]">{g.title}</p>
                       <div className="flex gap-1">
                         <button onClick={() => { setShowSaveForm(g.id); setSfAmount(""); }} className="text-[10px] px-2 py-1 rounded-lg bg-[#3D8C5A] text-white font-bold">+ ادخار</button>
+                        <button onClick={() => { setEditGoalId(g.id); setEgTitle(g.title); setEgAmount(String(g.targetAmount)); setEgDeadline(g.deadline); setEgSaved(String(g.savedSoFar)); }}
+                          className="text-[10px] px-2 py-1 rounded-lg text-[#6B7280] hover:bg-gray-100">✏️</button>
                         <button onClick={() => { api.delete(`/api/finance/goals/${g.id}`).catch(() => {}); sFinGoals(finGoals.filter(x => x.id !== g.id)); }} className="text-[#9CA3AF] hover:text-red-400 text-xs px-1">✕</button>
                       </div>
                     </div>
@@ -1664,6 +1690,7 @@ export default function FinancePage() {
                       {daysLeft !== null && <span>{daysLeft === 0 ? "حان الموعد!" : `${daysLeft} يوم متبقي`}{monthlyNeeded > 0 ? ` · ${monthlyNeeded.toLocaleString()} ريال/شهر` : ""}</span>}
                     </div>
                   </div>
+                  )}
                   {/* نموذج ادخار */}
                   {showSaveForm === g.id && (
                     <div className="px-5 pb-3 flex gap-2 items-center fade-up">
@@ -1703,20 +1730,46 @@ export default function FinancePage() {
                     )}
                     {g.items.length === 0 && !showItemForm && <p className="text-[10px] text-[#9CA3AF]">أضف بنود التكلفة لحساب المبلغ تلقائياً</p>}
                     {g.items.map((item, i) => (
-                      <div key={i} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-0">
+                      <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
                         <span className="text-xs text-[#16213E]">{item.name}</span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <span className="text-xs font-bold text-[#2C2C54]">{item.cost.toLocaleString()}</span>
+                          <button onClick={async () => {
+                            // تسجيل البند كمصروف
+                            const cat = g.title;
+                            try { await api.post("/api/finance/transactions", { title: `${item.name} (${g.title})`, amount: item.cost, type: "Expense", category: cat, date: new Date().toISOString().slice(0, 10) }); } catch {}
+                            setTxs(prev => [{ id: Date.now().toString(), title: `${item.name} (${g.title})`, amount: item.cost, type: "expense", category: cat, accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) } as Transaction, ...prev]);
+                            // تحديث المدّخر
+                            sFinGoals(finGoals.map(x => x.id === g.id ? { ...x, savedSoFar: x.savedSoFar + item.cost } : x));
+                          }}
+                            className="text-[9px] px-2 py-0.5 rounded-lg font-bold text-white bg-[#3D8C5A] hover:opacity-80 transition"
+                            title="تسجيل كمصروف">شراء ✓</button>
                           <button onClick={() => sFinGoals(finGoals.map(x => x.id === g.id ? { ...x, items: x.items.filter((_, j) => j !== i) } : x))}
                             className="text-[#9CA3AF] hover:text-red-400 text-[10px]">✕</button>
                         </div>
                       </div>
                     ))}
                     {g.items.length > 0 && (
-                      <div className="flex items-center justify-between pt-2 mt-1 border-t border-gray-200">
-                        <span className="text-xs font-bold text-[#16213E]">الإجمالي</span>
-                        <span className="text-xs font-black text-[#D4AF37]">{totalItems.toLocaleString()} ريال</span>
-                      </div>
+                      <>
+                        <div className="flex items-center justify-between pt-2 mt-1 border-t border-gray-200">
+                          <span className="text-xs font-bold text-[#16213E]">الإجمالي</span>
+                          <span className="text-xs font-black text-[#D4AF37]">{totalItems.toLocaleString()} ريال</span>
+                        </div>
+                        {/* شراء الكل دفعة واحدة */}
+                        <button onClick={async () => {
+                          const remaining = g.items.filter((_, i) => true); // كل البنود
+                          const cat = g.title;
+                          for (const item of remaining) {
+                            try { await api.post("/api/finance/transactions", { title: `${item.name} (${g.title})`, amount: item.cost, type: "Expense", category: cat, date: new Date().toISOString().slice(0, 10) }); } catch {}
+                            setTxs(prev => [{ id: Date.now().toString() + Math.random(), title: `${item.name} (${g.title})`, amount: item.cost, type: "expense", category: cat, accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) } as Transaction, ...prev]);
+                          }
+                          sFinGoals(finGoals.map(x => x.id === g.id ? { ...x, savedSoFar: totalItems } : x));
+                        }}
+                          className="w-full mt-2 py-2 rounded-xl text-xs font-bold text-white transition hover:opacity-90"
+                          style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
+                          🛒 شراء جميع البنود وتسجيلها ({totalItems.toLocaleString()} ريال)
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
