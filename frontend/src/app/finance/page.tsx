@@ -785,6 +785,7 @@ export default function FinancePage() {
   // Goal modals
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [gfTitle, setGfTitle] = useState(""); const [gfDeadline, setGfDeadline] = useState(""); const [gfAmount, setGfAmount] = useState("");
+  const [gfItems, setGfItems] = useState<{ name: string; cost: number }[]>([]); const [gfItemName, setGfItemName] = useState(""); const [gfItemCost, setGfItemCost] = useState("");
   const [showSaveForm, setShowSaveForm] = useState<string | null>(null);
   const [sfAmount, setSfAmount] = useState("");
   const [showItemForm, setShowItemForm] = useState<string | null>(null);
@@ -1627,25 +1628,77 @@ export default function FinancePage() {
             </div>
 
             {/* نموذج إضافة هدف */}
-            {showGoalForm && (
-              <div className="bg-white rounded-xl p-5 border border-[#D4AF37] shadow-sm fade-up space-y-3">
-                <p className="font-bold text-sm text-[#16213E]">هدف مالي جديد</p>
-                <input value={gfTitle} onChange={e => setGfTitle(e.target.value)} placeholder="اسم الهدف (سيارة، زواج، سفر…)"
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
-                <input type="number" value={gfAmount} onChange={e => setGfAmount(e.target.value)} placeholder="المبلغ المستهدف (اختياري إذا فيه بنود)"
+            {showGoalForm && (() => {
+              const itemsTotal = gfItems.reduce((s, i) => s + i.cost, 0);
+              const finalAmount = itemsTotal > 0 ? itemsTotal : Number(gfAmount) || 0;
+              return (
+              <div className="bg-white rounded-2xl p-5 border-2 border-[#D4AF37] shadow-sm fade-up space-y-3">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-bold" style={{ color: "#D4AF37" }}>هدف مالي جديد</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => { setShowGoalForm(false); setGfItems([]); }} className="px-3 py-1 rounded-lg text-[10px] text-[#6B7280] bg-gray-100">إلغاء</button>
+                    <button onClick={() => {
+                      if (!gfTitle.trim()) return;
+                      const items = gfItems.map(i => ({ name: i.name, cost: i.cost }));
+                      api.post("/api/finance/goals", { title: gfTitle.trim(), description: "", targetAmount: finalAmount, savedSoFar: 0, deadline: gfDeadline || null, items })
+                        .then(({ data }) => { sFinGoals([{ id: data.id, title: gfTitle.trim(), description: "", targetAmount: finalAmount, savedSoFar: 0, deadline: gfDeadline, items }, ...finGoals]); })
+                        .catch(() => { sFinGoals([{ id: Date.now().toString(), title: gfTitle.trim(), description: "", targetAmount: finalAmount, savedSoFar: 0, deadline: gfDeadline, items }, ...finGoals]); });
+                      setGfTitle(""); setGfAmount(""); setGfDeadline(""); setGfItems([]); setShowGoalForm(false);
+                    }} className="px-4 py-1 rounded-lg text-[10px] font-bold text-white" style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>إنشاء الهدف</button>
+                  </div>
+                </div>
+
+                <input value={gfTitle} onChange={e => setGfTitle(e.target.value)} placeholder="اسم الهدف (سيارة، زواج، سفر…)" autoFocus
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
                 <input type="date" value={gfDeadline} onChange={e => setGfDeadline(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
-                <div className="flex gap-2">
-                  <button onClick={() => setShowGoalForm(false)} className="flex-1 py-2.5 rounded-xl text-sm text-[#6B7280] bg-gray-100">إلغاء</button>
-                  <button onClick={() => {
-                    if (!gfTitle.trim()) return;
-                    api.post("/api/finance/goals", { title: gfTitle.trim(), description: "", targetAmount: Number(gfAmount) || 0, savedSoFar: 0, deadline: gfDeadline || null, items: [] }).then(({ data }) => { sFinGoals([{ id: data.id, title: gfTitle.trim(), description: "", targetAmount: Number(gfAmount) || 0, savedSoFar: 0, deadline: gfDeadline, items: [] }, ...finGoals]); }).catch(() => { sFinGoals([{ id: Date.now().toString(), title: gfTitle.trim(), description: "", targetAmount: Number(gfAmount) || 0, savedSoFar: 0, deadline: gfDeadline, items: [] }, ...finGoals]); });
-                    setGfTitle(""); setGfAmount(""); setGfDeadline(""); setShowGoalForm(false);
-                  }} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>إضافة</button>
+
+                {/* بنود التكلفة */}
+                <div className="border border-[#D4AF37] rounded-xl p-3 space-y-2" style={{ background: "#D4AF3708" }}>
+                  <p className="text-[11px] font-bold" style={{ color: "#D4AF37" }}>بنود التكلفة</p>
+
+                  {gfItems.map((item, i) => (
+                    <div key={i} className="flex items-center justify-between py-1 border-b border-[#D4AF3720] last:border-0">
+                      <span className="text-xs text-[#16213E]">{item.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-[#2C2C54]">{item.cost.toLocaleString()}</span>
+                        <button onClick={() => setGfItems(gfItems.filter((_, j) => j !== i))}
+                          className="text-[#9CA3AF] hover:text-red-400 text-[10px]">✕</button>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="flex gap-2">
+                    <input value={gfItemName} onChange={e => setGfItemName(e.target.value)} placeholder="اسم البند"
+                      onKeyDown={e => { if (e.key === "Enter" && gfItemName.trim() && gfItemCost) { setGfItems([...gfItems, { name: gfItemName.trim(), cost: Number(gfItemCost) }]); setGfItemName(""); setGfItemCost(""); } }}
+                      className="flex-1 px-3 py-2 rounded-lg border border-[#D4AF37] text-xs focus:outline-none" />
+                    <input type="number" value={gfItemCost} onChange={e => setGfItemCost(e.target.value)} placeholder="التكلفة"
+                      onKeyDown={e => { if (e.key === "Enter" && gfItemName.trim() && gfItemCost) { setGfItems([...gfItems, { name: gfItemName.trim(), cost: Number(gfItemCost) }]); setGfItemName(""); setGfItemCost(""); } }}
+                      className="w-24 px-3 py-2 rounded-lg border border-[#D4AF37] text-xs focus:outline-none" />
+                    <button onClick={() => {
+                      if (!gfItemName.trim() || !gfItemCost) return;
+                      setGfItems([...gfItems, { name: gfItemName.trim(), cost: Number(gfItemCost) }]);
+                      setGfItemName(""); setGfItemCost("");
+                    }} className="px-3 py-2 rounded-lg text-[10px] font-bold text-white" style={{ background: "#D4AF37" }}>+</button>
+                  </div>
+
+                  {gfItems.length === 0 && <p className="text-[9px] text-[#9CA3AF]">أضف بنود التكلفة — Enter للإضافة السريعة</p>}
                 </div>
+
+                {/* الإجمالي المحسوب */}
+                <div className="flex items-center justify-between rounded-xl px-4 py-3" style={{ background: "#2C2C5410", border: "1px solid #2C2C5420" }}>
+                  <span className="text-sm font-bold" style={{ color: "#2C2C54" }}>التكلفة الإجمالية</span>
+                  <span className="text-lg font-black" style={{ color: "#D4AF37" }}>{finalAmount.toLocaleString()} ريال</span>
+                </div>
+
+                {/* مبلغ يدوي إذا لم تُضف بنود */}
+                {gfItems.length === 0 && (
+                  <input type="number" value={gfAmount} onChange={e => setGfAmount(e.target.value)} placeholder="أو أدخل المبلغ يدوياً"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                )}
               </div>
-            )}
+              );
+            })()}
             {finGoals.length === 0 && <p className="text-center text-[#9CA3AF] text-xs py-8">لا توجد أهداف مالية — أضف هدفك الأول</p>}
             {finGoals.map(g => {
               const totalItems = g.items.reduce((s, i) => s + i.cost, 0);
