@@ -985,7 +985,17 @@ export default function FinancePage() {
     setZakatData(v);
     api.put("/api/finance/zakat", { hawalDate: v.hawalDate, goldGrams: v.goldGrams }).catch(() => {});
   }
-  function sFinGoals(v: FinGoal[]) { setFinGoals(v); }
+  function sFinGoals(v: FinGoal[]) {
+    setFinGoals(v);
+    // حفظ كل هدف في API
+    for (const g of v) {
+      api.put(`/api/finance/goals/${g.id}`, {
+        title: g.title, description: g.description ?? "", targetAmount: g.targetAmount,
+        savedSoFar: g.savedSoFar, deadline: g.deadline || null,
+        items: g.items.map(i => ({ name: i.name, cost: i.cost })),
+      }).catch(() => {});
+    }
+  }
 
   /** تأكيد دفع التزام — يخصم من المحفظة الأساسية */
   async function confirmDue(due: RecurringDue) {
