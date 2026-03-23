@@ -1835,14 +1835,39 @@ export default function FinancePage() {
                               className="text-[#9CA3AF] hover:text-red-400 text-[10px]">✕</button>
                           </div>
                         </div>
-                        {/* نموذج التنفيذ — تعديل المبلغ والبند */}
-                        {isBuying && (
-                          <div className="pb-2 space-y-2 fade-up">
-                            <div className="flex gap-2 items-center">
-                              <input type="number" value={buyAmt} onChange={e => setBuyAmt(e.target.value)}
-                                className="w-28 px-2 py-1.5 rounded-lg border border-[#3D8C5A] text-sm text-center font-bold focus:outline-none" />
-                              <span className="text-[9px] text-[#6B7280]">ريال (عدّل إذا اختلف)</span>
+                        {/* نموذج التنفيذ — مقارنة السعر المخطط بالفعلي */}
+                        {isBuying && (() => {
+                          const planned = item.cost;
+                          const actual = Number(buyAmt) || planned;
+                          const diff = actual - planned;
+                          const diffPct = planned > 0 ? Math.round(Math.abs(diff) / planned * 100) : 0;
+                          return (
+                          <div className="pb-3 pt-1 space-y-2 fade-up border-t border-gray-100 mt-1">
+                            {/* مقارنة الأسعار */}
+                            <div className="grid grid-cols-3 gap-2 text-center rounded-lg p-2" style={{ background: "#F9FAFB" }}>
+                              <div>
+                                <p className="text-[8px] text-[#6B7280]">المخطط</p>
+                                <p className="text-xs font-bold text-[#2C2C54]">{planned.toLocaleString()}</p>
+                              </div>
+                              <div>
+                                <p className="text-[8px] text-[#6B7280]">الفعلي</p>
+                                <input type="number" value={buyAmt} onChange={e => setBuyAmt(e.target.value)}
+                                  className="w-full px-1 py-1 rounded-lg border text-xs text-center font-bold focus:outline-none"
+                                  style={{ borderColor: diff === 0 ? "#3D8C5A" : diff > 0 ? "#DC2626" : "#2D6B9E", color: diff === 0 ? "#3D8C5A" : diff > 0 ? "#DC2626" : "#2D6B9E" }} />
+                              </div>
+                              <div>
+                                <p className="text-[8px] text-[#6B7280]">الفرق</p>
+                                <p className="text-xs font-bold" style={{ color: diff === 0 ? "#3D8C5A" : diff > 0 ? "#DC2626" : "#2D6B9E" }}>
+                                  {diff === 0 ? "✅ مطابق" : diff > 0 ? `+${diff.toLocaleString()} (${diffPct}%)` : `${diff.toLocaleString()} (${diffPct}%)`}
+                                </p>
+                              </div>
                             </div>
+                            {diff !== 0 && (
+                              <p className="text-[9px] text-center" style={{ color: diff > 0 ? "#DC2626" : "#2D6B9E" }}>
+                                {diff > 0 ? `⚠️ السعر الفعلي أعلى بـ ${diff.toLocaleString()} ريال` : `✨ وفّرت ${Math.abs(diff).toLocaleString()} ريال!`}
+                              </p>
+                            )}
+                            {/* البند المالي */}
                             <div className="flex gap-1 flex-wrap">
                               {(settings.expenseCategories ?? DEF_EXP_CATS).map(c => (
                                 <button key={c} onClick={() => setBuyCat(c)} className="px-2 py-0.5 rounded text-[8px] font-medium"
@@ -1851,22 +1876,22 @@ export default function FinancePage() {
                             </div>
                             <div className="flex gap-2">
                               <button onClick={async () => {
-                                const amt = Number(buyAmt) || item.cost;
+                                const amt = actual;
                                 const cat = buyCat || g.title;
                                 try { await api.post("/api/finance/transactions", { title: `${item.name} (${g.title})`, amount: amt, type: "Expense", category: cat, date: new Date().toISOString().slice(0, 10) }); } catch {}
                                 setTxs(prev => [{ id: Date.now().toString(), title: `${item.name} (${g.title})`, amount: amt, type: "expense", category: cat, accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) } as Transaction, ...prev]);
-                                // تحديث البند كمدفوع + تحديث المدّخر + تحديث التكلفة إذا اختلفت
                                 sFinGoals(finGoals.map(x => x.id === g.id ? {
                                   ...x,
                                   savedSoFar: x.savedSoFar + amt,
                                   items: x.items.map((it, j) => j === i ? { ...it, cost: amt, paid: true, category: cat } : it),
                                 } : x));
                                 setBuyItemKey(null);
-                              }} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white bg-[#3D8C5A]">تأكيد وتسجيل ✓</button>
+                              }} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white bg-[#3D8C5A]">تأكيد وتسجيل ({actual.toLocaleString()} ريال) ✓</button>
                               <button onClick={() => setBuyItemKey(null)} className="px-3 py-1.5 rounded-lg text-[10px] text-[#6B7280] bg-gray-100">إلغاء</button>
                             </div>
                           </div>
-                        )}
+                          );
+                        })()}
                       </div>
                       );
                     })}
