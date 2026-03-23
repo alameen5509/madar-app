@@ -431,6 +431,12 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
   const [dCat, setDCat]       = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [partialAmt, setPartialAmt] = useState("");
+  const [editDueId, setEditDueId] = useState<string | null>(null);
+  const [edTitle, setEdTitle] = useState("");
+  const [edAmount, setEdAmount] = useState("");
+  const [edType, setEdType] = useState<RecurringDue["type"]>("bill");
+  const [edFreq, setEdFreq] = useState<RecurringDue["frequency"]>("monthly");
+  const [edDay, setEdDay] = useState("");
 
   function addDue() {
     if (!dTitle.trim() || !dAmount) return;
@@ -507,6 +513,41 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
         const freqLabel = d.frequency === "monthly" ? "شهري" : d.frequency === "quarterly" ? "ربع سنوي" : d.frequency === "yearly" ? "سنوي" : "مرة واحدة";
         return (
           <div key={d.id} className={`bg-white rounded-xl border border-gray-200 transition-all ${confirmed ? "opacity-50" : ""}`}>
+            {/* Edit form */}
+            {editDueId === d.id ? (
+              <div className="p-4 space-y-2 fade-up">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-bold text-[#DC2626]">تعديل الالتزام</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setEditDueId(null)} className="px-3 py-1 rounded-lg text-[10px] text-[#6B7280] bg-gray-100">إلغاء</button>
+                    <button onClick={() => {
+                      onUpdate(dues.map(x => x.id === d.id ? { ...x, title: edTitle.trim() || x.title, amount: Number(edAmount) || x.amount, type: edType, frequency: edFreq, dueDay: Number(edDay) || x.dueDay } : x));
+                      setEditDueId(null);
+                    }} className="px-3 py-1 rounded-lg text-[10px] font-bold text-white" style={{ background: "#DC2626" }}>حفظ</button>
+                  </div>
+                </div>
+                <input value={edTitle} onChange={e => setEdTitle(e.target.value)} placeholder="العنوان"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                <input type="number" value={edAmount} onChange={e => setEdAmount(e.target.value)} placeholder="المبلغ"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                <div className="flex gap-1 flex-wrap">
+                  {DUE_TYPES.map(t => (
+                    <button key={t.key} onClick={() => setEdType(t.key as RecurringDue["type"])}
+                      className="px-2 py-1 rounded-lg text-[9px] font-semibold"
+                      style={{ background: edType === t.key ? t.color : "#F3F4F6", color: edType === t.key ? "#fff" : "#6B7280" }}>{t.icon} {t.label}</button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  {([["monthly","شهري"],["quarterly","ربع سنوي"],["yearly","سنوي"],["once","مرة واحدة"]] as const).map(([k, l]) => (
+                    <button key={k} onClick={() => setEdFreq(k)} className="flex-1 py-1.5 rounded-lg text-[9px] font-semibold"
+                      style={{ background: edFreq === k ? "#2C2C54" : "#F3F4F6", color: edFreq === k ? "#fff" : "#6B7280" }}>{l}</button>
+                  ))}
+                </div>
+                <input type="number" min={1} max={31} value={edDay} onChange={e => setEdDay(e.target.value)} placeholder="يوم الاستحقاق"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+              </div>
+            ) : (
+            <>
             {/* Row */}
             <div className="flex items-center gap-3 px-5 py-4 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : d.id)}>
               <span className="text-lg">{DUE_TYPES.find((t) => t.key === d.type)?.icon}</span>
@@ -567,6 +608,12 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
                   </button>
                 </div>
 
+                {/* تعديل */}
+                <button onClick={() => { setEditDueId(d.id); setEdTitle(d.title); setEdAmount(String(d.amount)); setEdType(d.type); setEdFreq(d.frequency); setEdDay(String(d.dueDay)); setExpandedId(null); }}
+                  className="w-full py-2 rounded-xl text-xs font-medium text-[#2D6B9E] hover:bg-blue-50 transition border border-blue-100">
+                  ✏️ تعديل الالتزام
+                </button>
+
                 {/* إلغاء الالتزام */}
                 <button onClick={() => {
                   if (!confirm(`إلغاء "${d.title}" نهائياً؟`)) return;
@@ -577,6 +624,8 @@ function DuesSection({ dues, accounts, pockets, expCats, incCats, onUpdate, onCo
                   🗑️ إلغاء الالتزام
                 </button>
               </div>
+            )}
+            </>
             )}
           </div>
         );
@@ -752,6 +801,7 @@ export default function FinancePage() {
   const [showAddRec, setShowAddRec] = useState(false);
   const [rrTitle, setRrTitle] = useState(""); const [rrAmount, setRrAmount] = useState("");
   const [rrFrom, setRrFrom] = useState(""); const [rrDate, setRrDate] = useState(""); const [rrFreq, setRrFreq] = useState("once");
+  const [editRecId, setEditRecId] = useState<string | null>(null);
   // Gold form
   const [goldForm, setGoldForm] = useState<"buy"|"sell"|null>(null);
   const [gfGrams, setGfGrams] = useState(""); const [gfPrice, setGfPrice] = useState(""); const [gfNotes, setGfNotes] = useState("");
@@ -2029,50 +2079,62 @@ export default function FinancePage() {
                 </div>
               )}
 
-              {/* Recurring receivables */}
-              {recurring.length > 0 && (
-                <>
-                  <GeometricDivider label={`مستحقات متكررة (${recurring.length})`} />
-                  {recurring.map(r => (
-                    <div key={r.id} className="bg-white rounded-xl px-5 py-4 border border-gray-200 flex items-center gap-3">
-                      <span className="text-lg">🔄</span>
-                      <div className="flex-1">
-                        <p className="text-sm font-bold text-[#16213E]">{r.title}</p>
-                        <p className="text-[10px] text-[#6B7280]">من: {r.fromWhom} · {freqLabel(r.frequency)}{r.dueDate ? ` · ${new Date(r.dueDate).toLocaleDateString("ar-SA")}` : ""}</p>
-                      </div>
-                      <p className="text-sm font-black text-[#3D8C5A]">{r.amount.toLocaleString()}</p>
-                      <button onClick={async () => {
-                        try { await api.post("/api/finance/transactions", { title: `استلام: ${r.title}`, amount: r.amount, type: "Income", category: "راتب", date: new Date().toISOString().slice(0, 10) }); } catch {}
-                        setTxs(prev => [{ id: Date.now().toString(), title: `استلام: ${r.title}`, amount: r.amount, type: "income", category: "راتب", accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) }, ...prev]);
-                      }} className="text-[10px] px-3 py-1.5 rounded-lg font-bold text-white bg-[#3D8C5A]">استلمت</button>
-                      <button onClick={() => sSettings({ ...settings, receivables: recs.filter(x => x.id !== r.id) })} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
+              {/* Receivable items — recurring + one-time */}
+              {[{ label: `مستحقات متكررة (${recurring.length})`, items: recurring, icon: "🔄", isRecurring: true },
+                { label: `مستحقات مقطوعة (${oneTime.length})`, items: oneTime, icon: "💰", isRecurring: false }]
+                .filter(g => g.items.length > 0).map(g => (
+                <div key={g.label}>
+                  <GeometricDivider label={g.label} />
+                  {g.items.map(r => (
+                    <div key={r.id} className="bg-white rounded-xl border border-gray-200 mb-2 overflow-hidden">
+                      {editRecId === r.id ? (
+                        <div className="p-4 space-y-2 fade-up">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-xs font-bold" style={{ color: "#D4AF37" }}>تعديل</p>
+                            <div className="flex gap-2">
+                              <button onClick={() => setEditRecId(null)} className="px-3 py-1 rounded-lg text-[10px] text-[#6B7280] bg-gray-100">إلغاء</button>
+                              <button onClick={() => {
+                                sSettings({ ...settings, receivables: recs.map(x => x.id === r.id ? { ...x, title: rrTitle.trim() || x.title, amount: Number(rrAmount) || x.amount, fromWhom: rrFrom.trim() || x.fromWhom, frequency: (rrFreq as Receivable["frequency"]) || x.frequency } : x) });
+                                setEditRecId(null);
+                              }} className="px-3 py-1 rounded-lg text-[10px] font-bold text-white" style={{ background: "#D4AF37" }}>حفظ</button>
+                            </div>
+                          </div>
+                          <input value={rrTitle} onChange={e => setRrTitle(e.target.value)} placeholder="الوصف"
+                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                          <input type="number" value={rrAmount} onChange={e => setRrAmount(e.target.value)} placeholder="المبلغ"
+                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                          <input value={rrFrom} onChange={e => setRrFrom(e.target.value)} placeholder="من عند"
+                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+                          <div className="flex gap-1.5">
+                            {([["once","مرة واحدة"],["monthly","شهري"],["quarterly","ربع سنوي"],["yearly","سنوي"]] as const).map(([k, l]) => (
+                              <button key={k} onClick={() => setRrFreq(k)} className="flex-1 py-1.5 rounded-lg text-[9px] font-semibold"
+                                style={{ background: rrFreq === k ? "#D4AF37" : "#F3F4F6", color: rrFreq === k ? "#fff" : "#6B7280" }}>{l}</button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="px-5 py-4 flex items-center gap-3">
+                          <span className="text-lg">{g.icon}</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-bold text-[#16213E]">{r.title}</p>
+                            <p className="text-[10px] text-[#6B7280]">من: {r.fromWhom} · {freqLabel(r.frequency)}{r.dueDate ? ` · ${new Date(r.dueDate).toLocaleDateString("ar-SA")}` : ""}</p>
+                          </div>
+                          <p className="text-sm font-black" style={{ color: g.isRecurring ? "#3D8C5A" : "#D4AF37" }}>{r.amount.toLocaleString()}</p>
+                          <button onClick={async () => {
+                            const cat = g.isRecurring ? "راتب" : "أخرى";
+                            try { await api.post("/api/finance/transactions", { title: `استلام: ${r.title}`, amount: r.amount, type: "Income", category: cat, date: new Date().toISOString().slice(0, 10) }); } catch {}
+                            setTxs(prev => [{ id: Date.now().toString(), title: `استلام: ${r.title}`, amount: r.amount, type: "income", category: cat, accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) }, ...prev]);
+                            if (!g.isRecurring) sSettings({ ...settings, receivables: recs.map(x => x.id === r.id ? { ...x, isPaid: true } : x) });
+                          }} className="text-[10px] px-3 py-1.5 rounded-lg font-bold text-white bg-[#3D8C5A]">{g.isRecurring ? "استلمت" : "تم الاستلام"}</button>
+                          <button onClick={() => { setEditRecId(r.id); setRrTitle(r.title); setRrAmount(String(r.amount)); setRrFrom(r.fromWhom); setRrFreq(r.frequency ?? "once"); }}
+                            className="text-[10px] px-2 py-1.5 rounded-lg text-[#6B7280] hover:bg-gray-100 transition">✏️</button>
+                          <button onClick={() => sSettings({ ...settings, receivables: recs.filter(x => x.id !== r.id) })} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
+                        </div>
+                      )}
                     </div>
                   ))}
-                </>
-              )}
-
-              {/* One-time receivables */}
-              {oneTime.length > 0 && (
-                <>
-                  <GeometricDivider label={`مستحقات مقطوعة (${oneTime.length})`} />
-                  {oneTime.map(r => (
-                    <div key={r.id} className="bg-white rounded-xl px-5 py-4 border border-gray-200 flex items-center gap-3">
-                      <span className="text-lg">💰</span>
-                      <div className="flex-1">
-                        <p className="text-sm font-bold text-[#16213E]">{r.title}</p>
-                        <p className="text-[10px] text-[#6B7280]">من: {r.fromWhom}{r.dueDate ? ` · ${new Date(r.dueDate).toLocaleDateString("ar-SA")}` : ""}</p>
-                      </div>
-                      <p className="text-sm font-black text-[#D4AF37]">{r.amount.toLocaleString()}</p>
-                      <button onClick={async () => {
-                        try { await api.post("/api/finance/transactions", { title: `استلام: ${r.title}`, amount: r.amount, type: "Income", category: "أخرى", date: new Date().toISOString().slice(0, 10) }); } catch {}
-                        setTxs(prev => [{ id: Date.now().toString(), title: `استلام: ${r.title}`, amount: r.amount, type: "income", category: "أخرى", accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) }, ...prev]);
-                        sSettings({ ...settings, receivables: recs.map(x => x.id === r.id ? { ...x, isPaid: true } : x) });
-                      }} className="text-[10px] px-3 py-1.5 rounded-lg font-bold text-white bg-[#3D8C5A]">تم الاستلام</button>
-                      <button onClick={() => sSettings({ ...settings, receivables: recs.filter(x => x.id !== r.id) })} className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
-                    </div>
-                  ))}
-                </>
-              )}
+                </div>
+              ))}
 
               {unpaid.length === 0 && !showAddRec && <p className="text-center text-[#9CA3AF] text-xs py-6">لا توجد مبالغ مستحقة — الحمد لله</p>}
 
