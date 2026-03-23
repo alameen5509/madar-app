@@ -98,7 +98,7 @@ interface FinGoal {
   targetAmount: number;
   savedSoFar: number;
   deadline: string;
-  items: { name: string; cost: number }[];
+  items: { name: string; cost: number; category?: string; paid?: boolean }[];
 }
 
 interface Deduction {
@@ -791,6 +791,8 @@ export default function FinancePage() {
   const [showItemForm, setShowItemForm] = useState<string | null>(null);
   const [editGoalId, setEditGoalId] = useState<string | null>(null);
   const [egTitle, setEgTitle] = useState(""); const [egAmount, setEgAmount] = useState(""); const [egDeadline, setEgDeadline] = useState(""); const [egSaved, setEgSaved] = useState("");
+  const [buyItemKey, setBuyItemKey] = useState<string | null>(null); // "goalId-itemIdx"
+  const [buyAmt, setBuyAmt] = useState(""); const [buyCat, setBuyCat] = useState("");
   const [ifName, setIfName] = useState(""); const [ifCost, setIfCost] = useState("");
   const [showMoreTabs, setShowMoreTabs] = useState(false);
   // Gold alert
@@ -1668,18 +1670,26 @@ export default function FinancePage() {
                     </div>
                   ))}
 
-                  <div className="flex gap-2">
-                    <input value={gfItemName} onChange={e => setGfItemName(e.target.value)} placeholder="اسم البند"
-                      onKeyDown={e => { if (e.key === "Enter" && gfItemName.trim() && gfItemCost) { setGfItems([...gfItems, { name: gfItemName.trim(), cost: Number(gfItemCost) }]); setGfItemName(""); setGfItemCost(""); } }}
-                      className="flex-1 px-3 py-2 rounded-lg border border-[#D4AF37] text-xs focus:outline-none" />
-                    <input type="number" value={gfItemCost} onChange={e => setGfItemCost(e.target.value)} placeholder="التكلفة"
-                      onKeyDown={e => { if (e.key === "Enter" && gfItemName.trim() && gfItemCost) { setGfItems([...gfItems, { name: gfItemName.trim(), cost: Number(gfItemCost) }]); setGfItemName(""); setGfItemCost(""); } }}
-                      className="w-24 px-3 py-2 rounded-lg border border-[#D4AF37] text-xs focus:outline-none" />
-                    <button onClick={() => {
-                      if (!gfItemName.trim() || !gfItemCost) return;
-                      setGfItems([...gfItems, { name: gfItemName.trim(), cost: Number(gfItemCost) }]);
-                      setGfItemName(""); setGfItemCost("");
-                    }} className="px-3 py-2 rounded-lg text-[10px] font-bold text-white" style={{ background: "#D4AF37" }}>+</button>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input value={gfItemName} onChange={e => setGfItemName(e.target.value)} placeholder="اسم البند"
+                        onKeyDown={e => { if (e.key === "Enter" && gfItemName.trim() && gfItemCost) { setGfItems([...gfItems, { name: gfItemName.trim(), cost: Number(gfItemCost), category: buyCat || undefined }]); setGfItemName(""); setGfItemCost(""); } }}
+                        className="flex-1 px-3 py-2 rounded-lg border border-[#D4AF37] text-xs focus:outline-none" />
+                      <input type="number" value={gfItemCost} onChange={e => setGfItemCost(e.target.value)} placeholder="التكلفة"
+                        onKeyDown={e => { if (e.key === "Enter" && gfItemName.trim() && gfItemCost) { setGfItems([...gfItems, { name: gfItemName.trim(), cost: Number(gfItemCost), category: buyCat || undefined }]); setGfItemName(""); setGfItemCost(""); } }}
+                        className="w-24 px-3 py-2 rounded-lg border border-[#D4AF37] text-xs focus:outline-none" />
+                      <button onClick={() => {
+                        if (!gfItemName.trim() || !gfItemCost) return;
+                        setGfItems([...gfItems, { name: gfItemName.trim(), cost: Number(gfItemCost), category: buyCat || undefined }]);
+                        setGfItemName(""); setGfItemCost("");
+                      }} className="px-3 py-2 rounded-lg text-[10px] font-bold text-white" style={{ background: "#D4AF37" }}>+</button>
+                    </div>
+                    <div className="flex gap-1 flex-wrap">
+                      {(settings.expenseCategories ?? DEF_EXP_CATS).map(c => (
+                        <button key={c} onClick={() => setBuyCat(buyCat === c ? "" : c)} className="px-2 py-0.5 rounded text-[8px] font-medium"
+                          style={{ background: buyCat === c ? "#2C2C54" : "#F3F4F6", color: buyCat === c ? "#fff" : "#6B7280" }}>{c}</button>
+                      ))}
+                    </div>
                   </div>
 
                   {gfItems.length === 0 && <p className="text-[9px] text-[#9CA3AF]">أضف بنود التكلفة — Enter للإضافة السريعة</p>}
@@ -1792,46 +1802,91 @@ export default function FinancePage() {
                       </div>
                     )}
                     {g.items.length === 0 && !showItemForm && <p className="text-[10px] text-[#9CA3AF]">أضف بنود التكلفة لحساب المبلغ تلقائياً</p>}
-                    {g.items.map((item, i) => (
-                      <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
-                        <span className="text-xs text-[#16213E]">{item.name}</span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-bold text-[#2C2C54]">{item.cost.toLocaleString()}</span>
-                          <button onClick={async () => {
-                            // تسجيل البند كمصروف
-                            const cat = g.title;
-                            try { await api.post("/api/finance/transactions", { title: `${item.name} (${g.title})`, amount: item.cost, type: "Expense", category: cat, date: new Date().toISOString().slice(0, 10) }); } catch {}
-                            setTxs(prev => [{ id: Date.now().toString(), title: `${item.name} (${g.title})`, amount: item.cost, type: "expense", category: cat, accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) } as Transaction, ...prev]);
-                            // تحديث المدّخر
-                            sFinGoals(finGoals.map(x => x.id === g.id ? { ...x, savedSoFar: x.savedSoFar + item.cost } : x));
-                          }}
-                            className="text-[9px] px-2 py-0.5 rounded-lg font-bold text-white bg-[#3D8C5A] hover:opacity-80 transition"
-                            title="تسجيل كمصروف">شراء ✓</button>
-                          <button onClick={() => sFinGoals(finGoals.map(x => x.id === g.id ? { ...x, items: x.items.filter((_, j) => j !== i) } : x))}
-                            className="text-[#9CA3AF] hover:text-red-400 text-[10px]">✕</button>
+                    {g.items.map((item, i) => {
+                      const key = `${g.id}-${i}`;
+                      const isBuying = buyItemKey === key;
+                      return (
+                      <div key={i} className="border-b border-gray-100 last:border-0">
+                        <div className="flex items-center justify-between py-1.5">
+                          <div className="flex items-center gap-2">
+                            {item.paid && <span className="text-[8px]">✅</span>}
+                            <span className="text-xs" style={{ color: item.paid ? "#9CA3AF" : "#16213E", textDecoration: item.paid ? "line-through" : "none" }}>{item.name}</span>
+                            {item.category && <span className="text-[7px] px-1 py-0.5 rounded bg-gray-100 text-[#6B7280]">{item.category}</span>}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-[#2C2C54]">{item.cost.toLocaleString()}</span>
+                            {!item.paid && (
+                              <button onClick={() => { setBuyItemKey(isBuying ? null : key); setBuyAmt(String(item.cost)); setBuyCat(item.category || g.title); }}
+                                className="text-[9px] px-2 py-0.5 rounded-lg font-bold text-white bg-[#3D8C5A] hover:opacity-80 transition">
+                                تنفيذ
+                              </button>
+                            )}
+                            <button onClick={() => sFinGoals(finGoals.map(x => x.id === g.id ? { ...x, items: x.items.filter((_, j) => j !== i) } : x))}
+                              className="text-[#9CA3AF] hover:text-red-400 text-[10px]">✕</button>
+                          </div>
                         </div>
+                        {/* نموذج التنفيذ — تعديل المبلغ والبند */}
+                        {isBuying && (
+                          <div className="pb-2 space-y-2 fade-up">
+                            <div className="flex gap-2 items-center">
+                              <input type="number" value={buyAmt} onChange={e => setBuyAmt(e.target.value)}
+                                className="w-28 px-2 py-1.5 rounded-lg border border-[#3D8C5A] text-sm text-center font-bold focus:outline-none" />
+                              <span className="text-[9px] text-[#6B7280]">ريال (عدّل إذا اختلف)</span>
+                            </div>
+                            <div className="flex gap-1 flex-wrap">
+                              {(settings.expenseCategories ?? DEF_EXP_CATS).map(c => (
+                                <button key={c} onClick={() => setBuyCat(c)} className="px-2 py-0.5 rounded text-[8px] font-medium"
+                                  style={{ background: buyCat === c ? "#2C2C54" : "#F3F4F6", color: buyCat === c ? "#fff" : "#6B7280" }}>{c}</button>
+                              ))}
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={async () => {
+                                const amt = Number(buyAmt) || item.cost;
+                                const cat = buyCat || g.title;
+                                try { await api.post("/api/finance/transactions", { title: `${item.name} (${g.title})`, amount: amt, type: "Expense", category: cat, date: new Date().toISOString().slice(0, 10) }); } catch {}
+                                setTxs(prev => [{ id: Date.now().toString(), title: `${item.name} (${g.title})`, amount: amt, type: "expense", category: cat, accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) } as Transaction, ...prev]);
+                                // تحديث البند كمدفوع + تحديث المدّخر + تحديث التكلفة إذا اختلفت
+                                sFinGoals(finGoals.map(x => x.id === g.id ? {
+                                  ...x,
+                                  savedSoFar: x.savedSoFar + amt,
+                                  items: x.items.map((it, j) => j === i ? { ...it, cost: amt, paid: true, category: cat } : it),
+                                } : x));
+                                setBuyItemKey(null);
+                              }} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white bg-[#3D8C5A]">تأكيد وتسجيل ✓</button>
+                              <button onClick={() => setBuyItemKey(null)} className="px-3 py-1.5 rounded-lg text-[10px] text-[#6B7280] bg-gray-100">إلغاء</button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    ))}
+                      );
+                    })}
                     {g.items.length > 0 && (
                       <>
                         <div className="flex items-center justify-between pt-2 mt-1 border-t border-gray-200">
                           <span className="text-xs font-bold text-[#16213E]">الإجمالي</span>
                           <span className="text-xs font-black text-[#D4AF37]">{totalItems.toLocaleString()} ريال</span>
                         </div>
-                        {/* شراء الكل دفعة واحدة */}
+                        {/* تنفيذ جميع البنود غير المدفوعة */}
+                        {g.items.some(it => !it.paid) && (
                         <button onClick={async () => {
-                          const remaining = g.items.filter((_, i) => true); // كل البنود
-                          const cat = g.title;
-                          for (const item of remaining) {
+                          const unpaidItems = g.items.filter(it => !it.paid);
+                          const unpaidTotal = unpaidItems.reduce((s, it) => s + it.cost, 0);
+                          for (const item of unpaidItems) {
+                            const cat = item.category || g.title;
                             try { await api.post("/api/finance/transactions", { title: `${item.name} (${g.title})`, amount: item.cost, type: "Expense", category: cat, date: new Date().toISOString().slice(0, 10) }); } catch {}
                             setTxs(prev => [{ id: Date.now().toString() + Math.random(), title: `${item.name} (${g.title})`, amount: item.cost, type: "expense", category: cat, accountId: "", pocketId: "", date: new Date().toISOString().slice(0, 10) } as Transaction, ...prev]);
                           }
-                          sFinGoals(finGoals.map(x => x.id === g.id ? { ...x, savedSoFar: totalItems } : x));
+                          sFinGoals(finGoals.map(x => x.id === g.id ? {
+                            ...x,
+                            savedSoFar: x.savedSoFar + unpaidTotal,
+                            items: x.items.map(it => it.paid ? it : { ...it, paid: true }),
+                          } : x));
                         }}
                           className="w-full mt-2 py-2 rounded-xl text-xs font-bold text-white transition hover:opacity-90"
                           style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
-                          🛒 شراء جميع البنود وتسجيلها ({totalItems.toLocaleString()} ريال)
+                          🛒 تنفيذ جميع البنود المتبقية ({g.items.filter(it => !it.paid).reduce((s, it) => s + it.cost, 0).toLocaleString()} ريال)
                         </button>
+                        )}
                       </>
                     )}
                   </div>
