@@ -1252,11 +1252,21 @@ export default function FinancePage() {
             }
 
             // نصائح الذهب (الادخار)
-            if (zakatData.goldGrams > 0) {
+            if (income > 0 && settings.savingsPercent > 0) {
+              const savTarget = Math.round(income * settings.savingsPercent / 100);
+              const goldBought = mTx.filter(t => t.category === "شراء ذهب").reduce((s, t) => s + t.amount, 0);
+              const savRemaining = Math.max(0, savTarget - goldBought);
+              const canBuyGrams = goldPrice > 0 ? Math.round(savRemaining / goldPrice * 10) / 10 : 0;
+              if (zakatData.goldGrams > 0) {
+                tips.push({ text: `ادخارك في الذهب: ${zakatData.goldGrams} جرام = ${goldValue.toLocaleString()} ريال`, icon: "🪙", color: "#D4AF37", bg: "#FFFBEB" });
+              }
+              if (goldBought >= savTarget && savTarget > 0) {
+                tips.push({ text: `أحسنت! ادّخرت ${goldBought.toLocaleString()} من حصة ${savTarget.toLocaleString()} هذا الشهر ✅`, icon: "✅", color: "#3D8C5A", bg: "#F0FDF4" });
+              } else {
+                tips.push({ text: `حصة الادخار: ${savTarget.toLocaleString()} ريال (${settings.savingsPercent}% من الدخل) — اشتريت ذهب بـ ${goldBought.toLocaleString()} — متبقي ${savRemaining.toLocaleString()}${canBuyGrams > 0 ? ` (~${canBuyGrams} جرام)` : ""}`, icon: "💎", color: savRemaining > 0 ? "#D4AF37" : "#3D8C5A", bg: savRemaining > 0 ? "#FFFBEB" : "#F0FDF4" });
+              }
+            } else if (zakatData.goldGrams > 0) {
               tips.push({ text: `ادخارك في الذهب: ${zakatData.goldGrams} جرام = ${goldValue.toLocaleString()} ريال`, icon: "🪙", color: "#D4AF37", bg: "#FFFBEB" });
-            }
-            if (income > 0 && zakatData.goldGrams === 0) {
-              tips.push({ text: `ابدأ بالادخار في الذهب — اشترِ من قسم الذهب`, icon: "💎", color: "#2D6B9E", bg: "#EFF6FF" });
             }
 
             // نصائح عامة
