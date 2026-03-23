@@ -1340,12 +1340,43 @@ export default function FinancePage() {
               tips.push({ text: `ادخارك في الذهب: ${zakatData.goldGrams} جرام = ${goldValue.toLocaleString()} ريال`, icon: "🪙", color: "#D4AF37", bg: "#FFFBEB" });
             }
 
+            // نصائح الأهداف المالية والترشيد
+            if (finGoals.length > 0) {
+              const allItems = finGoals.flatMap(g => g.items);
+              const paidItems = allItems.filter(it => it.paid);
+              const plannedTotal = paidItems.reduce((s, it) => s + (it.cost || 0), 0);
+              // حساب التوفير: البنود المدفوعة بأقل من المخطط (cost الآن = الفعلي بعد التنفيذ)
+              // نحتاج المخطط الأصلي — لكن cost يتغير عند التنفيذ، فنقدّر من الفرق بين targetAmount و savedSoFar
+              const activeGoals = finGoals.filter(g => g.items.some(it => !it.paid));
+              const pendingItems = allItems.filter(it => !it.paid);
+              const pendingCost = pendingItems.reduce((s, it) => s + it.cost, 0);
+
+              if (pendingItems.length > 0) {
+                tips.push({ text: `لديك ${pendingItems.length} بند بقيمة ${pendingCost.toLocaleString()} ينتظر التنفيذ — حاول تنفيذها بأقل تكلفة!`, icon: "🎯", color: "#5E5495", bg: "#F5F3FF" });
+              }
+              if (paidItems.length > 0) {
+                tips.push({ text: `نفّذت ${paidItems.length} بند — كل ريال توفره يقربك من أهدافك أسرع`, icon: "💪", color: "#3D8C5A", bg: "#F0FDF4" });
+              }
+              if (activeGoals.length > 0) {
+                const nearest = activeGoals.filter(g => g.deadline).sort((a, b) => a.deadline.localeCompare(b.deadline))[0];
+                if (nearest) {
+                  const daysLeft = Math.max(0, Math.ceil((new Date(nearest.deadline).getTime() - Date.now()) / 86400000));
+                  if (daysLeft <= 30) {
+                    tips.push({ text: `"${nearest.title}" موعده قريب (${daysLeft} يوم) — رشّد وسارع بالتنفيذ!`, icon: "⏰", color: "#DC2626", bg: "#FEF2F2" });
+                  }
+                }
+              }
+            }
+
             // نصائح عامة
             if (expense > income && income > 0) {
               tips.push({ text: `مصاريفك (${expense.toLocaleString()}) تجاوزت دخلك (${income.toLocaleString()}) — راجع مصاريفك`, icon: "⚠️", color: "#DC2626", bg: "#FEF2F2" });
             }
             if (income > 0 && expense < income * 0.5) {
-              tips.push({ text: `ممتاز! مصاريفك أقل من نصف دخلك`, icon: "👏", color: "#3D8C5A", bg: "#F0FDF4" });
+              tips.push({ text: `ممتاز! مصاريفك أقل من نصف دخلك — فرصة للادخار في الذهب`, icon: "👏", color: "#3D8C5A", bg: "#F0FDF4" });
+            }
+            if (income > 0 && expense > income * 0.7 && expense <= income) {
+              tips.push({ text: `مصاريفك ${Math.round(expense/income*100)}% من دخلك — حاول تقليلها تحت 70%`, icon: "📉", color: "#D4AF37", bg: "#FFFBEB" });
             }
             if (upcomingDues.length > 0) {
               const duesTotal = upcomingDues.reduce((s, d) => s + d.amount, 0);
