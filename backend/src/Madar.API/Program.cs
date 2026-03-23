@@ -180,6 +180,37 @@ using (var scope = app.Services.CreateScope())
     try
     {
         await db.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS Works (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                OwnerId CHAR(36) NOT NULL,
+                Type VARCHAR(20) NOT NULL DEFAULT 'job',
+                Name VARCHAR(200) NOT NULL,
+                Title VARCHAR(200) NULL,
+                Employer VARCHAR(200) NULL,
+                Salary DECIMAL(18,2) NOT NULL DEFAULT 0,
+                StartDate DATETIME(6) NULL,
+                EndDate DATETIME(6) NULL,
+                Status VARCHAR(20) NOT NULL DEFAULT 'active',
+                Sector VARCHAR(100) NULL,
+                Role VARCHAR(100) NULL,
+                OwnershipPercentage DECIMAL(5,2) NOT NULL DEFAULT 0,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_Works_OwnerId (OwnerId)
+            );
+            CREATE TABLE IF NOT EXISTS WorkJobs (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                WorkId CHAR(36) NOT NULL,
+                Title VARCHAR(200) NOT NULL,
+                Description VARCHAR(1000) NULL,
+                StartDate DATETIME(6) NULL,
+                EndDate DATETIME(6) NULL,
+                Salary DECIMAL(18,2) NOT NULL DEFAULT 0,
+                Status VARCHAR(20) NOT NULL DEFAULT 'active',
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_WorkJobs_WorkId (WorkId)
+            );");
+
+        await db.Database.ExecuteSqlRawAsync(@"
             CREATE TABLE IF NOT EXISTS JobDimensions (
                 Id CHAR(36) NOT NULL PRIMARY KEY,
                 JobId CHAR(36) NOT NULL,

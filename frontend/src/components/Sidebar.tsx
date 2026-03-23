@@ -29,7 +29,7 @@ const NAV_ITEMS = [
   { icon: "↻", label: "العادات",            href: "/habits",      badgeKey: "habits" as const, fixed: false },
   { icon: "◻", label: "أعمال اليوم",        href: "/tasks",       badgeKey: "tasks" as const, fixed: true },
   { icon: "◎", label: "أدوار الحياة",       href: "/circles",     badgeKey: null, fixed: false },
-  { icon: "◈", label: "الوظائف",            href: "/jobs",        badgeKey: null, fixed: false },
+  { icon: "◈", label: "الأعمال",            href: "/works",       badgeKey: null, fixed: false },
   { icon: "▣", label: "المشاريع",           href: "/projects",    badgeKey: null, fixed: false },
   { icon: "✦", label: "صندوق الوارد",      href: "/inbox",       badgeKey: "inbox" as const, fixed: false },
   { icon: "◑", label: "الإحصائيات",         href: "/energy",      badgeKey: null, fixed: false },

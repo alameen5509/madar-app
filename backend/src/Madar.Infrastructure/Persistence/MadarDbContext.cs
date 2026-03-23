@@ -43,6 +43,10 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
     public DbSet<GoldPurchase> GoldPurchases => Set<GoldPurchase>();
     public DbSet<FinSettings> FinSettings => Set<FinSettings>();
 
+    // Works
+    public DbSet<Work> Works => Set<Work>();
+    public DbSet<WorkJob> WorkJobs => Set<WorkJob>();
+
     // Job dimensions & goals
     public DbSet<JobDimension> JobDimensions => Set<JobDimension>();
     public DbSet<JobGoal> JobGoals => Set<JobGoal>();
@@ -291,6 +295,31 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
             ct.Property(x => x.Notes).HasMaxLength(500);
             ct.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
             ct.HasIndex(x => new { x.OwnerId, x.Phone }).IsUnique();
+        });
+
+        // ═══ Works ═══
+        builder.Entity<Work>(w => {
+            w.HasKey(x => x.Id);
+            w.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            w.Property(x => x.Type).HasMaxLength(20).IsRequired();
+            w.Property(x => x.Title).HasMaxLength(200);
+            w.Property(x => x.Employer).HasMaxLength(200);
+            w.Property(x => x.Salary).HasPrecision(18, 2);
+            w.Property(x => x.Status).HasMaxLength(20);
+            w.Property(x => x.Sector).HasMaxLength(100);
+            w.Property(x => x.Role).HasMaxLength(100);
+            w.Property(x => x.OwnershipPercentage).HasPrecision(5, 2);
+            w.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+            w.HasIndex(x => x.OwnerId);
+        });
+
+        builder.Entity<WorkJob>(wj => {
+            wj.HasKey(x => x.Id);
+            wj.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            wj.Property(x => x.Description).HasMaxLength(1000);
+            wj.Property(x => x.Salary).HasPrecision(18, 2);
+            wj.Property(x => x.Status).HasMaxLength(20);
+            wj.HasOne(x => x.Work).WithMany(x => x.Jobs).HasForeignKey(x => x.WorkId).OnDelete(DeleteBehavior.Cascade);
         });
 
         // ═══ Job Dimensions & Goals ═══
