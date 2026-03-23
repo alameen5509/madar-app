@@ -785,7 +785,7 @@ export default function FinancePage() {
   // Goal modals
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [gfTitle, setGfTitle] = useState(""); const [gfDeadline, setGfDeadline] = useState(""); const [gfAmount, setGfAmount] = useState("");
-  const [gfItems, setGfItems] = useState<{ name: string; cost: number; category?: string; paid?: boolean }[]>([]); const [gfItemName, setGfItemName] = useState(""); const [gfItemCost, setGfItemCost] = useState("");
+  const [gfItems, setGfItems] = useState<{ name: string; cost: number; category?: string; paid?: boolean }[]>([]); const [gfItemName, setGfItemName] = useState(""); const [gfItemCost, setGfItemCost] = useState(""); const [gfItemCat, setGfItemCat] = useState("");
   const [showSaveForm, setShowSaveForm] = useState<string | null>(null);
   const [sfAmount, setSfAmount] = useState("");
   const [showItemForm, setShowItemForm] = useState<string | null>(null);
@@ -1647,11 +1647,11 @@ export default function FinancePage() {
                     <button onClick={() => { setShowGoalForm(false); setGfItems([]); }} className="px-3 py-1 rounded-lg text-[10px] text-[#6B7280] bg-gray-100">إلغاء</button>
                     <button onClick={() => {
                       if (!gfTitle.trim()) return;
-                      const items = gfItems.map(i => ({ name: i.name, cost: i.cost }));
-                      api.post("/api/finance/goals", { title: gfTitle.trim(), description: "", targetAmount: finalAmount, savedSoFar: 0, deadline: gfDeadline || null, items })
-                        .then(({ data }) => { sFinGoals([{ id: data.id, title: gfTitle.trim(), description: "", targetAmount: finalAmount, savedSoFar: 0, deadline: gfDeadline, items }, ...finGoals]); })
-                        .catch(() => { sFinGoals([{ id: Date.now().toString(), title: gfTitle.trim(), description: "", targetAmount: finalAmount, savedSoFar: 0, deadline: gfDeadline, items }, ...finGoals]); });
-                      setGfTitle(""); setGfAmount(""); setGfDeadline(""); setGfItems([]); setShowGoalForm(false);
+                      const fullItems = gfItems;
+                      api.post("/api/finance/goals", { title: gfTitle.trim(), description: "", targetAmount: finalAmount, savedSoFar: 0, deadline: gfDeadline || null, items: fullItems.map(i => ({ name: i.name + (i.category ? `|${i.category}` : ""), cost: i.cost })) })
+                        .then(({ data }) => { sFinGoals([{ id: data.id, title: gfTitle.trim(), description: "", targetAmount: finalAmount, savedSoFar: 0, deadline: gfDeadline, items: fullItems }, ...finGoals]); })
+                        .catch(() => { sFinGoals([{ id: Date.now().toString(), title: gfTitle.trim(), description: "", targetAmount: finalAmount, savedSoFar: 0, deadline: gfDeadline, items: fullItems }, ...finGoals]); });
+                      setGfTitle(""); setGfAmount(""); setGfDeadline(""); setGfItems([]); setGfItemCat(""); setShowGoalForm(false);
                     }} className="px-4 py-1 rounded-lg text-[10px] font-bold text-white" style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>إنشاء الهدف</button>
                   </div>
                 </div>
@@ -1666,8 +1666,11 @@ export default function FinancePage() {
                   <p className="text-[11px] font-bold" style={{ color: "#D4AF37" }}>بنود التكلفة</p>
 
                   {gfItems.map((item, i) => (
-                    <div key={i} className="flex items-center justify-between py-1 border-b border-[#D4AF3720] last:border-0">
-                      <span className="text-xs text-[#16213E]">{item.name}</span>
+                    <div key={i} className="flex items-center justify-between py-1.5 border-b border-[#D4AF3720] last:border-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-[#16213E]">{item.name}</span>
+                        {item.category && <span className="text-[7px] px-1 py-0.5 rounded bg-[#2C2C5415] text-[#2C2C54] font-medium">{item.category}</span>}
+                      </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-[#2C2C54]">{item.cost.toLocaleString()}</span>
                         <button onClick={() => setGfItems(gfItems.filter((_, j) => j !== i))}
@@ -1677,24 +1680,25 @@ export default function FinancePage() {
                   ))}
 
                   <div className="space-y-2">
+                    <p className="text-[9px] text-[#6B7280]">اختر البند المالي أولاً ثم اكتب اسم البند والتكلفة</p>
+                    <div className="flex gap-1 flex-wrap">
+                      {(settings.expenseCategories ?? DEF_EXP_CATS).map(c => (
+                        <button key={c} onClick={() => setGfItemCat(gfItemCat === c ? "" : c)} className="px-2 py-1 rounded text-[9px] font-medium transition"
+                          style={{ background: gfItemCat === c ? "#2C2C54" : "#F3F4F6", color: gfItemCat === c ? "#fff" : "#6B7280" }}>{c}</button>
+                      ))}
+                    </div>
                     <div className="flex gap-2">
                       <input value={gfItemName} onChange={e => setGfItemName(e.target.value)} placeholder="اسم البند"
-                        onKeyDown={e => { if (e.key === "Enter" && gfItemName.trim() && gfItemCost) { setGfItems([...gfItems, { name: gfItemName.trim(), cost: Number(gfItemCost), category: buyCat || undefined }]); setGfItemName(""); setGfItemCost(""); } }}
+                        onKeyDown={e => { if (e.key === "Enter" && gfItemName.trim() && gfItemCost) { setGfItems([...gfItems, { name: gfItemName.trim(), cost: Number(gfItemCost), category: gfItemCat || undefined }]); setGfItemName(""); setGfItemCost(""); setGfItemCat(""); } }}
                         className="flex-1 px-3 py-2 rounded-lg border border-[#D4AF37] text-xs focus:outline-none" />
                       <input type="number" value={gfItemCost} onChange={e => setGfItemCost(e.target.value)} placeholder="التكلفة"
-                        onKeyDown={e => { if (e.key === "Enter" && gfItemName.trim() && gfItemCost) { setGfItems([...gfItems, { name: gfItemName.trim(), cost: Number(gfItemCost), category: buyCat || undefined }]); setGfItemName(""); setGfItemCost(""); } }}
+                        onKeyDown={e => { if (e.key === "Enter" && gfItemName.trim() && gfItemCost) { setGfItems([...gfItems, { name: gfItemName.trim(), cost: Number(gfItemCost), category: gfItemCat || undefined }]); setGfItemName(""); setGfItemCost(""); setGfItemCat(""); } }}
                         className="w-24 px-3 py-2 rounded-lg border border-[#D4AF37] text-xs focus:outline-none" />
                       <button onClick={() => {
                         if (!gfItemName.trim() || !gfItemCost) return;
-                        setGfItems([...gfItems, { name: gfItemName.trim(), cost: Number(gfItemCost), category: buyCat || undefined }]);
-                        setGfItemName(""); setGfItemCost("");
+                        setGfItems([...gfItems, { name: gfItemName.trim(), cost: Number(gfItemCost), category: gfItemCat || undefined }]);
+                        setGfItemName(""); setGfItemCost(""); setGfItemCat("");
                       }} className="px-3 py-2 rounded-lg text-[10px] font-bold text-white" style={{ background: "#D4AF37" }}>+</button>
-                    </div>
-                    <div className="flex gap-1 flex-wrap">
-                      {(settings.expenseCategories ?? DEF_EXP_CATS).map(c => (
-                        <button key={c} onClick={() => setBuyCat(buyCat === c ? "" : c)} className="px-2 py-0.5 rounded text-[8px] font-medium"
-                          style={{ background: buyCat === c ? "#2C2C54" : "#F3F4F6", color: buyCat === c ? "#fff" : "#6B7280" }}>{c}</button>
-                      ))}
                     </div>
                   </div>
 
