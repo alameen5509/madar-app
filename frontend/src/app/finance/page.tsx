@@ -785,7 +785,7 @@ export default function FinancePage() {
   // Goal modals
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [gfTitle, setGfTitle] = useState(""); const [gfDeadline, setGfDeadline] = useState(""); const [gfAmount, setGfAmount] = useState("");
-  const [gfItems, setGfItems] = useState<{ name: string; cost: number }[]>([]); const [gfItemName, setGfItemName] = useState(""); const [gfItemCost, setGfItemCost] = useState("");
+  const [gfItems, setGfItems] = useState<{ name: string; cost: number; category?: string; paid?: boolean }[]>([]); const [gfItemName, setGfItemName] = useState(""); const [gfItemCost, setGfItemCost] = useState("");
   const [showSaveForm, setShowSaveForm] = useState<string | null>(null);
   const [sfAmount, setSfAmount] = useState("");
   const [showItemForm, setShowItemForm] = useState<string | null>(null);
@@ -898,7 +898,13 @@ export default function FinancePage() {
       ...du, type: (dueTypeMap[du.type] ?? du.type) as RecurringDue["type"],
       frequency: (dueFreqMap[du.frequency] ?? du.frequency) as RecurringDue["frequency"],
     })));
-    setFinGoals((d.goals ?? []).map(g => ({ ...g, items: g.items ?? [] })));
+    setFinGoals((d.goals ?? []).map(g => ({
+      ...g,
+      items: (g.items ?? []).map((it: { name: string; cost: number }) => {
+        const parts = it.name.split("|");
+        return { name: parts[0], cost: it.cost, category: parts[1] && parts[1] !== "paid" ? parts[1] : undefined, paid: it.name.includes("|paid") };
+      }),
+    })));
     setZakatData(d.zakat ?? { hawalDate: "", goldGrams: 0, goldPurchases: [] });
     const cats = (d.settings ?? {}) as Partial<FinSettings>;
     // جلب الاستقطاعات والالتزامات من preferences
@@ -995,7 +1001,7 @@ export default function FinancePage() {
       api.put(`/api/finance/goals/${g.id}`, {
         title: g.title, description: g.description ?? "", targetAmount: g.targetAmount,
         savedSoFar: g.savedSoFar, deadline: g.deadline || null,
-        items: g.items.map(i => ({ name: i.name, cost: i.cost })),
+        items: g.items.map(i => ({ name: i.name + (i.category ? `|${i.category}` : "") + (i.paid ? "|paid" : ""), cost: i.cost })),
       }).catch(() => {});
     }
   }
