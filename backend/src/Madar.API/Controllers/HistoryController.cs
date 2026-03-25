@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Madar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using MySqlConnector;
 
 namespace Madar.API.Controllers;
