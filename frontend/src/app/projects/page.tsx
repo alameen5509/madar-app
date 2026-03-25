@@ -14,10 +14,10 @@ import {
    ═══════════════════════════════════════════════════════════════════════ */
 
 const STATUSES = [
-  { key: "Critical",  label: "حرجة",  color: "#DC2626", icon: "⚠️" },
+  { key: "Draft",     label: "مسودة",  color: "#6B7280", icon: "📝" },
   { key: "Active",    label: "قائم",   color: "#3D8C5A", icon: "🟢" },
-  { key: "Draft",     label: "مسودة",  color: "#8C6B3D", icon: "📝" },
-  { key: "Completed", label: "مكتمل", color: "#6B7280", icon: "✅" },
+  { key: "Critical",  label: "حرجة",  color: "#DC2626", icon: "⚠️" },
+  { key: "Completed", label: "مكتمل", color: "#2D6B9E", icon: "✅" },
 ] as const;
 
 const STATUS_MAP = Object.fromEntries(STATUSES.map(s => [s.key, s]));
@@ -54,10 +54,7 @@ export default function ProjectsPage() {
   const [showNew, setShowNew] = useState(false);
   const [selected, setSelected] = useState<Goal | null>(null);
   const [prefs, setPrefs] = useState<ProjectPrefs>(DEFAULT_PREFS);
-  const [showDrafts, setShowDrafts] = useState(false);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
-  const [activeOpen, setActiveOpen] = useState(true);
-  const [completedOpen, setCompletedOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError("");
@@ -168,53 +165,35 @@ export default function ProjectsPage() {
           </div>
         )}
 
-        {/* ═══ Critical Projects ═══ */}
-        {!loading && critical.length > 0 && (
-          <section>
-            <SectionHeader icon="⚠️" label={`مشاريع حرجة (${critical.length})`} color="#DC2626" open alwaysOpen />
-            <div className="space-y-2 mt-2">
-              {critical.map(g => <ProjectCard key={g.id} goal={g} circleMap={circleMap} prefs={prefs} onTogglePin={togglePin} onClick={() => setSelected(g)} daysLeft={daysLeft(g.targetDate)} isCritical />)}
-            </div>
-          </section>
-        )}
-
-        {/* ═══ Active Projects ═══ */}
-        {!loading && (active.length > 0 || critical.length === 0) && (
-          <section>
-            <SectionHeader icon="🟢" label={`مشاريع قائمة (${active.length})`} color="#3D8C5A" open={activeOpen} onToggle={() => setActiveOpen(!activeOpen)} />
-            {activeOpen && (
-              <div className="space-y-2 mt-2">
-                {active.map(g => <ProjectCard key={g.id} goal={g} circleMap={circleMap} prefs={prefs} onTogglePin={togglePin} onClick={() => setSelected(g)} daysLeft={daysLeft(g.targetDate)} />)}
-                {active.length === 0 && <EmptySection text="لا توجد مشاريع قائمة" />}
-              </div>
+        {/* ═══ Collapsible Sections ═══ */}
+        {!loading && !error && (
+          <div className="space-y-4">
+            {/* حرجة — مفتوحة دائماً */}
+            {critical.length > 0 && (
+              <CollapsibleSection icon="⚠️" label="حرجة" count={critical.length} color="#DC2626" defaultOpen isCritical>
+                {critical.map(g => <ProjectCard key={g.id} goal={g} circleMap={circleMap} prefs={prefs} onTogglePin={togglePin} onClick={() => setSelected(g)} daysLeft={daysLeft(g.targetDate)} isCritical />)}
+              </CollapsibleSection>
             )}
-          </section>
-        )}
 
-        {/* ═══ Completed Projects ═══ */}
-        {!loading && completed.length > 0 && (
-          <section>
-            <SectionHeader icon="✅" label={`مكتملة (${completed.length})`} color="#6B7280" open={completedOpen} onToggle={() => setCompletedOpen(!completedOpen)} />
-            {completedOpen && (
-              <div className="space-y-2 mt-2">
-                {completed.map(g => <ProjectCard key={g.id} goal={g} circleMap={circleMap} prefs={prefs} onTogglePin={togglePin} onClick={() => setSelected(g)} daysLeft={daysLeft(g.targetDate)} isCompleted />)}
-              </div>
-            )}
-          </section>
-        )}
+            {/* قائم — مفتوحة افتراضياً */}
+            <CollapsibleSection icon="🟢" label="قائم" count={active.length} color="#3D8C5A" defaultOpen>
+              {active.length > 0
+                ? active.map(g => <ProjectCard key={g.id} goal={g} circleMap={circleMap} prefs={prefs} onTogglePin={togglePin} onClick={() => setSelected(g)} daysLeft={daysLeft(g.targetDate)} />)
+                : <EmptySection text="لا توجد مشاريع قائمة" />}
+            </CollapsibleSection>
 
-        {/* ═══ Drafts (hidden by default) ═══ */}
-        {!loading && drafts.length > 0 && (
-          <div className="text-center">
-            <button onClick={() => setShowDrafts(!showDrafts)}
-              className="text-xs font-semibold px-4 py-2 rounded-xl transition"
-              style={{ background: "var(--bg)", color: "var(--muted)", border: "1px solid var(--card-border)" }}>
-              {showDrafts ? "إخفاء المسودات" : `عرض المسودات (${drafts.length})`}
-            </button>
-            {showDrafts && (
-              <div className="space-y-2 mt-3">
+            {/* مسودة — مغلقة افتراضياً */}
+            {drafts.length > 0 && (
+              <CollapsibleSection icon="📝" label="مسودة" count={drafts.length} color="#6B7280" defaultOpen={false}>
                 {drafts.map(g => <ProjectCard key={g.id} goal={g} circleMap={circleMap} prefs={prefs} onTogglePin={togglePin} onClick={() => setSelected(g)} daysLeft={daysLeft(g.targetDate)} isDraft />)}
-              </div>
+              </CollapsibleSection>
+            )}
+
+            {/* مكتمل — مغلقة افتراضياً */}
+            {completed.length > 0 && (
+              <CollapsibleSection icon="✅" label="مكتمل" count={completed.length} color="#2D6B9E" defaultOpen={false}>
+                {completed.map(g => <ProjectCard key={g.id} goal={g} circleMap={circleMap} prefs={prefs} onTogglePin={togglePin} onClick={() => setSelected(g)} daysLeft={daysLeft(g.targetDate)} isCompleted />)}
+              </CollapsibleSection>
             )}
           </div>
         )}
@@ -247,16 +226,29 @@ export default function ProjectsPage() {
    SECTION HEADER (collapsible)
    ═══════════════════════════════════════════════════════════════════════ */
 
-function SectionHeader({ icon, label, color, open, onToggle, alwaysOpen }: {
-  icon: string; label: string; color: string; open: boolean; onToggle?: () => void; alwaysOpen?: boolean;
+function CollapsibleSection({ icon, label, count, color, defaultOpen, isCritical, children }: {
+  icon: string; label: string; count: number; color: string;
+  defaultOpen: boolean; isCritical?: boolean; children: React.ReactNode;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <button onClick={alwaysOpen ? undefined : onToggle} className="flex items-center gap-2 w-full group">
-      <span>{icon}</span>
-      <span className="font-bold text-sm" style={{ color }}>{label}</span>
-      <div className="flex-1 h-px" style={{ background: `${color}30` }} />
-      {!alwaysOpen && <span className={`text-xs transition-transform ${open ? "rotate-180" : ""}`} style={{ color }}>▼</span>}
-    </button>
+    <div className={`rounded-2xl border overflow-hidden transition-all ${isCritical ? "animate-pulse-subtle" : ""}`}
+      style={{ borderColor: isCritical ? "#DC2626" : `${color}30`, borderWidth: isCritical ? 2 : 1 }}>
+      <button onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 w-full px-4 py-3 transition-colors"
+        style={{ background: `${color}08` }}>
+        <span className={`text-xs transition-transform duration-200 ${open ? "rotate-180" : ""}`} style={{ color }}>▼</span>
+        <span className="text-sm">{icon}</span>
+        <span className="font-bold text-sm" style={{ color }}>{label}</span>
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${color}15`, color }}>{count}</span>
+        <div className="flex-1" />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 pt-2 space-y-2">
+          {children}
+        </div>
+      )}
+    </div>
   );
 }
 
