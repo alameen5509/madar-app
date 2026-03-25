@@ -20,23 +20,23 @@ interface HistoryFigure {
 
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 
-const CATEGORIES = [
-  { key: "political", label: "سياسي", color: "#DC2626", icon: "🏛️" },
-  { key: "intellectual", label: "فكري", color: "#7C3AED", icon: "📚" },
-  { key: "military", label: "عسكري", color: "#92400E", icon: "⚔️" },
-  { key: "economic", label: "اقتصادي", color: "#059669", icon: "💰" },
-  { key: "religious", label: "ديني", color: "#2563EB", icon: "🕌" },
-  { key: "civilizational", label: "حضاري", color: "#D97706", icon: "🏗️" },
-  { key: "other", label: "أخرى", color: "#6B7280", icon: "📋" },
-];
+// ألوان عشوائية مستقرة للفئات
+const CAT_COLORS = ["#DC2626","#7C3AED","#92400E","#059669","#2563EB","#D97706","#6B7280","#0891B2","#BE185D","#4F46E5"];
+function catColor(cat: string): string {
+  let h = 0;
+  for (let i = 0; i < cat.length; i++) h = ((h << 5) - h + cat.charCodeAt(i)) | 0;
+  return CAT_COLORS[Math.abs(h) % CAT_COLORS.length];
+}
 
-const CAT_MAP = Object.fromEntries(CATEGORIES.map(c => [c.key, c]));
-
-const IMPORTANCE = [
-  { key: "normal", label: "عادي", color: "#6B7280" },
-  { key: "important", label: "مهم", color: "#D97706" },
-  { key: "critical", label: "فارق", color: "#DC2626" },
-];
+const IMP_COLORS: Record<string, string> = {};
+function impColor(imp: string): string {
+  if (IMP_COLORS[imp]) return IMP_COLORS[imp];
+  const colors = ["#6B7280","#D97706","#DC2626","#059669","#2563EB","#7C3AED"];
+  let h = 0;
+  for (let i = 0; i < imp.length; i++) h = ((h << 5) - h + imp.charCodeAt(i)) | 0;
+  IMP_COLORS[imp] = colors[Math.abs(h) % colors.length];
+  return IMP_COLORS[imp];
+}
 
 /* ─── Hijri conversion (client-side for instant preview) ─────────────── */
 function hijriToGreg(h: number): number { return Math.round(h * 0.970229 + 621.5709); }
@@ -110,6 +110,8 @@ export default function HistoryPage() {
   });
 
   // Unique values from data for filters
+  const allCategories = [...new Set(records.map(r => r.category).filter(Boolean))] as string[];
+  const allImportances = [...new Set(records.map(r => r.importance).filter(Boolean))] as string[];
   const countries = [...new Set(records.map(r => r.country).filter(Boolean))] as string[];
   const allFigures = [...new Set(records.map(r => r.figure).filter(Boolean))] as string[];
 
@@ -140,18 +142,22 @@ export default function HistoryPage() {
               <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="🔍 بحث..."
                 className="px-3 py-2 rounded-xl border text-xs flex-1 min-w-[120px] focus:outline-none"
                 style={{ background: "var(--card)", borderColor: "var(--card-border)", color: "var(--text)" }} />
-              <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
-                className="px-2 py-2 rounded-xl border text-xs focus:outline-none"
-                style={{ background: "var(--card)", borderColor: "var(--card-border)", color: "var(--text)" }}>
-                <option value="">كل الفئات</option>
-                {CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.icon} {c.label}</option>)}
-              </select>
-              <select value={filterImportance} onChange={e => setFilterImportance(e.target.value)}
-                className="px-2 py-2 rounded-xl border text-xs focus:outline-none"
-                style={{ background: "var(--card)", borderColor: "var(--card-border)", color: "var(--text)" }}>
-                <option value="">كل الأهمية</option>
-                {IMPORTANCE.map(i => <option key={i.key} value={i.key}>{i.label}</option>)}
-              </select>
+              {allCategories.length > 0 && (
+                <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
+                  className="px-2 py-2 rounded-xl border text-xs focus:outline-none"
+                  style={{ background: "var(--card)", borderColor: "var(--card-border)", color: "var(--text)" }}>
+                  <option value="">كل الفئات</option>
+                  {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              )}
+              {allImportances.length > 0 && (
+                <select value={filterImportance} onChange={e => setFilterImportance(e.target.value)}
+                  className="px-2 py-2 rounded-xl border text-xs focus:outline-none"
+                  style={{ background: "var(--card)", borderColor: "var(--card-border)", color: "var(--text)" }}>
+                  <option value="">كل الأهمية</option>
+                  {allImportances.map(i => <option key={i} value={i}>{i}</option>)}
+                </select>
+              )}
               {countries.length > 0 && (
                 <select value={filterCountry} onChange={e => setFilterCountry(e.target.value)}
                   className="px-2 py-2 rounded-xl border text-xs focus:outline-none"
@@ -219,8 +225,8 @@ function EraSection({ era, records, defaultOpen, onSelect }: {
       {open && records.length > 0 && (
         <div className="border-t px-4 py-2 space-y-1.5" style={{ borderColor: "var(--card-border)" }}>
           {records.map(r => {
-            const cat = CAT_MAP[r.category] ?? CAT_MAP.other;
-            const imp = IMPORTANCE.find(i => i.key === r.importance);
+            const cc = catColor(r.category);
+            const ic = impColor(r.importance);
             return (
               <div key={r.id} onClick={() => onSelect(r)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:shadow-sm transition"
@@ -229,13 +235,13 @@ function EraSection({ era, records, defaultOpen, onSelect }: {
                   <p className="text-xs font-black" style={{ color: "#5E5495" }}>{r.year > 0 ? `${r.year}م` : `${Math.abs(r.year)} ق.م`}</p>
                   {r.hijriYear > 0 && <p className="text-[9px]" style={{ color: "var(--muted)" }}>{r.hijriYear}هـ</p>}
                 </div>
-                <span className="text-sm">{cat.icon}</span>
+                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: cc }} />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium truncate" style={{ color: "var(--text)" }}>{r.title}</p>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: `${cat.color}15`, color: cat.color }}>{cat.label}</span>
-                    {r.importance !== "normal" && imp && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: `${imp.color}15`, color: imp.color }}>{imp.label}</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: `${cc}15`, color: cc }}>{r.category}</span>
+                    {r.importance && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: `${ic}15`, color: ic }}>{r.importance}</span>
                     )}
                     {r.country && <span className="text-[9px]" style={{ color: "var(--muted)" }}>{r.country}</span>}
                   </div>
@@ -257,7 +263,7 @@ function EraSection({ era, records, defaultOpen, onSelect }: {
 /* ─── Record Detail ──────────────────────────────────────────────────── */
 
 function RecordDetail({ record: r, onClose, onDelete }: { record: HistoryRecord; onClose: () => void; onDelete: () => void }) {
-  const cat = CAT_MAP[r.category] ?? CAT_MAP.other;
+  const cc = catColor(r.category);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
@@ -277,8 +283,8 @@ function RecordDetail({ record: r, onClose, onDelete }: { record: HistoryRecord;
         </div>
         <div className="px-6 py-5 space-y-3">
           <div className="flex gap-2 flex-wrap">
-            <span className="text-xs px-2 py-1 rounded-full" style={{ background: `${cat.color}15`, color: cat.color }}>{cat.icon} {cat.label}</span>
-            {r.importance !== "normal" && <span className="text-xs px-2 py-1 rounded-full font-bold" style={{ background: "#DC262615", color: "#DC2626" }}>{IMPORTANCE.find(i => i.key === r.importance)?.label}</span>}
+            <span className="text-xs px-2 py-1 rounded-full" style={{ background: `${cc}15`, color: cc }}>{r.category}</span>
+            {r.importance && <span className="text-xs px-2 py-1 rounded-full font-bold" style={{ background: `${impColor(r.importance)}15`, color: impColor(r.importance) }}>{r.importance}</span>}
           </div>
           {r.description && <p className="text-xs leading-relaxed" style={{ color: "var(--text)" }}>{r.description}</p>}
           {r.strategicImportance && (
@@ -395,31 +401,17 @@ function AddRecordModal({ onClose, onSaved, figures }: { onClose: () => void; on
             <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={2} placeholder="تفاصيل..."
               className="w-full px-4 py-2.5 rounded-xl border text-sm resize-none focus:outline-none" style={IS} />
           </div>
-          {/* Category */}
+          {/* Category — free text */}
           <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text)" }}>الفئة</label>
-            <div className="flex gap-1 flex-wrap">
-              {CATEGORIES.map(c => (
-                <button key={c.key} type="button" onClick={() => setCategory(c.key)}
-                  className="px-2 py-1.5 rounded-lg text-[10px] font-medium transition"
-                  style={{ background: category === c.key ? c.color : "var(--bg)", color: category === c.key ? "#fff" : "var(--muted)", border: `1px solid ${category === c.key ? c.color : "var(--card-border)"}` }}>
-                  {c.icon} {c.label}
-                </button>
-              ))}
-            </div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>الفئة</label>
+            <input value={category} onChange={e => setCategory(e.target.value)} placeholder="مثال: سياسي، فكري، عسكري..."
+              className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={IS} />
           </div>
-          {/* Importance */}
+          {/* Importance — free text */}
           <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text)" }}>الأهمية</label>
-            <div className="flex gap-1.5">
-              {IMPORTANCE.map(i => (
-                <button key={i.key} type="button" onClick={() => setImportance(i.key)}
-                  className="flex-1 py-2 rounded-xl text-xs font-semibold transition"
-                  style={{ background: importance === i.key ? i.color : "var(--bg)", color: importance === i.key ? "#fff" : "var(--muted)", border: `1px solid ${importance === i.key ? i.color : "var(--card-border)"}` }}>
-                  {i.label}
-                </button>
-              ))}
-            </div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>الأهمية</label>
+            <input value={importance} onChange={e => setImportance(e.target.value)} placeholder="مثال: عادي، مهم، فارق..."
+              className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={IS} />
           </div>
           {/* Figure */}
           <div>
