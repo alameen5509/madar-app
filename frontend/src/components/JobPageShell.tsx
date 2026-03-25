@@ -29,10 +29,25 @@ export function useJobData(jobId: string) {
 
   const loadJob = useCallback(async () => {
     try {
-      const { data } = await api.get("/api/circles");
-      const found = (data as JobInfo[]).find(c => c.id === jobId);
-      if (found) setJob(found);
-    } catch {}
+      const { data } = await api.get(`/api/works/${jobId}`);
+      const w = data as { id: string; name: string; status: string; sector?: string; role?: string };
+      setJob({
+        id: w.id,
+        name: w.name,
+        description: w.sector ?? undefined,
+        isActive: w.status === "active",
+        taskCount: 0,
+        goalCount: 0,
+        progressPercent: 0,
+      });
+    } catch {
+      // Fallback: try circles (legacy)
+      try {
+        const { data } = await api.get("/api/circles");
+        const found = (data as JobInfo[]).find(c => c.id === jobId);
+        if (found) setJob(found);
+      } catch {}
+    }
   }, [jobId]);
 
   const loadTree = useCallback(async () => {
