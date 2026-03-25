@@ -130,7 +130,7 @@ export default function LoginPage() {
 
       // Small delay to ensure cookie is set before redirect
       await new Promise(r => setTimeout(r, 100));
-      window.location.href = "/tasks";
+      window.location.href = "/habits";
     } catch {
       setError("تعذّر الاتصال بالخادم، يرجى المحاولة لاحقاً");
     } finally {

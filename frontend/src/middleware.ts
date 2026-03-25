@@ -26,7 +26,7 @@ export function middleware(request: NextRequest) {
 
   // Has token and on public page → redirect to tasks
   if (token && isPublic) {
-    return NextResponse.redirect(new URL('/tasks', request.url));
+    return NextResponse.redirect(new URL('/habits', request.url));
   }
 
   return NextResponse.next();
