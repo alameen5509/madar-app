@@ -552,6 +552,8 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
   const [tasks, setTasks] = useState<SmartTask[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [showEdit, setShowEdit] = useState(false);
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [nt, setNt] = useState({ title: "", desc: "", priority: 3, dueDate: "", context: "Anywhere", isUrgent: false, isWork: false });
   const [editTitle, setEditTitle] = useState(goal.title);
   // Strip rating tag from description for editing
   const cleanDesc = (goal.description ?? "").replace(/\s*\[rating:\{.*?\}\]/, "");
@@ -619,6 +621,28 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
       setShowEdit(false);
       onRefresh();
     } catch {} finally { setSaving(false); }
+  }
+
+  async function handleAddTask() {
+    if (!nt.title.trim()) return;
+    try {
+      await createTask({
+        title: nt.title.trim(),
+        description: nt.desc.trim() || undefined,
+        userPriority: nt.priority,
+        dueDate: nt.dueDate || undefined,
+        goalId: goal.id,
+        lifeCircleId: goal.lifeCircle?.id,
+        isWorkTask: nt.isWork || undefined,
+        isUrgent: nt.isUrgent || undefined,
+        taskContext: nt.context !== "Anywhere" ? nt.context : undefined,
+      });
+      setNt({ title: "", desc: "", priority: 3, dueDate: "", context: "Anywhere", isUrgent: false, isWork: false });
+      setShowAddTask(false);
+      // Refresh tasks in this detail
+      getGoalTasks(goal.id).then(setTasks).catch(() => {});
+      onRefresh();
+    } catch { alert("فشل إضافة المهمة"); }
   }
 
   async function handleDelete() {
@@ -763,7 +787,7 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold" style={{ color: "var(--text)" }}>المهام ({tasks.length})</span>
-              <a href={`/tasks?addTask=1&goalId=${goal.id}`} className="text-[10px] font-bold px-3 py-1 rounded-lg text-white" style={{ background: "#D4AF37" }}>+ مهمة</a>
+              <button onClick={() => setShowAddTask(true)} className="text-[10px] font-bold px-3 py-1 rounded-lg text-white" style={{ background: "#D4AF37" }}>+ مهمة</button>
             </div>
             {loadingTasks && <p className="text-center py-4 animate-pulse text-xs" style={{ color: "var(--muted)" }}>جارٍ التحميل...</p>}
             <div className="space-y-1.5">
@@ -781,6 +805,80 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
         </div>
 
         {/* Edit Dialog */}
+        {/* Add Task Modal */}
+        {showAddTask && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAddTask(false)} />
+            <div className="relative z-10 rounded-2xl shadow-2xl w-full max-w-md" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+              <div className="px-6 pt-6 pb-3 border-b flex items-center justify-between" style={{ borderColor: "var(--card-border)" }}>
+                <h3 className="font-bold text-sm" style={{ color: "var(--text)" }}>إضافة مهمة — {goal.title}</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setShowAddTask(false)} className="px-3 py-1.5 rounded-lg text-xs" style={{ background: "var(--bg)", color: "var(--muted)" }}>إلغاء</button>
+                  <button onClick={handleAddTask} disabled={!nt.title.trim()}
+                    className="px-4 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-40"
+                    style={{ background: "#D4AF37" }}>
+                    إضافة
+                  </button>
+                </div>
+              </div>
+              <div className="px-6 py-5 space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>عنوان المهمة *</label>
+                  <input value={nt.title} onChange={e => setNt({ ...nt, title: e.target.value })} autoFocus placeholder="مثال: إعداد التقرير..."
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>تفاصيل</label>
+                  <textarea value={nt.desc} onChange={e => setNt({ ...nt, desc: e.target.value })} rows={2} placeholder="وصف اختياري..."
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm resize-none focus:outline-none" style={inputStyle} />
+                </div>
+                {/* الأولوية */}
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text)" }}>الأولوية</label>
+                  <div className="flex gap-1">
+                    {[{ v: 1, l: "منخفضة", c: "#3D8C5A" }, { v: 3, l: "متوسطة", c: "#D4AF37" }, { v: 5, l: "عالية", c: "#DC2626" }].map(p => (
+                      <button key={p.v} type="button" onClick={() => setNt({ ...nt, priority: p.v })}
+                        className="flex-1 py-2 rounded-lg text-xs font-semibold transition"
+                        style={{ background: nt.priority === p.v ? p.c : "var(--bg)", color: nt.priority === p.v ? "#fff" : "var(--muted)", border: `1px solid ${nt.priority === p.v ? p.c : "var(--card-border)"}` }}>
+                        {p.l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>تاريخ الاستحقاق</label>
+                  <input type="date" value={nt.dueDate} onChange={e => setNt({ ...nt, dueDate: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle} />
+                </div>
+                {/* البيئة */}
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text)" }}>البيئة</label>
+                  <div className="flex gap-1 flex-wrap">
+                    {[{ k: "Anywhere", l: "أي مكان", i: "🌐" }, { k: "Office", l: "مكتب", i: "🏢" }, { k: "Home", l: "منزل", i: "🏠" }, { k: "Phone", l: "اتصال", i: "📞" }, { k: "Online", l: "أونلاين", i: "💻" }].map(c => (
+                      <button key={c.k} type="button" onClick={() => setNt({ ...nt, context: c.k })}
+                        className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition"
+                        style={{ background: nt.context === c.k ? "#5E5495" : "var(--bg)", color: nt.context === c.k ? "#fff" : "var(--muted)", border: `1px solid ${nt.context === c.k ? "#5E5495" : "var(--card-border)"}` }}>
+                        {c.i} {c.l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* خيارات */}
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={nt.isUrgent} onChange={() => setNt({ ...nt, isUrgent: !nt.isUrgent })} className="accent-red-500" />
+                    <span className="text-xs" style={{ color: "var(--text)" }}>🔴 ملحة</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={nt.isWork} onChange={() => setNt({ ...nt, isWork: !nt.isWork })} className="accent-[#5E5495]" />
+                    <span className="text-xs" style={{ color: "var(--text)" }}>💼 عمل</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showEdit && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/40" onClick={() => setShowEdit(false)} />
