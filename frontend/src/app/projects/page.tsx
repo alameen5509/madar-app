@@ -617,6 +617,7 @@ function ProjectDetail({ goal, circle, circles, users, onClose, onRefresh }: {
             </div>
             <div className="flex flex-col gap-1.5 items-end">
               <button onClick={onClose} className="text-lg px-2 rounded-lg" style={{ color: "var(--muted)" }}>✕</button>
+              <a href={`/projects/${goal.id}/board`} className="text-xs px-3 py-1 rounded-lg font-semibold" style={{ background: "#5E549520", color: "#5E5495" }}>🎨 السبورة</a>
               <button onClick={() => setShowEdit(true)} className="text-xs px-3 py-1 rounded-lg font-semibold" style={{ background: "#2D6B9E20", color: "#2D6B9E" }}>✎ تعديل</button>
               <button onClick={handleDelete} disabled={deleting} className="text-xs px-3 py-1 rounded-lg font-semibold" style={{ background: "#DC262620", color: "#DC2626" }}>
                 {deleting ? "..." : "🗑 حذف"}

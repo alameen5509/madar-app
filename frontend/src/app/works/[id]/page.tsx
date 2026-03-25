@@ -92,6 +92,7 @@ export default function WorkDetailPage({ params }: { params: Promise<{ id: strin
               { href: `/jobs/${id}/skills`, label: "المهارات", icon: "💡" },
               { href: `/jobs/${id}/meetings`, label: "الاجتماعات", icon: "📅" },
               { href: `/jobs/${id}/lessons`, label: "الدروس", icon: "📝" },
+              { href: `/jobs/${id}/board`, label: "السبورة", icon: "🎨" },
             ].map(n => (
               <Link key={n.href} href={n.href}
                 className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition whitespace-nowrap"

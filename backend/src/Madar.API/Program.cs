@@ -143,6 +143,20 @@ using (var scope = app.Services.CreateScope())
             DeviceName VARCHAR(200) NULL, Status VARCHAR(20) NULL,
             UserId CHAR(36) NULL, ExpiresAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6));",
     ];
+        // Boards table (whiteboards)
+        @"CREATE TABLE IF NOT EXISTS Boards (
+            Id CHAR(36) NOT NULL PRIMARY KEY,
+            UserId CHAR(36) NOT NULL,
+            Name VARCHAR(300) NOT NULL,
+            EntityType VARCHAR(30) NOT NULL DEFAULT 'personal',
+            EntityId CHAR(36) NULL,
+            Data LONGTEXT NULL,
+            CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            UpdatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            INDEX IX_Boards_UserId (UserId),
+            INDEX IX_Boards_Entity (EntityType, EntityId)
+        );",
+    ];
     foreach (var sql in sqls)
     {
         try { db.Database.ExecuteSqlRaw(sql); } catch { /* table/column may exist */ }
