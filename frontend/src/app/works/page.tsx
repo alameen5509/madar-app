@@ -106,36 +106,48 @@ export default function WorksPage() {
         {/* Cards */}
         <div className="space-y-3">
           {filtered.map(w => (
-            <Link key={w.id} href={`/works/${w.id}`}
-              className="group block rounded-2xl border overflow-hidden transition-all hover:shadow-lg hover:border-[#2D6B9E]"
+            <div key={w.id} className="group rounded-2xl border overflow-hidden transition-all hover:shadow-lg hover:border-[#2D6B9E]"
               style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-              <div className="p-5 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
-                  style={{ background: w.type === "entrepreneur" ? "#D4AF3715" : "#2D6B9E15" }}>
-                  {w.type === "entrepreneur" ? "🏢" : "💼"}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-bold text-sm" style={{ color: "var(--text)" }}>{w.name}</h3>
-                    <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold"
-                      style={{ background: w.status === "active" ? "#3D8C5A15" : "#6B728015", color: w.status === "active" ? "#3D8C5A" : "#6B7280" }}>
-                      {w.status === "active" ? "نشط" : "منتهي"}
-                    </span>
-                    <span className="text-[9px] px-2 py-0.5 rounded-full font-medium"
-                      style={{ background: w.type === "entrepreneur" ? "#D4AF3715" : "#2D6B9E15", color: w.type === "entrepreneur" ? "#D4AF37" : "#2D6B9E" }}>
-                      {w.type === "entrepreneur" ? "عمل حر" : "وظيفة"}
-                    </span>
+              <Link href={`/works/${w.id}`} className="block p-5">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                    style={{ background: w.type === "entrepreneur" ? "#D4AF3715" : "#2D6B9E15" }}>
+                    {w.type === "entrepreneur" ? "🏢" : "💼"}
                   </div>
-                  <p className="text-[10px]" style={{ color: "var(--muted)" }}>
-                    {w.type === "job" ? `${w.employer || w.title || ""} · ${w.salary > 0 ? w.salary.toLocaleString() + " ريال" : ""}` : `${w.sector || ""} · ${w.role || ""} · ${w.jobCount} وظيفة`}
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-bold text-sm" style={{ color: "var(--text)" }}>{w.name}</h3>
+                      <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold"
+                        style={{ background: w.status === "active" ? "#3D8C5A15" : "#6B728015", color: w.status === "active" ? "#3D8C5A" : "#6B7280" }}>
+                        {w.status === "active" ? "نشط" : "منتهي"}
+                      </span>
+                      <span className="text-[9px] px-2 py-0.5 rounded-full font-medium"
+                        style={{ background: w.type === "entrepreneur" ? "#D4AF3715" : "#2D6B9E15", color: w.type === "entrepreneur" ? "#D4AF37" : "#2D6B9E" }}>
+                        {w.type === "entrepreneur" ? "عمل حر" : "وظيفة"}
+                      </span>
+                    </div>
+                    <p className="text-[10px]" style={{ color: "var(--muted)" }}>
+                      {w.type === "job" ? `${w.employer || w.title || ""} · ${w.salary > 0 ? w.salary.toLocaleString() + " ريال" : ""}` : `${w.sector || ""} · ${w.role || ""} · ${w.jobCount} وظيفة`}
+                    </p>
+                  </div>
+                  {w.type === "entrepreneur" && w.jobCount > 0 && (
+                    <span className="text-lg font-black" style={{ color: "#D4AF37" }}>{w.jobCount}</span>
+                  )}
+                  <span className="text-xs group-hover:translate-x-[-4px] transition-transform" style={{ color: "#2D6B9E" }}>←</span>
                 </div>
-                {w.type === "entrepreneur" && w.jobCount > 0 && (
-                  <span className="text-lg font-black" style={{ color: "#D4AF37" }}>{w.jobCount}</span>
-                )}
-                <span className="text-xs group-hover:translate-x-[-4px] transition-transform" style={{ color: "#2D6B9E" }}>←</span>
+              </Link>
+              {/* Delete button */}
+              <div className="flex justify-end px-5 pb-3 -mt-1">
+                <button onClick={async () => {
+                  if (!confirm(`حذف "${w.name}" نهائياً؟`)) return;
+                  try { await api.delete(`/api/works/${w.id}`); load(); } catch { alert("فشل الحذف"); }
+                }}
+                  className="text-[10px] px-3 py-1.5 rounded-lg font-medium transition hover:bg-red-50"
+                  style={{ color: "#ef4444", border: "1px solid #ef444430" }}>
+                  🗑️ حذف
+                </button>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
 
