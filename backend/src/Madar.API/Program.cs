@@ -118,6 +118,11 @@ using (var scope = app.Services.CreateScope())
         "ALTER TABLE SmartTasks ADD COLUMN AssignedToId CHAR(36) NULL;",
         "ALTER TABLE SmartTasks ADD COLUMN WorkId CHAR(36) NULL;",
         "ALTER TABLE Goals ADD COLUMN WorkId CHAR(36) NULL;",
+        // History date columns
+        "ALTER TABLE HistoryRecords ADD COLUMN Month INT NULL;",
+        "ALTER TABLE HistoryRecords ADD COLUMN Day INT NULL;",
+        "ALTER TABLE HistoryRecords ADD COLUMN HijriMonth INT NULL;",
+        "ALTER TABLE HistoryRecords ADD COLUMN HijriDay INT NULL;",
         "ALTER TABLE SmartTasks ADD COLUMN ProjectId CHAR(36) NULL;",
         @"CREATE TABLE IF NOT EXISTS Habits (
             Id CHAR(36) NOT NULL PRIMARY KEY, OwnerId CHAR(36) NOT NULL,

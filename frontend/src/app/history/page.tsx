@@ -362,7 +362,12 @@ function AddRecordModal({ onClose, onSaved, figures, allCategories, allImportanc
         source: source.trim() || undefined, tags: tags.trim() || undefined,
       });
       onSaved(); onClose();
-    } catch {} finally { setSaving(false); }
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const msg = (err as { response?: { data?: { title?: string } } })?.response?.data?.title;
+      alert(`فشل الحفظ${status ? ` (${status})` : ""}${msg ? `: ${msg}` : ""}`);
+      console.error("Save history error:", err);
+    } finally { setSaving(false); }
   }
 
   return (
