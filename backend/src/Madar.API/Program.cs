@@ -116,6 +116,8 @@ using (var scope = app.Services.CreateScope())
         "ALTER TABLE SmartTasks ADD COLUMN Cost DECIMAL(18,2) NULL;",
         "ALTER TABLE SmartTasks ADD COLUMN CostCurrency VARCHAR(10) NULL DEFAULT 'SAR';",
         "ALTER TABLE SmartTasks ADD COLUMN AssignedToId CHAR(36) NULL;",
+        "ALTER TABLE SmartTasks ADD COLUMN WorkId CHAR(36) NULL;",
+        "ALTER TABLE Goals ADD COLUMN WorkId CHAR(36) NULL;",
         "ALTER TABLE SmartTasks ADD COLUMN ProjectId CHAR(36) NULL;",
         @"CREATE TABLE IF NOT EXISTS Habits (
             Id CHAR(36) NOT NULL PRIMARY KEY, OwnerId CHAR(36) NOT NULL,

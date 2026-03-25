@@ -249,6 +249,8 @@ export function NewTaskDialog({
   const [taskContext, setTaskContext] = useState("Anywhere");
   const [dueDate, setDueDate]       = useState(() => new Date().toISOString().slice(0, 10));
   const [goalId, setGoalId]         = useState(defaultGoalId ?? "");
+  const [workId, setWorkId]         = useState("");
+  const [worksList, setWorksList]   = useState<{id: string; name: string; type: string}[]>([]);
   const [circleId, setCircleId]     = useState("");
   const [circles, setCircles]       = useState<{id: string; name: string; iconKey?: string; tier: string}[]>([]);
   const [hasCost, setHasCost]       = useState(false);
@@ -276,6 +278,7 @@ export function NewTaskDialog({
   useEffect(() => {
     import("@/lib/api").then(m => m.api.get("/api/users")).then(r => setPUsers(r.data)).catch(() => {});
     import("@/lib/api").then(m => m.getCircles()).then(c => setCircles(c.map(x => ({ id: x.id, name: x.name, iconKey: x.iconKey, tier: x.tier })))).catch(() => {});
+    import("@/lib/api").then(m => m.api.get("/api/works")).then(r => setWorksList((r.data ?? []).map((w: { id: string; name: string; type: string }) => ({ id: w.id, name: w.name, type: w.type })))).catch(() => {});
     import("@/lib/api").then(m => m.api.get("/api/finance/snapshot")).then(r => {
       const txs = r.data?.transactions ?? [];
       const inc = txs.filter((t: { type: string }) => t.type === "Income" || t.type === "income").reduce((s: number, t: { amount: number }) => s + t.amount, 0);
@@ -418,6 +421,17 @@ export function NewTaskDialog({
                   className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition">
                   <option value="">مهمة مستقلة</option>
                   {goals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
+                </select>
+              </div>
+            )}
+            {/* Link to work/job */}
+            {worksList.length > 0 && (
+              <div className="mb-3">
+                <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">ربط بوظيفة <span className="text-[#7C7A8E] font-normal">(اختياري)</span></label>
+                <select value={workId} onChange={(e) => setWorkId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition">
+                  <option value="">بدون ربط</option>
+                  {worksList.map((w) => <option key={w.id} value={w.id}>{w.type === "job" ? "💼" : "🏢"} {w.name}</option>)}
                 </select>
               </div>
             )}

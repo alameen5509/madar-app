@@ -86,6 +86,14 @@ public class GoalsController : BaseController
         _db.Goals.Add(goal);
         await _db.SaveChangesAsync(ct);
 
+        // Set WorkId via raw SQL (column added dynamically, not in EF model)
+        if (req.WorkId.HasValue && req.WorkId.Value != Guid.Empty)
+        {
+            await _db.Database.ExecuteSqlRawAsync(
+                "UPDATE Goals SET WorkId = @p0 WHERE Id = @p1",
+                [req.WorkId.Value.ToString(), goal.Id.ToString()]);
+        }
+
         await _db.Entry(goal).Reference(g => g.LifeCircle).LoadAsync(ct);
 
         return Ok(new
@@ -129,6 +137,15 @@ public class GoalsController : BaseController
             goal.LifeCircleId = req.LifeCircleId.Value;
 
         await _db.SaveChangesAsync(ct);
+
+        // Set WorkId via raw SQL
+        if (req.WorkId.HasValue)
+        {
+            var wid = req.WorkId.Value == Guid.Empty ? (object)DBNull.Value : req.WorkId.Value.ToString();
+            await _db.Database.ExecuteSqlRawAsync(
+                "UPDATE Goals SET WorkId = @p0 WHERE Id = @p1",
+                [wid, goal.Id.ToString()]);
+        }
 
         await _db.Entry(goal).Reference(g => g.LifeCircle).LoadAsync(ct);
 
@@ -190,19 +207,23 @@ public class GoalsController : BaseController
     }
 }
 
-public record CreateGoalRequest(
-    string Title,
-    string? Description = null,
-    DateTime? TargetDate = null,
-    int? PriorityWeight = 5,
-    Guid? LifeCircleId = null
-);
+public class CreateGoalRequest
+{
+    public string Title { get; set; } = "";
+    public string? Description { get; set; }
+    public DateTime? TargetDate { get; set; }
+    public int? PriorityWeight { get; set; } = 5;
+    public Guid? LifeCircleId { get; set; }
+    public Guid? WorkId { get; set; }
+}
 
-public record UpdateGoalRequest(
-    string? Title = null,
-    string? Description = null,
-    DateTime? TargetDate = null,
-    int? PriorityWeight = null,
-    string? Status = null,
-    Guid? LifeCircleId = null
-);
+public class UpdateGoalRequest
+{
+    public string? Title { get; set; }
+    public string? Description { get; set; }
+    public DateTime? TargetDate { get; set; }
+    public int? PriorityWeight { get; set; }
+    public string? Status { get; set; }
+    public Guid? LifeCircleId { get; set; }
+    public Guid? WorkId { get; set; }
+}

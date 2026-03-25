@@ -10,6 +10,30 @@ export default function JobOverview({ params }: { params: Promise<{ id: string }
   const { id } = use(params);
   const { job, dims, goals, calcProgress } = useJobData(id);
   const { meta } = useJobMeta(id);
+
+  // Linked projects and tasks
+  const [linkedProjects, setLinkedProjects] = useState<{ id: string; title: string; status: string; progressPercent: number }[]>([]);
+  const [linkedTasks, setLinkedTasks] = useState<{ id: string; title: string; status: string }[]>([]);
+
+  useEffect(() => {
+    // Fetch projects linked to this work via preferences
+    api.get("/api/users/me/preferences").then(({ data }) => {
+      const pp = data?.projectPrefs?.linkedWork ?? {};
+      const linkedGoalIds = Object.entries(pp).filter(([, wid]) => wid === id).map(([gid]) => gid);
+      if (linkedGoalIds.length > 0) {
+        api.get("/api/goals").then(({ data: allGoals }) => {
+          setLinkedProjects((allGoals as { id: string; title: string; status: string; progressPercent: number }[])
+            .filter(g => linkedGoalIds.includes(g.id)));
+        }).catch(() => {});
+      }
+    }).catch(() => {});
+    // Fetch tasks (look for tasks that have this work's goals)
+    api.get("/api/tasks").then(({ data: allTasks }) => {
+      // Show tasks that belong to linked goals or have this work context
+      setLinkedTasks((allTasks as { id: string; title: string; status: string; goal?: { id: string } }[])
+        .filter(t => t.status !== "Completed").slice(0, 10));
+    }).catch(() => {});
+  }, [id]);
   const rootDims = dims.filter(d => !d.parentDimensionId);
 
   // Editable vision/mission
@@ -128,6 +152,28 @@ export default function JobOverview({ params }: { params: Promise<{ id: string }
           </div>
         )}
       </div>
+
+      {/* ═══ Linked Projects ═══ */}
+      {linkedProjects.length > 0 && (
+        <div className="rounded-2xl p-5 mb-4 border" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+          <p className="text-sm font-bold mb-3" style={{ color: "var(--text)" }}>📁 المشاريع المرتبطة ({linkedProjects.length})</p>
+          <div className="space-y-2">
+            {linkedProjects.map(p => (
+              <Link key={p.id} href={`/projects`}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl border transition hover:border-[#D4AF37]"
+                style={{ background: "var(--bg)", borderColor: "var(--card-border)" }}>
+                <span className="text-sm">📁</span>
+                <span className="text-xs font-medium flex-1" style={{ color: "var(--text)" }}>{p.title}</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold"
+                  style={{ background: p.status === "Active" ? "#3D8C5A15" : p.status === "Critical" ? "#DC262615" : "#6B728015", color: p.status === "Active" ? "#3D8C5A" : p.status === "Critical" ? "#DC2626" : "#6B7280" }}>
+                  {p.status === "Active" ? "قائم" : p.status === "Critical" ? "حرجة" : p.status === "Completed" ? "مكتمل" : "مسودة"}
+                </span>
+                <span className="text-[10px] font-bold" style={{ color: "#2D6B9E" }}>{p.progressPercent}%</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ═══ Section Cards Grid ═══ */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
