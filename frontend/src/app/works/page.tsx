@@ -55,7 +55,13 @@ export default function WorksPage() {
       body.ownershipPercentage = Number(fOwnership) || 0;
       body.startDate = fStart || undefined;
     }
-    await api.post("/api/works", body).catch(() => {});
+    try {
+      await api.post("/api/works", body);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "فشل الحفظ";
+      alert(msg);
+      return;
+    }
     resetForm(); load();
   }
 
