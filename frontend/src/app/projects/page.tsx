@@ -22,6 +22,27 @@ const STATUSES = [
 
 const STATUS_MAP = Object.fromEntries(STATUSES.map(s => [s.key, s]));
 
+function getProjectScore(desc?: string): number | null {
+  if (!desc) return null;
+  const m = desc.match(/\[rating:(\{.*?\})\]/);
+  if (!m) return null;
+  try { return JSON.parse(m[1]).score ?? null; } catch { return null; }
+}
+
+function scoreColor(s: number): string {
+  if (s > 45) return "#DC2626";
+  if (s > 30) return "#D4AF37";
+  if (s > 15) return "#3D8C5A";
+  return "#6B7280";
+}
+
+function scoreLabelAr(s: number): string {
+  if (s > 45) return "حرج";
+  if (s > 30) return "مرتفع";
+  if (s > 15) return "متوسط";
+  return "منخفض";
+}
+
 const TASK_STATUS: Record<string, { label: string; color: string }> = {
   Inbox: { label: "وارد", color: "#6B7280" },
   Todo: { label: "مخطط", color: "#3B82F6" },
@@ -86,11 +107,13 @@ export default function ProjectsPage() {
   // Sorting: Critical → Pinned → rest
   function sortedGoals(list: Goal[]): Goal[] {
     return [...list].sort((a, b) => {
-      const aCrit = a.status === "Critical" ? -2 : 0;
-      const bCrit = b.status === "Critical" ? -2 : 0;
-      const aPin = prefs.pinned.includes(a.id) ? -1 : 0;
-      const bPin = prefs.pinned.includes(b.id) ? -1 : 0;
-      return (aCrit + aPin) - (bCrit + bPin);
+      // Pinned first
+      const aPin = prefs.pinned.includes(a.id) ? -1000 : 0;
+      const bPin = prefs.pinned.includes(b.id) ? -1000 : 0;
+      // Then by score (higher = more urgent = first)
+      const aScore = getProjectScore(a.description) ?? 0;
+      const bScore = getProjectScore(b.description) ?? 0;
+      return (aPin - bPin) || (bScore - aScore);
     });
   }
 
@@ -271,6 +294,7 @@ function ProjectCard({ goal, circleMap, prefs, onTogglePin, onClick, daysLeft, i
   const status = STATUS_MAP[goal.status] ?? STATUS_MAP.Active;
   const deadlineAlert = daysLeft !== null && daysLeft <= 7 && daysLeft >= 0;
   const overdue = daysLeft !== null && daysLeft < 0;
+  const score = getProjectScore(goal.description);
 
   return (
     <div onClick={onClick}
@@ -290,6 +314,11 @@ function ProjectCard({ goal, circleMap, prefs, onTogglePin, onClick, daysLeft, i
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
+            {score !== null && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-black" style={{ background: scoreColor(score) + "18", color: scoreColor(score) }}>
+                {score}/60 {scoreLabelAr(score)}
+              </span>
+            )}
             <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{goal.title}</p>
             <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: `${status.color}15`, color: status.color }}>
               {status.icon} {status.label}
@@ -344,14 +373,22 @@ function NewProjectDialog({ circles, works, onClose, onCreated }: {
   const [status, setStatus] = useState("Active");
   const [tags, setTags] = useState("");
   const [creating, setCreating] = useState(false);
+  // Rating
+  const [rImportance, setRImportance] = useState(0);
+  const [rUrgency, setRUrgency] = useState(0);
+  const [rImpact, setRImpact] = useState(0);
+  const [rEffort, setREffort] = useState(0);
+  const score = (rImportance + rUrgency + rImpact + rEffort) * 3;
+  const rated = rImportance > 0 && rUrgency > 0 && rImpact > 0 && rEffort > 0;
 
   async function handleCreate() {
     if (!title.trim()) return;
     setCreating(true);
     try {
+      const ratingTag = rated ? ` [rating:${JSON.stringify({ im: rImportance, ur: rUrgency, ip: rImpact, ef: rEffort, score })}]` : "";
       await createGoal({
         title: title.trim(),
-        description: desc.trim() || undefined,
+        description: (desc.trim() + ratingTag).trim() || undefined,
         targetDate: targetDate || undefined,
         lifeCircleId: circleId || undefined,
       });
@@ -434,6 +471,41 @@ function NewProjectDialog({ circles, works, onClose, onCreated }: {
           </div>
 
           <Input label="وسوم (مفصولة بفاصلة)" value={tags} onChange={setTags} placeholder="تقني, عاجل, تسويق" />
+
+          {/* Rating */}
+          <div className="rounded-xl border p-3 space-y-2.5" style={{ borderColor: rated ? "#3D8C5A40" : "var(--card-border)", background: rated ? "#3D8C5A06" : "var(--bg)" }}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold" style={{ color: "var(--text)" }}>تقييم المشروع</span>
+              {rated && (
+                <span className="text-sm font-black px-2 py-0.5 rounded-full" style={{ background: scoreColor(score) + "18", color: scoreColor(score) }}>
+                  {score}/60 {scoreLabelAr(score)}
+                </span>
+              )}
+            </div>
+            {[
+              { label: "الأهمية", value: rImportance, set: setRImportance, icon: "⭐" },
+              { label: "الاستعجال", value: rUrgency, set: setRUrgency, icon: "⏰" },
+              { label: "التأثير", value: rImpact, set: setRImpact, icon: "💥" },
+              { label: "الجهد المطلوب", value: rEffort, set: setREffort, icon: "💪" },
+            ].map(r => (
+              <div key={r.label} className="flex items-center gap-2">
+                <span className="text-[10px] w-20 text-right flex-shrink-0" style={{ color: "var(--text)" }}>{r.icon} {r.label}</span>
+                <div className="flex gap-1 flex-1">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <button key={n} type="button" onClick={() => r.set(n)}
+                      className="flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all"
+                      style={{
+                        background: r.value >= n ? (n >= 4 ? "#DC2626" : n >= 3 ? "#D4AF37" : "#3D8C5A") : "var(--card)",
+                        color: r.value >= n ? "#fff" : "var(--muted)",
+                        border: `1px solid ${r.value >= n ? "transparent" : "var(--card-border)"}`,
+                      }}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
