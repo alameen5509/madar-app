@@ -201,6 +201,30 @@ using (var scope = app.Services.CreateScope())
             CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
             INDEX IX_HF_UserId (UserId)
         );",
+        // CircleGroups + UserCircles (new circles system)
+        @"CREATE TABLE IF NOT EXISTS CircleGroups (
+            Id CHAR(36) NOT NULL PRIMARY KEY,
+            UserId CHAR(36) NOT NULL,
+            Name VARCHAR(200) NOT NULL,
+            Color VARCHAR(20) NULL,
+            Icon VARCHAR(10) NULL,
+            Priority INT NOT NULL DEFAULT 0,
+            CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            INDEX IX_CG_UserId (UserId)
+        );",
+        @"CREATE TABLE IF NOT EXISTS UserCircles (
+            Id CHAR(36) NOT NULL PRIMARY KEY,
+            UserId CHAR(36) NOT NULL,
+            GroupId CHAR(36) NOT NULL,
+            Name VARCHAR(200) NOT NULL,
+            Color VARCHAR(20) NULL,
+            Icon VARCHAR(10) NULL,
+            Slug VARCHAR(100) NULL,
+            Priority INT NOT NULL DEFAULT 0,
+            CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            INDEX IX_UC_UserId (UserId),
+            INDEX IX_UC_GroupId (GroupId)
+        );",
     ];
     foreach (var sql in sqls)
     {
