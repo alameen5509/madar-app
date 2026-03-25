@@ -526,8 +526,24 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [showEdit, setShowEdit] = useState(false);
   const [editTitle, setEditTitle] = useState(goal.title);
-  const [editDesc, setEditDesc] = useState(goal.description ?? "");
+  // Strip rating tag from description for editing
+  const cleanDesc = (goal.description ?? "").replace(/\s*\[rating:\{.*?\}\]/, "");
+  const [editDesc, setEditDesc] = useState(cleanDesc);
   const [editDate, setEditDate] = useState(goal.targetDate?.split("T")[0] ?? "");
+  const [editWorkId, setEditWorkId] = useState(prefs.linkedWork[goal.id] ?? "");
+  const [editCircleId, setEditCircleId] = useState(goal.lifeCircle?.id ?? "");
+  // Parse existing rating
+  const existingRating = (() => {
+    const m = (goal.description ?? "").match(/\[rating:(\{.*?\})\]/);
+    if (!m) return { im: 0, ur: 0, ip: 0, ef: 0 };
+    try { return JSON.parse(m[1]); } catch { return { im: 0, ur: 0, ip: 0, ef: 0 }; }
+  })();
+  const [eImportance, setEImportance] = useState<number>(existingRating.im ?? 0);
+  const [eUrgency, setEUrgency] = useState<number>(existingRating.ur ?? 0);
+  const [eImpact, setEImpact] = useState<number>(existingRating.ip ?? 0);
+  const [eEffort, setEEffort] = useState<number>(existingRating.ef ?? 0);
+  const eScore = (eImportance + eUrgency + eImpact + eEffort) * 3;
+  const eRated = eImportance > 0 && eUrgency > 0 && eImpact > 0 && eEffort > 0;
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [newTag, setNewTag] = useState("");
@@ -557,8 +573,22 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
 
   async function handleSaveEdit() {
     setSaving(true);
-    try { await updateGoal(goal.id, { title: editTitle.trim(), description: editDesc.trim() || undefined, targetDate: editDate || undefined }); setShowEdit(false); onRefresh(); }
-    catch {} finally { setSaving(false); }
+    try {
+      const ratingTag = eRated ? ` [rating:${JSON.stringify({ im: eImportance, ur: eUrgency, ip: eImpact, ef: eEffort, score: eScore })}]` : "";
+      const fullDesc = (editDesc.trim() + ratingTag).trim() || undefined;
+      await updateGoal(goal.id, {
+        title: editTitle.trim(),
+        description: fullDesc,
+        targetDate: editDate || undefined,
+        lifeCircleId: editCircleId || undefined,
+      });
+      // Save work link in preferences
+      const updatedPrefs = { ...prefs, linkedWork: { ...prefs.linkedWork, [goal.id]: editWorkId } };
+      if (!editWorkId) delete updatedPrefs.linkedWork[goal.id];
+      savePrefs(updatedPrefs);
+      setShowEdit(false);
+      onRefresh();
+    } catch {} finally { setSaving(false); }
   }
 
   async function handleDelete() {
@@ -734,14 +764,69 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
                   </button>
                 </div>
               </div>
-              <div className="px-6 py-5 space-y-4">
+              <div className="px-6 py-5 space-y-4 max-h-[65vh] overflow-y-auto">
                 <Input label="الاسم" value={editTitle} onChange={setEditTitle} />
                 <div>
                   <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>الوصف</label>
-                  <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={3}
+                  <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={2}
                     className="w-full px-4 py-2.5 rounded-xl border text-sm resize-none focus:outline-none" style={inputStyle} />
                 </div>
                 <Input label="تاريخ الانتهاء" type="date" value={editDate} onChange={setEditDate} />
+
+                {/* ربط بوظيفة */}
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>ربط بوظيفة</label>
+                  <select value={editWorkId} onChange={e => setEditWorkId(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle}>
+                    <option value="">بدون ربط</option>
+                    {works.map(w => <option key={w.id} value={w.id}>{w.type === "job" ? "💼" : "🏢"} {w.name}</option>)}
+                  </select>
+                </div>
+
+                {/* ربط بدائرة */}
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>الدور</label>
+                  <select value={editCircleId} onChange={e => setEditCircleId(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle}>
+                    <option value="">بدون</option>
+                    {circles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+
+                {/* تقييم */}
+                <div className="rounded-xl border p-3 space-y-2.5" style={{ borderColor: eRated ? "#3D8C5A40" : "var(--card-border)", background: eRated ? "#3D8C5A06" : "var(--bg)" }}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold" style={{ color: "var(--text)" }}>تقييم المشروع</span>
+                    {eRated && (
+                      <span className="text-sm font-black px-2 py-0.5 rounded-full" style={{ background: scoreColor(eScore) + "18", color: scoreColor(eScore) }}>
+                        {eScore}/60 {scoreLabelAr(eScore)}
+                      </span>
+                    )}
+                  </div>
+                  {[
+                    { label: "الأهمية", value: eImportance, set: setEImportance, icon: "⭐" },
+                    { label: "الاستعجال", value: eUrgency, set: setEUrgency, icon: "⏰" },
+                    { label: "التأثير", value: eImpact, set: setEImpact, icon: "💥" },
+                    { label: "الجهد", value: eEffort, set: setEEffort, icon: "💪" },
+                  ].map(r => (
+                    <div key={r.label} className="flex items-center gap-2">
+                      <span className="text-[10px] w-16 text-right flex-shrink-0" style={{ color: "var(--text)" }}>{r.icon} {r.label}</span>
+                      <div className="flex gap-1 flex-1">
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <button key={n} type="button" onClick={() => r.set(n)}
+                            className="flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all"
+                            style={{
+                              background: r.value >= n ? (n >= 4 ? "#DC2626" : n >= 3 ? "#D4AF37" : "#3D8C5A") : "var(--card)",
+                              color: r.value >= n ? "#fff" : "var(--muted)",
+                              border: `1px solid ${r.value >= n ? "transparent" : "var(--card-border)"}`,
+                            }}>
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
