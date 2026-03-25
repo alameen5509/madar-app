@@ -112,7 +112,7 @@ export default function WorksPage() {
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
                     style={{ background: w.type === "entrepreneur" ? "#D4AF3715" : "#2D6B9E15" }}>
-                    {w.type === "entrepreneur" ? "🏢" : "💼"}
+                    {w.type === "entrepreneur" ? "👔" : "💼"}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -181,7 +181,7 @@ export default function WorksPage() {
                   <button onClick={() => setNewType("entrepreneur")}
                     className="rounded-2xl p-6 border-2 text-center transition-all hover:shadow-md hover:border-[#D4AF37]"
                     style={{ borderColor: "var(--card-border)" }}>
-                    <span className="text-4xl block mb-3">🏢</span>
+                    <span className="text-4xl block mb-3">👔</span>
                     <p className="text-sm font-bold" style={{ color: "var(--text)" }}>رجل أعمال</p>
                     <p className="text-[10px] mt-1" style={{ color: "var(--muted)" }}>رجل أعمال / مشاريع</p>
                   </button>
@@ -203,7 +203,7 @@ export default function WorksPage() {
                 </>
               ) : (
                 <>
-                  <p className="text-xs font-bold" style={{ color: "#D4AF37" }}>🏢 رجل أعمال جديد</p>
+                  <p className="text-xs font-bold" style={{ color: "#D4AF37" }}>👔 رجل أعمال جديد</p>
                   <input value={fName} onChange={e => setFName(e.target.value)} placeholder="اسم العمل *" autoFocus
                     className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={{ borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" }} />
                   <input value={fSector} onChange={e => setFSector(e.target.value)} placeholder="القطاع (تقنية، تجارة، عقار…)"
