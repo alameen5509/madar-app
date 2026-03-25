@@ -32,34 +32,43 @@ export function useJobData(jobId: string) {
   const loadJob = useCallback(async () => {
     setJobLoading(true);
     setJobError("");
+    let found = false;
+
+    // Try /api/works/{id}
     try {
-      const { data } = await api.get(`/api/works/${jobId}`);
-      const w = data as { id: string; name: string; status: string; sector?: string; role?: string; title?: string };
-      setJob({
-        id: w.id,
-        name: w.name,
-        description: w.title ?? w.sector ?? undefined,
-        isActive: w.status === "active",
-        taskCount: 0,
-        goalCount: 0,
-        progressPercent: 0,
-      });
-    } catch {
-      // Fallback: try circles (legacy)
-      try {
-        const { data } = await api.get("/api/circles");
-        const found = (data as JobInfo[]).find(c => c.id === jobId);
-        if (found) {
-          setJob(found);
-        } else {
-          setJobError("لم يتم العثور على بيانات هذا العمل");
-        }
-      } catch {
-        setJobError("تعذّر تحميل بيانات العمل");
+      const res = await api.get(`/api/works/${jobId}`);
+      const raw = res.data?.data ?? res.data; // handle both wrapped and unwrapped responses
+      if (raw && raw.id) {
+        setJob({
+          id: raw.id,
+          name: raw.name ?? "بدون اسم",
+          description: raw.title ?? raw.sector ?? undefined,
+          isActive: (raw.status ?? "active") === "active",
+          taskCount: 0,
+          goalCount: 0,
+          progressPercent: 0,
+        });
+        found = true;
       }
-    } finally {
-      setJobLoading(false);
+    } catch { /* will try circles next */ }
+
+    // Fallback: try circles (legacy)
+    if (!found) {
+      try {
+        const res = await api.get("/api/circles");
+        const circles = (res.data ?? []) as JobInfo[];
+        const match = circles.find(c => c.id === jobId);
+        if (match) {
+          setJob(match);
+          found = true;
+        }
+      } catch { /* ignored */ }
     }
+
+    if (!found) {
+      setJobError("لم يتم العثور على بيانات هذا العمل");
+    }
+    setJobLoading(false);
   }, [jobId]);
 
   const loadTree = useCallback(async () => {
@@ -124,49 +133,39 @@ export default function JobPageShell({ jobId, children }: { jobId: string; child
     </main>
   );
 
-  if (jobError || !job) return (
-    <main className="flex-1 flex items-center justify-center" style={{ background: "var(--bg)" }}>
-      <div className="flex flex-col items-center gap-3 text-center px-6">
-        <p className="text-3xl">⚠️</p>
-        <p className="text-sm font-medium" style={{ color: "var(--text)" }}>{jobError || "لم يتم العثور على بيانات العمل"}</p>
-        <Link href="/works" className="text-sm font-medium hover:underline" style={{ color: "#2D6B9E" }}>← العودة للأعمال</Link>
-      </div>
-    </main>
-  );
+  const name = job?.name ?? "العمل";
+  const base = `/jobs/${jobId}`;
+  const activeNav = NAV.find(n => n.key && pathname === base + n.key);
 
   return (
     <main className="flex-1 overflow-y-auto" style={{ background: "var(--bg)" }}>
       {/* Header */}
       <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b px-6 py-4 pr-14 md:pr-6" style={{ borderColor: "var(--card-border)" }}>
         {/* Breadcrumb */}
-        {(() => {
-          const base = `/jobs/${jobId}`;
-          const activeNav = NAV.find(n => n.key && pathname === base + n.key);
-          return (
-            <div className="flex items-center gap-1 text-[10px] mb-2">
-              <Link href="/works" className="hover:underline" style={{ color: "var(--muted)" }}>الأعمال</Link>
+        <div className="flex items-center gap-1 text-[10px] mb-2">
+          <Link href="/works" className="hover:underline" style={{ color: "var(--muted)" }}>الأعمال</Link>
+          <span style={{ color: "var(--muted)" }}>←</span>
+          {activeNav ? (
+            <>
+              <Link href={base} className="hover:underline" style={{ color: "var(--muted)" }}>{name}</Link>
               <span style={{ color: "var(--muted)" }}>←</span>
-              {activeNav ? (
-                <>
-                  <Link href={base} className="hover:underline" style={{ color: "var(--muted)" }}>{job.name}</Link>
-                  <span style={{ color: "var(--muted)" }}>←</span>
-                  <span className="font-semibold" style={{ color: "#2D6B9E" }}>{activeNav.icon} {activeNav.label}</span>
-                </>
-              ) : (
-                <span className="font-semibold" style={{ color: "#2D6B9E" }}>{job.name}</span>
-              )}
-            </div>
-          );
-        })()}
+              <span className="font-semibold" style={{ color: "#2D6B9E" }}>{activeNav.icon} {activeNav.label}</span>
+            </>
+          ) : (
+            <span className="font-semibold" style={{ color: "#2D6B9E" }}>{name}</span>
+          )}
+        </div>
 
         {/* Job info */}
         <div className="flex items-center gap-4">
           <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style={{ background: "#2D6B9E15" }}>💼</div>
           <div className="flex-1 min-w-0">
-            <h2 className="font-bold text-base" style={{ color: "var(--text)" }}>{job.name}</h2>
-            <p className="text-[10px]" style={{ color: "var(--muted)" }}>
-              {job.description ? `${job.description} · ` : ""}{job.isActive ? "نشطة" : "متوقفة"}
-            </p>
+            <h2 className="font-bold text-base" style={{ color: "var(--text)" }}>{name}</h2>
+            {job && (
+              <p className="text-[10px]" style={{ color: "var(--muted)" }}>
+                {job.description ? `${job.description} · ` : ""}{job.isActive ? "نشطة" : "متوقفة"}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <div className="w-20 h-2 rounded-full overflow-hidden" style={{ background: "#2D6B9E20" }}>
