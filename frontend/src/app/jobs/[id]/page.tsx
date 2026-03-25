@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import JobPageShell, { useJobData, useJobMeta } from "@/components/JobPageShell";
@@ -19,12 +19,13 @@ export default function JobOverview({ params }: { params: Promise<{ id: string }
   const [org, setOrg] = useState("");
 
   // Load vision/mission from preferences
-  useState(() => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
     api.get("/api/users/me/preferences").then(({ data }) => {
       const jv = data?.jobVision?.[id];
       if (jv) { setVision(jv.vision ?? ""); setMission(jv.mission ?? ""); setOrg(jv.org ?? ""); }
     }).catch(() => {});
-  });
+  }, [id]);
 
   async function saveVM() {
     try {

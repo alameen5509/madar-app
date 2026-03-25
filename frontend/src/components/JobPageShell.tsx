@@ -24,17 +24,21 @@ const NAV = [
 
 export function useJobData(jobId: string) {
   const [job, setJob] = useState<JobInfo | null>(null);
+  const [jobLoading, setJobLoading] = useState(true);
+  const [jobError, setJobError] = useState("");
   const [dims, setDims] = useState<JobDim[]>([]);
   const [goals, setGoals] = useState<JobGoalData[]>([]);
 
   const loadJob = useCallback(async () => {
+    setJobLoading(true);
+    setJobError("");
     try {
       const { data } = await api.get(`/api/works/${jobId}`);
-      const w = data as { id: string; name: string; status: string; sector?: string; role?: string };
+      const w = data as { id: string; name: string; status: string; sector?: string; role?: string; title?: string };
       setJob({
         id: w.id,
         name: w.name,
-        description: w.sector ?? undefined,
+        description: w.title ?? w.sector ?? undefined,
         isActive: w.status === "active",
         taskCount: 0,
         goalCount: 0,
@@ -45,27 +49,38 @@ export function useJobData(jobId: string) {
       try {
         const { data } = await api.get("/api/circles");
         const found = (data as JobInfo[]).find(c => c.id === jobId);
-        if (found) setJob(found);
-      } catch {}
+        if (found) {
+          setJob(found);
+        } else {
+          setJobError("لم يتم العثور على بيانات هذا العمل");
+        }
+      } catch {
+        setJobError("تعذّر تحميل بيانات العمل");
+      }
+    } finally {
+      setJobLoading(false);
     }
   }, [jobId]);
 
   const loadTree = useCallback(async () => {
     try {
       const [d, g] = await Promise.all([
-        api.get(`/api/job-dimensions/${jobId}`),
-        api.get(`/api/job-goals/${jobId}`),
+        api.get(`/api/job-dimensions/${jobId}`).catch(() => ({ data: [] })),
+        api.get(`/api/job-goals/${jobId}`).catch(() => ({ data: [] })),
       ]);
-      setDims(d.data as JobDim[]);
-      setGoals(g.data as JobGoalData[]);
-    } catch {}
+      setDims((d.data ?? []) as JobDim[]);
+      setGoals((g.data ?? []) as JobGoalData[]);
+    } catch {
+      setDims([]);
+      setGoals([]);
+    }
   }, [jobId]);
 
   useEffect(() => { loadJob(); loadTree(); }, [loadJob, loadTree]);
 
   const calcProgress = dims.length > 0 ? calcJobProgress(jobId, dims, goals) : (job?.progressPercent ?? 0);
 
-  return { job, dims, goals, calcProgress, refresh: loadTree, refreshJob: loadJob };
+  return { job, jobLoading, jobError, dims, goals, calcProgress, refresh: loadTree, refreshJob: loadJob };
 }
 
 export function useJobMeta(jobId: string) {
@@ -86,7 +101,6 @@ export function useJobMeta(jobId: string) {
 
   function setMeta(updated: typeof meta) {
     setMetaState(updated);
-    // Read current, merge, save
     api.get("/api/users/me/preferences").then(({ data }) => {
       const all = data?.jobMeta ?? {};
       all[jobId] = updated;
@@ -98,12 +112,25 @@ export function useJobMeta(jobId: string) {
 }
 
 export default function JobPageShell({ jobId, children }: { jobId: string; children: React.ReactNode }) {
-  const { job, calcProgress } = useJobData(jobId);
+  const { job, jobLoading, jobError, calcProgress } = useJobData(jobId);
   const pathname = usePathname();
 
-  if (!job) return (
+  if (jobLoading) return (
     <main className="flex-1 flex items-center justify-center" style={{ background: "var(--bg)" }}>
-      <p className="animate-pulse" style={{ color: "var(--muted)" }}>جارٍ التحميل...</p>
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-3 border-[#2D6B9E] border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm" style={{ color: "var(--muted)" }}>جارٍ التحميل...</p>
+      </div>
+    </main>
+  );
+
+  if (jobError || !job) return (
+    <main className="flex-1 flex items-center justify-center" style={{ background: "var(--bg)" }}>
+      <div className="flex flex-col items-center gap-3 text-center px-6">
+        <p className="text-3xl">⚠️</p>
+        <p className="text-sm font-medium" style={{ color: "var(--text)" }}>{jobError || "لم يتم العثور على بيانات العمل"}</p>
+        <Link href="/works" className="text-sm font-medium hover:underline" style={{ color: "#2D6B9E" }}>← العودة للأعمال</Link>
+      </div>
     </main>
   );
 
@@ -117,7 +144,7 @@ export default function JobPageShell({ jobId, children }: { jobId: string; child
           const activeNav = NAV.find(n => n.key && pathname === base + n.key);
           return (
             <div className="flex items-center gap-1 text-[10px] mb-2">
-              <Link href="/jobs" className="hover:underline" style={{ color: "var(--muted)" }}>الوظائف</Link>
+              <Link href="/works" className="hover:underline" style={{ color: "var(--muted)" }}>الأعمال</Link>
               <span style={{ color: "var(--muted)" }}>←</span>
               {activeNav ? (
                 <>
@@ -138,7 +165,7 @@ export default function JobPageShell({ jobId, children }: { jobId: string; child
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-base" style={{ color: "var(--text)" }}>{job.name}</h2>
             <p className="text-[10px]" style={{ color: "var(--muted)" }}>
-              {job.goalCount} هدف · {job.taskCount} مهمة · {job.isActive ? "نشطة" : "متوقفة"}
+              {job.description ? `${job.description} · ` : ""}{job.isActive ? "نشطة" : "متوقفة"}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">

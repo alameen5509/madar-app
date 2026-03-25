@@ -154,5 +154,27 @@ public class WorksController : ControllerBase
     }
 }
 
-public record CreateWorkReq(string Name, string? Type = "job", string? Title = null, string? Employer = null, decimal? Salary = null, string? StartDate = null, string? EndDate = null, string? Status = null, string? Sector = null, string? Role = null, decimal? OwnershipPercentage = null);
-public record CreateWorkJobReq(string Title, string? Description = null, decimal? Salary = null, string? Status = null, string? StartDate = null, string? EndDate = null);
+public class CreateWorkReq
+{
+    public string Name { get; set; } = "";
+    public string? Type { get; set; } = "job";
+    public string? Title { get; set; }
+    public string? Employer { get; set; }
+    public decimal? Salary { get; set; }
+    public string? StartDate { get; set; }
+    public string? EndDate { get; set; }
+    public string? Status { get; set; }
+    public string? Sector { get; set; }
+    public string? Role { get; set; }
+    public decimal? OwnershipPercentage { get; set; }
+}
+
+public class CreateWorkJobReq
+{
+    public string Title { get; set; } = "";
+    public string? Description { get; set; }
+    public decimal? Salary { get; set; }
+    public string? Status { get; set; }
+    public string? StartDate { get; set; }
+    public string? EndDate { get; set; }
+}
