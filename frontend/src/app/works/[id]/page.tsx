@@ -22,10 +22,18 @@ export default function WorkDetailPage({ params }: { params: Promise<{ id: strin
   const load = useCallback(async () => {
     setLoadError("");
     try {
-      const { data } = await api.get(`/api/works/${id}`);
-      setWork(data);
-    } catch {
-      setLoadError("تعذّر تحميل بيانات العمل");
+      const res = await api.get(`/api/works/${id}`);
+      const raw = res.data;
+      // Handle both wrapped {succeeded, data: {...}} and direct {...} responses
+      const work = raw?.succeeded !== undefined ? raw.data : raw;
+      if (!work || !work.id) {
+        setLoadError(`لم يتم العثور على العمل (id=${id})`);
+        return;
+      }
+      setWork(work);
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      setLoadError(status === 404 ? `العمل غير موجود (id=${id})` : `خطأ في تحميل العمل (${status ?? "network"})`);
     }
   }, [id]);
 

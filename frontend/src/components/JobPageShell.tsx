@@ -37,10 +37,10 @@ export function useJobData(jobId: string) {
     // Try /api/works/{id}
     try {
       const res = await api.get(`/api/works/${jobId}`);
-      const raw = res.data?.data ?? res.data; // handle both wrapped and unwrapped responses
-      if (raw && raw.id) {
+      const raw = res.data?.data ?? res.data;
+      if (raw && (raw.id || raw.name)) {
         setJob({
-          id: raw.id,
+          id: raw.id ?? jobId,
           name: raw.name ?? "بدون اسم",
           description: raw.title ?? raw.sector ?? undefined,
           isActive: (raw.status ?? "active") === "active",
@@ -50,7 +50,9 @@ export function useJobData(jobId: string) {
         });
         found = true;
       }
-    } catch { /* will try circles next */ }
+    } catch (err: unknown) {
+      console.warn("[JobPageShell] /api/works failed:", (err as { response?: { status?: number } })?.response?.status ?? err);
+    }
 
     // Fallback: try circles (legacy)
     if (!found) {
