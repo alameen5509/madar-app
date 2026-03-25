@@ -157,6 +157,41 @@ using (var scope = app.Services.CreateScope())
             INDEX IX_Boards_UserId (UserId),
             INDEX IX_Boards_Entity (EntityType, EntityId)
         );",
+        // History tables
+        @"CREATE TABLE IF NOT EXISTS HistoryRecords (
+            Id CHAR(36) NOT NULL PRIMARY KEY,
+            UserId CHAR(36) NOT NULL,
+            Year INT NOT NULL,
+            HijriYear INT NULL,
+            InputType VARCHAR(10) NOT NULL DEFAULT 'gregorian',
+            Title VARCHAR(500) NOT NULL,
+            Description TEXT NULL,
+            Figure VARCHAR(300) NULL,
+            Location VARCHAR(300) NULL,
+            Country VARCHAR(200) NULL,
+            Category VARCHAR(50) NOT NULL DEFAULT 'other',
+            StrategicImportance TEXT NULL,
+            Importance VARCHAR(20) NOT NULL DEFAULT 'normal',
+            Source VARCHAR(500) NULL,
+            Tags VARCHAR(500) NULL,
+            CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            INDEX IX_HR_UserId (UserId),
+            INDEX IX_HR_Year (Year),
+            INDEX IX_HR_Category (Category)
+        );",
+        @"CREATE TABLE IF NOT EXISTS HistoryFigures (
+            Id CHAR(36) NOT NULL PRIMARY KEY,
+            UserId CHAR(36) NOT NULL,
+            Name VARCHAR(300) NOT NULL,
+            BirthYear INT NULL,
+            DeathYear INT NULL,
+            Role VARCHAR(200) NULL,
+            Nationality VARCHAR(200) NULL,
+            Category VARCHAR(50) NULL,
+            Bio TEXT NULL,
+            CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            INDEX IX_HF_UserId (UserId)
+        );",
     ];
     foreach (var sql in sqls)
     {
