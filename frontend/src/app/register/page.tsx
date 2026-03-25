@@ -55,6 +55,7 @@ function FullPagePattern() {
 }
 
 // ─── Input field ──────────────────────────────────────────────────────────────
+let regFieldId = 0;
 function Field({
   label,
   type,
@@ -72,16 +73,21 @@ function Field({
   autoComplete?: string;
   hint?: string;
 }) {
+  const id = `field-reg-${type}-${++regFieldId}`;
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm text-white/70 font-medium">{label}</label>
+      <label htmlFor={id} className="text-sm text-white/70 font-medium">{label}</label>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         autoComplete={autoComplete}
         required
+        aria-required="true"
+        aria-label={label}
+        minLength={type === "password" ? 8 : undefined}
         className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-white/30
                    bg-white/[0.07] border border-white/10
                    focus:outline-none focus:border-[#C9A84C]/60 focus:bg-white/10
@@ -146,8 +152,8 @@ export default function RegisterPage() {
       setError("كلمتا المرور غير متطابقتين");
       return;
     }
-    if (password.length < 6) {
-      setError("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
+    if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+      setError("كلمة المرور: 8 أحرف على الأقل، حرف كبير ورقم");
       return;
     }
 
@@ -303,11 +309,13 @@ export default function RegisterPage() {
                 autoComplete="new-password"
               />
 
-              {error && (
-                <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-2.5 text-center">
-                  {error}
-                </p>
-              )}
+              <div aria-live="polite" aria-atomic="true">
+                {error && (
+                  <p role="alert" className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-2.5 text-center">
+                    {error}
+                  </p>
+                )}
+              </div>
 
               <button
                 type="submit"

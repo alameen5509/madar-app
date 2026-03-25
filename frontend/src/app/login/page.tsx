@@ -54,6 +54,7 @@ function FullPagePattern() {
 }
 
 // ─── Input field ──────────────────────────────────────────────────────────────
+let fieldId = 0;
 function Field({
   label,
   type,
@@ -69,16 +70,20 @@ function Field({
   placeholder?: string;
   autoComplete?: string;
 }) {
+  const id = `field-login-${type}-${++fieldId}`;
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm text-white/70 font-medium">{label}</label>
+      <label htmlFor={id} className="text-sm text-white/70 font-medium">{label}</label>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         autoComplete={autoComplete}
         required
+        aria-required="true"
+        aria-label={label}
         className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-white/30
                    bg-white/[0.07] border border-white/10
                    focus:outline-none focus:border-[#C9A84C]/60 focus:bg-white/10
@@ -196,11 +201,13 @@ export default function LoginPage() {
               autoComplete="current-password"
             />
 
-            {error && (
-              <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-2.5 text-center">
-                {error}
-              </p>
-            )}
+            <div aria-live="polite" aria-atomic="true">
+              {error && (
+                <p role="alert" className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-2.5 text-center">
+                  {error}
+                </p>
+              )}
+            </div>
 
             <button
               type="submit"

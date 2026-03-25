@@ -16,9 +16,29 @@ const amiri = Amiri({
   weight: ["400", "700"],
 });
 
+const SITE_URL = "https://madar-web-ten.vercel.app";
+const SITE_DESC = "نظام مدار الذكي لإدارة الحياة والمهام والأهداف — تنظيم حياتك بمنهج إسلامي عصري";
+
 export const metadata: Metadata = {
   title: "مدار | نظام إدارة الحياة",
-  description: "نظام مدار الذكي لإدارة الحياة والمهام والأهداف",
+  description: SITE_DESC,
+  metadataBase: new URL(SITE_URL),
+  alternates: { canonical: "/", languages: { ar: "/" } },
+  openGraph: {
+    title: "مدار — نظام إدارة الحياة الذكي",
+    description: SITE_DESC,
+    url: SITE_URL,
+    siteName: "مدار",
+    locale: "ar_SA",
+    type: "website",
+    images: [{ url: "/icons/icon-512x512.png", width: 512, height: 512, alt: "شعار مدار" }],
+  },
+  twitter: {
+    card: "summary",
+    title: "مدار — نظام إدارة الحياة الذكي",
+    description: SITE_DESC,
+    images: ["/icons/icon-512x512.png"],
+  },
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
@@ -33,9 +53,7 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "مدار",
   },
-  other: {
-    "mobile-web-app-capable": "yes",
-  },
+  other: { "mobile-web-app-capable": "yes" },
 };
 
 export default function RootLayout({
@@ -54,21 +72,26 @@ export default function RootLayout({
           try {
             var s = JSON.parse(localStorage.getItem('madar_settings') || '{}');
             document.documentElement.setAttribute('data-theme', s.theme || 'light');
-          } catch(e) {}
-          // Register Service Worker
+          } catch(e) { console.warn('Theme init error:', e); }
           if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').catch(function() {});
+            navigator.serviceWorker.register('/sw.js').catch(function(err) { console.warn('SW registration failed:', err); });
           }
         ` }} />
       </head>
       <body className={`${mainFont.variable} ${amiri.variable} antialiased`}>
+        {/* Skip to content — accessibility */}
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-[#5E5495] focus:text-white focus:text-sm focus:font-bold">
+          تخطي إلى المحتوى
+        </a>
         <ImpersonationBar />
         <div
           className="flex h-screen overflow-hidden"
           style={{ fontFamily: "var(--font-main, 'IBM Plex Sans Arabic', sans-serif)" }}
         >
           <SidebarWrapper />
-          {children}
+          <div id="main-content" className="flex-1 flex flex-col overflow-hidden" role="main">
+            {children}
+          </div>
         </div>
       </body>
     </html>

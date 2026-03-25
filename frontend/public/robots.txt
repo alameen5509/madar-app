@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /login
+Disallow: /register
+
+Sitemap: https://madar-web-ten.vercel.app/sitemap.xml
