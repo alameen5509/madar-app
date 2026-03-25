@@ -378,14 +378,17 @@ function NewProjectDialog({ circles, works, onClose, onCreated }: {
   const [rUrgency, setRUrgency] = useState(0);
   const [rImpact, setRImpact] = useState(0);
   const [rEffort, setREffort] = useState(0);
-  const score = (rImportance + rUrgency + rImpact + rEffort) * 3;
-  const rated = rImportance > 0 && rUrgency > 0 && rImpact > 0 && rEffort > 0;
+  const [rManualScore, setRManualScore] = useState("");
+  const [rScoreMode, setRScoreMode] = useState<"auto" | "manual">("manual");
+  const autoScore = (rImportance + rUrgency + rImpact + rEffort) * 3;
+  const score = rScoreMode === "manual" ? (parseInt(rManualScore) || 0) : autoScore;
+  const rated = rScoreMode === "manual" ? (parseInt(rManualScore) > 0) : (rImportance > 0 && rUrgency > 0 && rImpact > 0 && rEffort > 0);
 
   async function handleCreate() {
     if (!title.trim()) return;
     setCreating(true);
     try {
-      const ratingTag = rated ? ` [rating:${JSON.stringify({ im: rImportance, ur: rUrgency, ip: rImpact, ef: rEffort, score })}]` : "";
+      const ratingTag = rated ? ` [rating:${JSON.stringify({ im: rImportance, ur: rUrgency, ip: rImpact, ef: rEffort, score, manual: rScoreMode === "manual" })}]` : "";
       await createGoal({
         title: title.trim(),
         description: (desc.trim() + ratingTag).trim() || undefined,
@@ -476,12 +479,34 @@ function NewProjectDialog({ circles, works, onClose, onCreated }: {
           <div className="rounded-xl border p-3 space-y-2.5" style={{ borderColor: rated ? "#3D8C5A40" : "var(--card-border)", background: rated ? "#3D8C5A06" : "var(--bg)" }}>
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold" style={{ color: "var(--text)" }}>تقييم المشروع</span>
-              {rated && (
-                <span className="text-sm font-black px-2 py-0.5 rounded-full" style={{ background: scoreColor(score) + "18", color: scoreColor(score) }}>
-                  {score}/60 {scoreLabelAr(score)}
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {rated && (
+                  <span className="text-sm font-black px-2 py-0.5 rounded-full" style={{ background: scoreColor(score) + "18", color: scoreColor(score) }}>
+                    {score}/60 {scoreLabelAr(score)}
+                  </span>
+                )}
+                <button type="button" onClick={() => setRScoreMode(rScoreMode === "auto" ? "manual" : "auto")}
+                  className="text-[10px] px-2 py-1 rounded-lg font-medium transition"
+                  style={{ background: "var(--card)", color: "#5E5495", border: "1px solid var(--card-border)" }}>
+                  {rScoreMode === "auto" ? "يدوي" : "تفصيلي"}
+                </button>
+              </div>
             </div>
+
+            {rScoreMode === "manual" ? (
+              <div className="flex items-center gap-3">
+                <span className="text-xs" style={{ color: "var(--text)" }}>الدرجة (0-60):</span>
+                <input type="number" min={0} max={60} value={rManualScore}
+                  onChange={e => setRManualScore(e.target.value)}
+                  placeholder="0"
+                  className="w-20 px-3 py-2 rounded-xl border text-sm text-center font-bold focus:outline-none"
+                  style={{ ...inputStyle, color: scoreColor(parseInt(rManualScore) || 0) }} />
+                <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "var(--card-border)" }}>
+                  <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, ((parseInt(rManualScore) || 0) / 60) * 100)}%`, background: scoreColor(parseInt(rManualScore) || 0) }} />
+                </div>
+              </div>
+            ) : (
+            <>
             {[
               { label: "الأهمية", value: rImportance, set: setRImportance, icon: "⭐" },
               { label: "الاستعجال", value: rUrgency, set: setRUrgency, icon: "⏰" },
@@ -505,6 +530,8 @@ function NewProjectDialog({ circles, works, onClose, onCreated }: {
                 </div>
               </div>
             ))}
+            </>
+            )}
           </div>
         </div>
       </div>
@@ -542,8 +569,11 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
   const [eUrgency, setEUrgency] = useState<number>(existingRating.ur ?? 0);
   const [eImpact, setEImpact] = useState<number>(existingRating.ip ?? 0);
   const [eEffort, setEEffort] = useState<number>(existingRating.ef ?? 0);
-  const eScore = (eImportance + eUrgency + eImpact + eEffort) * 3;
-  const eRated = eImportance > 0 && eUrgency > 0 && eImpact > 0 && eEffort > 0;
+  const [eManualScore, setEManualScore] = useState<string>(existingRating.score?.toString() ?? "");
+  const [eScoreMode, setEScoreMode] = useState<"auto" | "manual">(existingRating.manual ? "manual" : "auto");
+  const eAutoScore = (eImportance + eUrgency + eImpact + eEffort) * 3;
+  const eScore = eScoreMode === "manual" ? (parseInt(eManualScore) || 0) : eAutoScore;
+  const eRated = eScoreMode === "manual" ? (parseInt(eManualScore) > 0) : (eImportance > 0 && eUrgency > 0 && eImpact > 0 && eEffort > 0);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [newTag, setNewTag] = useState("");
@@ -574,7 +604,7 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
   async function handleSaveEdit() {
     setSaving(true);
     try {
-      const ratingTag = eRated ? ` [rating:${JSON.stringify({ im: eImportance, ur: eUrgency, ip: eImpact, ef: eEffort, score: eScore })}]` : "";
+      const ratingTag = eRated ? ` [rating:${JSON.stringify({ im: eImportance, ur: eUrgency, ip: eImpact, ef: eEffort, score: eScore, manual: eScoreMode === "manual" })}]` : "";
       const fullDesc = (editDesc.trim() + ratingTag).trim() || undefined;
       await updateGoal(goal.id, {
         title: editTitle.trim(),
@@ -797,12 +827,33 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
                 <div className="rounded-xl border p-3 space-y-2.5" style={{ borderColor: eRated ? "#3D8C5A40" : "var(--card-border)", background: eRated ? "#3D8C5A06" : "var(--bg)" }}>
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold" style={{ color: "var(--text)" }}>تقييم المشروع</span>
-                    {eRated && (
-                      <span className="text-sm font-black px-2 py-0.5 rounded-full" style={{ background: scoreColor(eScore) + "18", color: scoreColor(eScore) }}>
-                        {eScore}/60 {scoreLabelAr(eScore)}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {eRated && (
+                        <span className="text-sm font-black px-2 py-0.5 rounded-full" style={{ background: scoreColor(eScore) + "18", color: scoreColor(eScore) }}>
+                          {eScore}/60 {scoreLabelAr(eScore)}
+                        </span>
+                      )}
+                      <button type="button" onClick={() => setEScoreMode(eScoreMode === "auto" ? "manual" : "auto")}
+                        className="text-[10px] px-2 py-1 rounded-lg font-medium transition"
+                        style={{ background: "var(--card)", color: "#5E5495", border: "1px solid var(--card-border)" }}>
+                        {eScoreMode === "auto" ? "يدوي" : "تفصيلي"}
+                      </button>
+                    </div>
                   </div>
+
+                  {eScoreMode === "manual" ? (
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs" style={{ color: "var(--text)" }}>الدرجة (0-60):</span>
+                      <input type="number" min={0} max={60} value={eManualScore}
+                        onChange={e => setEManualScore(e.target.value)}
+                        className="w-20 px-3 py-2 rounded-xl border text-sm text-center font-bold focus:outline-none"
+                        style={{ ...inputStyle, color: scoreColor(parseInt(eManualScore) || 0) }} />
+                      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "var(--card-border)" }}>
+                        <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, ((parseInt(eManualScore) || 0) / 60) * 100)}%`, background: scoreColor(parseInt(eManualScore) || 0) }} />
+                      </div>
+                    </div>
+                  ) : (
+                    <>
                   {[
                     { label: "الأهمية", value: eImportance, set: setEImportance, icon: "⭐" },
                     { label: "الاستعجال", value: eUrgency, set: setEUrgency, icon: "⏰" },
@@ -826,6 +877,8 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
                       </div>
                     </div>
                   ))}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
