@@ -142,7 +142,6 @@ using (var scope = app.Services.CreateScope())
             Id CHAR(36) NOT NULL PRIMARY KEY, DeviceId VARCHAR(200) NOT NULL,
             DeviceName VARCHAR(200) NULL, Status VARCHAR(20) NULL,
             UserId CHAR(36) NULL, ExpiresAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6));",
-    ];
         // Boards table (whiteboards)
         @"CREATE TABLE IF NOT EXISTS Boards (
             Id CHAR(36) NOT NULL PRIMARY KEY,
