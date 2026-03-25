@@ -68,17 +68,16 @@ const CURRENT_CENTURY_IDX = ALL_ERAS.findIndex(e => e.from <= new Date().getFull
 /* ─── Page ───────────────────────────────────────────────────────────── */
 
 export default function HistoryPage() {
-  const [tab, setTab] = useState<"timeline" | "figures">("timeline");
   const [records, setRecords] = useState<HistoryRecord[]>([]);
   const [figures, setFigures] = useState<HistoryFigure[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [showAddFigure, setShowAddFigure] = useState(false);
   const [selected, setSelected] = useState<HistoryRecord | null>(null);
   // Filters
   const [filterCat, setFilterCat] = useState("");
   const [filterImportance, setFilterImportance] = useState("");
   const [filterCountry, setFilterCountry] = useState("");
+  const [filterFigure, setFilterFigure] = useState("");
   const [searchQ, setSearchQ] = useState("");
 
   const fetchData = useCallback(async () => {
@@ -101,6 +100,7 @@ export default function HistoryPage() {
     if (filterCat && r.category !== filterCat) return false;
     if (filterImportance && r.importance !== filterImportance) return false;
     if (filterCountry && r.country !== filterCountry) return false;
+    if (filterFigure && r.figure !== filterFigure) return false;
     if (searchQ) {
       const q = searchQ.toLowerCase();
       if (!r.title.toLowerCase().includes(q) && !(r.description ?? "").toLowerCase().includes(q) && !(r.figure ?? "").toLowerCase().includes(q))
@@ -109,8 +109,9 @@ export default function HistoryPage() {
     return true;
   });
 
-  // Countries from data
+  // Unique values from data for filters
   const countries = [...new Set(records.map(r => r.country).filter(Boolean))] as string[];
+  const allFigures = [...new Set(records.map(r => r.figure).filter(Boolean))] as string[];
 
   return (
     <main className="flex-1 overflow-y-auto" dir="rtl" style={{ background: "var(--bg)" }}>
@@ -120,29 +121,19 @@ export default function HistoryPage() {
             <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>📜 التاريخ والتوثيق</h2>
             <p className="text-xs" style={{ color: "var(--muted)" }}>{records.length} حدث · {figures.length} شخصية</p>
           </div>
-          <button onClick={() => tab === "timeline" ? setShowAdd(true) : setShowAddFigure(true)}
+          <button onClick={() => setShowAdd(true)}
             className="px-4 py-2 rounded-xl text-xs font-bold text-white"
             style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
-            + {tab === "timeline" ? "حدث" : "شخصية"}
+            + حدث جديد
           </button>
-        </div>
-        {/* Tabs */}
-        <div className="flex gap-1.5 mt-3">
-          {([["timeline", "📅 المحور الزمني"], ["figures", "👤 الشخصيات"]] as const).map(([k, l]) => (
-            <button key={k} onClick={() => setTab(k)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition"
-              style={{ background: tab === k ? "#2C2C54" : "transparent", color: tab === k ? "#fff" : "var(--muted)" }}>
-              {l}
-            </button>
-          ))}
         </div>
       </header>
 
       <div className="px-4 sm:px-6 py-4 space-y-4">
         {loading && <p className="text-center py-12 animate-pulse" style={{ color: "var(--muted)" }}>جارٍ التحميل...</p>}
 
-        {/* ═══ TIMELINE TAB ═══ */}
-        {!loading && tab === "timeline" && (
+        {/* ═══ TIMELINE ═══ */}
+        {!loading && (
           <>
             {/* Filters */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -169,6 +160,14 @@ export default function HistoryPage() {
                   {countries.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               )}
+              {allFigures.length > 0 && (
+                <select value={filterFigure} onChange={e => setFilterFigure(e.target.value)}
+                  className="px-2 py-2 rounded-xl border text-xs focus:outline-none"
+                  style={{ background: "var(--card)", borderColor: "var(--card-border)", color: "var(--text)" }}>
+                  <option value="">كل الشخصيات</option>
+                  {allFigures.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              )}
             </div>
 
             {/* Eras */}
@@ -190,44 +189,11 @@ export default function HistoryPage() {
           </>
         )}
 
-        {/* ═══ FIGURES TAB ═══ */}
-        {!loading && tab === "figures" && (
-          <div className="space-y-2">
-            {figures.map(f => (
-              <div key={f.id} className="rounded-xl border p-4 flex items-start gap-3"
-                style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-                <span className="text-2xl">👤</span>
-                <div className="flex-1">
-                  <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{f.name}</p>
-                  <div className="flex items-center gap-2 mt-1 text-[10px] flex-wrap" style={{ color: "var(--muted)" }}>
-                    {f.birthYear && <span>{f.birthYear > 0 ? `${f.birthYear}م` : `${Math.abs(f.birthYear)} ق.م`}</span>}
-                    {f.birthYear && f.deathYear && <span>—</span>}
-                    {f.deathYear && <span>{f.deathYear > 0 ? `${f.deathYear}م` : `${Math.abs(f.deathYear)} ق.م`}</span>}
-                    {f.role && <span>· {f.role}</span>}
-                    {f.nationality && <span>· {f.nationality}</span>}
-                  </div>
-                  {f.bio && <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>{f.bio}</p>}
-                </div>
-                <button onClick={async () => { if (confirm(`حذف "${f.name}"؟`)) { await api.delete(`/api/history/figures/${f.id}`).catch(() => {}); fetchData(); } }}
-                  className="text-xs text-red-400 hover:text-red-600">🗑</button>
-              </div>
-            ))}
-            {figures.length === 0 && (
-              <div className="text-center py-16">
-                <p className="text-4xl mb-3">👤</p>
-                <p className="font-bold" style={{ color: "var(--text)" }}>لا توجد شخصيات</p>
-                <button onClick={() => setShowAddFigure(true)} className="text-xs mt-2" style={{ color: "#D4AF37" }}>+ أضف شخصية</button>
-              </div>
-            )}
-          </div>
-        )}
-
         <GeometricDivider />
       </div>
 
       {/* ═══ MODALS ═══ */}
       {showAdd && <AddRecordModal onClose={() => setShowAdd(false)} onSaved={fetchData} figures={figures} />}
-      {showAddFigure && <AddFigureModal onClose={() => setShowAddFigure(false)} onSaved={fetchData} />}
       {selected && <RecordDetail record={selected} onClose={() => setSelected(null)} onDelete={() => { api.delete(`/api/history/records/${selected.id}`).catch(() => {}); setSelected(null); fetchData(); }} />}
     </main>
   );
@@ -490,102 +456,6 @@ function AddRecordModal({ onClose, onSaved, figures }: { onClose: () => void; on
               <input value={tags} onChange={e => setTags(e.target.value)} placeholder="حروب, فتوحات"
                 className="w-full px-3 py-2 rounded-xl border text-xs focus:outline-none" style={IS} />
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Add Figure Modal ───────────────────────────────────────────────── */
-
-function AddFigureModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [name, setName] = useState("");
-  const [birthYear, setBirthYear] = useState("");
-  const [deathYear, setDeathYear] = useState("");
-  const [role, setRole] = useState("");
-  const [nationality, setNationality] = useState("");
-  const [category, setCategory] = useState("");
-  const [bio, setBio] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  async function save() {
-    if (!name.trim()) return;
-    setSaving(true);
-    try {
-      await api.post("/api/history/figures", {
-        name: name.trim(),
-        birthYear: birthYear ? parseInt(birthYear) : undefined,
-        deathYear: deathYear ? parseInt(deathYear) : undefined,
-        role: role.trim() || undefined,
-        nationality: nationality.trim() || undefined,
-        category: category || undefined,
-        bio: bio.trim() || undefined,
-      });
-      onSaved(); onClose();
-    } catch {} finally { setSaving(false); }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
-        style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
-        <div className="px-6 pt-6 pb-3 border-b flex items-center justify-between" style={{ borderColor: "var(--card-border)" }}>
-          <h3 className="font-bold text-sm" style={{ color: "var(--text)" }}>👤 شخصية جديدة</h3>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-xs" style={{ background: "var(--bg)", color: "var(--muted)" }}>إلغاء</button>
-            <button onClick={save} disabled={saving || !name.trim()}
-              className="px-4 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-40"
-              style={{ background: "#2C2C54" }}>{saving ? "..." : "حفظ"}</button>
-          </div>
-        </div>
-        <div className="px-6 py-5 space-y-3">
-          <div>
-            <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>الاسم *</label>
-            <input value={name} onChange={e => setName(e.target.value)} autoFocus
-              className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={IS} />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>سنة الميلاد</label>
-              <input type="number" value={birthYear} onChange={e => setBirthYear(e.target.value)} placeholder="570"
-                className="w-full px-3 py-2 rounded-xl border text-xs focus:outline-none" style={IS} />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>سنة الوفاة</label>
-              <input type="number" value={deathYear} onChange={e => setDeathYear(e.target.value)} placeholder="632"
-                className="w-full px-3 py-2 rounded-xl border text-xs focus:outline-none" style={IS} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>الدور</label>
-              <input value={role} onChange={e => setRole(e.target.value)} placeholder="خليفة، عالم..."
-                className="w-full px-3 py-2 rounded-xl border text-xs focus:outline-none" style={IS} />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>الجنسية</label>
-              <input value={nationality} onChange={e => setNationality(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border text-xs focus:outline-none" style={IS} />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text)" }}>الفئة</label>
-            <div className="flex gap-1 flex-wrap">
-              {CATEGORIES.map(c => (
-                <button key={c.key} type="button" onClick={() => setCategory(c.key)}
-                  className="px-2 py-1 rounded-lg text-[10px] font-medium transition"
-                  style={{ background: category === c.key ? c.color : "var(--bg)", color: category === c.key ? "#fff" : "var(--muted)", border: `1px solid ${category === c.key ? c.color : "var(--card-border)"}` }}>
-                  {c.icon}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>نبذة</label>
-            <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3}
-              className="w-full px-4 py-2.5 rounded-xl border text-sm resize-none focus:outline-none" style={IS} />
           </div>
         </div>
       </div>
