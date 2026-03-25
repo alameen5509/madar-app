@@ -100,7 +100,7 @@ export interface Goal {
   id: string;
   title: string;
   description?: string;
-  status: 'Active' | 'Paused' | 'Completed' | 'Archived';
+  status: 'Active' | 'Paused' | 'Completed' | 'Archived' | 'Draft' | 'Critical';
   targetDate?: string;
   priorityWeight: number;
   progressPercent: number;
@@ -121,7 +121,7 @@ export interface CircleGoal {
   id: string;
   title: string;
   description?: string;
-  status: 'Active' | 'Paused' | 'Completed' | 'Archived';
+  status: 'Active' | 'Paused' | 'Completed' | 'Archived' | 'Draft' | 'Critical';
   targetDate?: string;
   progressPercent: number;
 }
