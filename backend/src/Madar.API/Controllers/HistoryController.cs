@@ -63,13 +63,14 @@ public class HistoryController : ControllerBase
             hijriYear = GregorianToHijri(year);
         }
 
-        await Exec(@"INSERT INTO HistoryRecords (Id,UserId,Year,HijriYear,InputType,Title,Description,Figure,Location,Country,Category,StrategicImportance,Importance,Source,Tags)
-            VALUES(@id,@uid,@y,@hy,@it,@ti,@de,@fi,@lo,@co,@ca,@si,@im,@so,@ta)",
-            [new("@id",id.ToString()),new("@uid",Uid),new("@y",year),new("@hy",hijriYear),
+        await Exec(@"INSERT INTO HistoryRecords (Id,UserId,Year,Month,Day,HijriYear,HijriMonth,HijriDay,InputType,Title,Description,Figure,Location,Country,Category,StrategicImportance,Importance,Source,Tags)
+            VALUES(@id,@uid,@y,@mo,@da,@hy,@hm,@hd,@it,@ti,@de,@fi,@lo,@co,@ca,@si,@im,@so,@ta)",
+            [new("@id",id.ToString()),new("@uid",Uid),new("@y",year),new("@mo",(object?)req.Month??DBNull.Value),new("@da",(object?)req.Day??DBNull.Value),
+             new("@hy",hijriYear),new("@hm",(object?)req.HijriMonth??DBNull.Value),new("@hd",(object?)req.HijriDay??DBNull.Value),
              new("@it",req.InputType??"gregorian"),new("@ti",req.Title??""),new("@de",(object?)req.Description??DBNull.Value),
              new("@fi",(object?)req.Figure??DBNull.Value),new("@lo",(object?)req.Location??DBNull.Value),
-             new("@co",(object?)req.Country??DBNull.Value),new("@ca",req.Category??"other"),
-             new("@si",(object?)req.StrategicImportance??DBNull.Value),new("@im",req.Importance??"normal"),
+             new("@co",(object?)req.Country??DBNull.Value),new("@ca",req.Category??""),
+             new("@si",(object?)req.StrategicImportance??DBNull.Value),new("@im",req.Importance??""),
              new("@so",(object?)req.Source??DBNull.Value),new("@ta",(object?)req.Tags??DBNull.Value)], ct);
 
         return Ok(new { id, year, hijriYear, title = req.Title });
@@ -90,14 +91,15 @@ public class HistoryController : ControllerBase
             hijriYear = GregorianToHijri(year);
         }
 
-        var rows = await Exec(@"UPDATE HistoryRecords SET Year=@y,HijriYear=@hy,InputType=@it,Title=@ti,Description=@de,
+        var rows = await Exec(@"UPDATE HistoryRecords SET Year=@y,Month=@mo,Day=@da,HijriYear=@hy,HijriMonth=@hm,HijriDay=@hd,InputType=@it,Title=@ti,Description=@de,
             Figure=@fi,Location=@lo,Country=@co,Category=@ca,StrategicImportance=@si,Importance=@im,Source=@so,Tags=@ta
             WHERE Id=@id AND UserId=@uid",
-            [new("@id",id.ToString()),new("@uid",Uid),new("@y",year),new("@hy",hijriYear),
+            [new("@id",id.ToString()),new("@uid",Uid),new("@y",year),new("@mo",(object?)req.Month??DBNull.Value),new("@da",(object?)req.Day??DBNull.Value),
+             new("@hy",hijriYear),new("@hm",(object?)req.HijriMonth??DBNull.Value),new("@hd",(object?)req.HijriDay??DBNull.Value),
              new("@it",req.InputType??"gregorian"),new("@ti",req.Title??""),new("@de",(object?)req.Description??DBNull.Value),
              new("@fi",(object?)req.Figure??DBNull.Value),new("@lo",(object?)req.Location??DBNull.Value),
-             new("@co",(object?)req.Country??DBNull.Value),new("@ca",req.Category??"other"),
-             new("@si",(object?)req.StrategicImportance??DBNull.Value),new("@im",req.Importance??"normal"),
+             new("@co",(object?)req.Country??DBNull.Value),new("@ca",req.Category??""),
+             new("@si",(object?)req.StrategicImportance??DBNull.Value),new("@im",req.Importance??""),
              new("@so",(object?)req.Source??DBNull.Value),new("@ta",(object?)req.Tags??DBNull.Value)], ct);
         return rows > 0 ? Ok(new { id }) : NotFound();
     }
@@ -223,7 +225,11 @@ public class HistoryController : ControllerBase
 public class HistoryRecordReq
 {
     public int Year { get; set; }
+    public int? Month { get; set; }
+    public int? Day { get; set; }
     public int? HijriYear { get; set; }
+    public int? HijriMonth { get; set; }
+    public int? HijriDay { get; set; }
     public string? InputType { get; set; }
     public string? Title { get; set; }
     public string? Description { get; set; }

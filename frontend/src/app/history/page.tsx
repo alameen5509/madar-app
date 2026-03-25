@@ -7,7 +7,9 @@ import { api } from "@/lib/api";
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
 interface HistoryRecord {
-  id: string; year: number; hijriYear: number; inputType: string;
+  id: string; year: number; month?: number; day?: number;
+  hijriYear: number; hijriMonth?: number; hijriDay?: number;
+  inputType: string;
   title: string; description?: string; figure?: string; location?: string;
   country?: string; category: string; strategicImportance?: string;
   importance: string; source?: string; tags?: string;
@@ -199,7 +201,7 @@ export default function HistoryPage() {
       </div>
 
       {/* ═══ MODALS ═══ */}
-      {showAdd && <AddRecordModal onClose={() => setShowAdd(false)} onSaved={fetchData} figures={figures} />}
+      {showAdd && <AddRecordModal onClose={() => setShowAdd(false)} onSaved={fetchData} figures={figures} allCategories={allCategories} allImportances={allImportances} countries={countries} />}
       {selected && <RecordDetail record={selected} onClose={() => setSelected(null)} onDelete={() => { api.delete(`/api/history/records/${selected.id}`).catch(() => {}); setSelected(null); fetchData(); }} />}
     </main>
   );
@@ -232,8 +234,12 @@ function EraSection({ era, records, defaultOpen, onSelect }: {
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:shadow-sm transition"
                 style={{ background: "var(--bg)" }}>
                 <div className="text-center flex-shrink-0 w-14">
-                  <p className="text-xs font-black" style={{ color: "#5E5495" }}>{r.year > 0 ? `${r.year}م` : `${Math.abs(r.year)} ق.م`}</p>
-                  {r.hijriYear > 0 && <p className="text-[9px]" style={{ color: "var(--muted)" }}>{r.hijriYear}هـ</p>}
+                  <p className="text-xs font-black" style={{ color: "#5E5495" }}>
+                    {r.day ? `${r.day}/` : ""}{r.month ? `${r.month}/` : ""}{r.year > 0 ? `${r.year}م` : `${Math.abs(r.year)} ق.م`}
+                  </p>
+                  {r.hijriYear > 0 && <p className="text-[9px]" style={{ color: "var(--muted)" }}>
+                    {r.hijriDay ? `${r.hijriDay}/` : ""}{r.hijriMonth ? `${r.hijriMonth}/` : ""}{r.hijriYear}هـ
+                  </p>}
                 </div>
                 <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: cc }} />
                 <div className="flex-1 min-w-0">
@@ -272,7 +278,8 @@ function RecordDetail({ record: r, onClose, onDelete }: { record: HistoryRecord;
         <div className="px-6 pt-6 pb-3 border-b flex items-center justify-between" style={{ borderColor: "var(--card-border)" }}>
           <div>
             <p className="text-xs" style={{ color: "#5E5495" }}>
-              {r.year > 0 ? `${r.year}م` : `${Math.abs(r.year)} ق.م`} {r.hijriYear > 0 ? `/ ${r.hijriYear}هـ` : ""}
+              {r.day ? `${r.day}/` : ""}{r.month ? `${r.month}/` : ""}{r.year > 0 ? `${r.year}م` : `${Math.abs(r.year)} ق.م`}
+              {r.hijriYear > 0 ? ` / ${r.hijriDay ? `${r.hijriDay}/` : ""}${r.hijriMonth ? `${r.hijriMonth}/` : ""}${r.hijriYear}هـ` : ""}
             </p>
             <h3 className="font-bold text-sm mt-1" style={{ color: "var(--text)" }}>{r.title}</h3>
           </div>
@@ -312,9 +319,14 @@ function RecordDetail({ record: r, onClose, onDelete }: { record: HistoryRecord;
 
 /* ─── Add Record Modal ───────────────────────────────────────────────── */
 
-function AddRecordModal({ onClose, onSaved, figures }: { onClose: () => void; onSaved: () => void; figures: HistoryFigure[] }) {
+function AddRecordModal({ onClose, onSaved, figures, allCategories, allImportances, countries }: {
+  onClose: () => void; onSaved: () => void; figures: HistoryFigure[];
+  allCategories: string[]; allImportances: string[]; countries: string[];
+}) {
   const [inputType, setInputType] = useState<"gregorian" | "hijri">("hijri");
   const [yearVal, setYearVal] = useState("");
+  const [monthVal, setMonthVal] = useState("");
+  const [dayVal, setDayVal] = useState("");
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [figure, setFigure] = useState("");
@@ -334,9 +346,15 @@ function AddRecordModal({ onClose, onSaved, figures }: { onClose: () => void; on
     if (!title.trim() || !yearVal) return;
     setSaving(true);
     try {
+      const mo = parseInt(monthVal) || undefined;
+      const da = parseInt(dayVal) || undefined;
       await api.post("/api/history/records", {
         year: inputType === "gregorian" ? yearNum : hijriToGreg(yearNum),
+        month: inputType === "gregorian" ? mo : undefined,
+        day: inputType === "gregorian" ? da : undefined,
         hijriYear: inputType === "hijri" ? yearNum : undefined,
+        hijriMonth: inputType === "hijri" ? mo : undefined,
+        hijriDay: inputType === "hijri" ? da : undefined,
         inputType, title: title.trim(), description: desc.trim() || undefined,
         figure: figure.trim() || undefined, location: location.trim() || undefined,
         country: country.trim() || undefined, category, importance,
@@ -378,15 +396,33 @@ function AddRecordModal({ onClose, onSaved, figures }: { onClose: () => void; on
             </div>
           </div>
           {/* Year + conversion */}
+          {/* التاريخ: سنة + شهر + يوم */}
           <div>
             <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>
-              السنة {inputType === "hijri" ? "الهجرية" : "الميلادية"} *
+              التاريخ {inputType === "hijri" ? "الهجري" : "الميلادي"} *
             </label>
-            <input type="number" value={yearVal} onChange={e => setYearVal(e.target.value)}
-              placeholder={inputType === "hijri" ? "مثال: 1445" : "مثال: 2024"}
-              className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={IS} />
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <input type="number" value={dayVal} onChange={e => setDayVal(e.target.value)}
+                  placeholder="اليوم" min={1} max={30}
+                  className="w-full px-3 py-2.5 rounded-xl border text-sm text-center focus:outline-none" style={IS} />
+                <p className="text-[9px] text-center mt-0.5" style={{ color: "var(--muted)" }}>اليوم</p>
+              </div>
+              <div>
+                <input type="number" value={monthVal} onChange={e => setMonthVal(e.target.value)}
+                  placeholder="الشهر" min={1} max={12}
+                  className="w-full px-3 py-2.5 rounded-xl border text-sm text-center focus:outline-none" style={IS} />
+                <p className="text-[9px] text-center mt-0.5" style={{ color: "var(--muted)" }}>الشهر</p>
+              </div>
+              <div>
+                <input type="number" value={yearVal} onChange={e => setYearVal(e.target.value)}
+                  placeholder={inputType === "hijri" ? "1445" : "2024"}
+                  className="w-full px-3 py-2.5 rounded-xl border text-sm text-center focus:outline-none" style={IS} />
+                <p className="text-[9px] text-center mt-0.5" style={{ color: "var(--muted)" }}>السنة *</p>
+              </div>
+            </div>
             {yearVal && (
-              <p className="text-[10px] mt-1 font-medium" style={{ color: "#5E5495" }}>
+              <p className="text-[10px] mt-1.5 font-medium" style={{ color: "#5E5495" }}>
                 = {inputType === "hijri" ? `${converted}م` : `${converted}هـ`}
               </p>
             )}
@@ -404,14 +440,16 @@ function AddRecordModal({ onClose, onSaved, figures }: { onClose: () => void; on
           {/* Category — free text */}
           <div>
             <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>الفئة</label>
-            <input value={category} onChange={e => setCategory(e.target.value)} placeholder="مثال: سياسي، فكري، عسكري..."
+            <input value={category} onChange={e => setCategory(e.target.value)} list="cat-list" placeholder="مثال: سياسي، فكري، عسكري..."
               className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={IS} />
+            <datalist id="cat-list">{allCategories.map(c => <option key={c} value={c} />)}</datalist>
           </div>
-          {/* Importance — free text */}
+          {/* Importance — free text with suggestions */}
           <div>
             <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>الأهمية</label>
-            <input value={importance} onChange={e => setImportance(e.target.value)} placeholder="مثال: عادي، مهم، فارق..."
+            <input value={importance} onChange={e => setImportance(e.target.value)} list="imp-list" placeholder="مثال: عادي، مهم، فارق..."
               className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={IS} />
+            <datalist id="imp-list">{allImportances.map(i => <option key={i} value={i} />)}</datalist>
           </div>
           {/* Figure */}
           <div>
@@ -428,8 +466,9 @@ function AddRecordModal({ onClose, onSaved, figures }: { onClose: () => void; on
             </div>
             <div>
               <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>الدولة</label>
-              <input value={country} onChange={e => setCountry(e.target.value)} placeholder="الدولة..."
+              <input value={country} onChange={e => setCountry(e.target.value)} list="country-list" placeholder="الدولة..."
                 className="w-full px-3 py-2 rounded-xl border text-xs focus:outline-none" style={IS} />
+              <datalist id="country-list">{countries.map(c => <option key={c} value={c} />)}</datalist>
             </div>
           </div>
           <div>
