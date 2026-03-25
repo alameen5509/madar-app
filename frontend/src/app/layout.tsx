@@ -6,14 +6,18 @@ import "./globals.css";
 
 const mainFont = IBM_Plex_Sans_Arabic({
   variable: "--font-main",
-  subsets: ["arabic", "latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  subsets: ["arabic"],
+  weight: ["400", "600", "700"],
+  display: "swap",
+  preload: true,
 });
 
 const amiri = Amiri({
   variable: "--font-amiri",
-  subsets: ["arabic", "latin"],
-  weight: ["400", "700"],
+  subsets: ["arabic"],
+  weight: ["400"],
+  display: "swap",
+  preload: false,
 });
 
 const SITE_URL = "https://madar-web-ten.vercel.app";

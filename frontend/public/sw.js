@@ -1,74 +1,77 @@
-const CACHE_NAME = 'madar-v1';
+const CACHE_NAME = 'madar-v2';
+const STATIC_CACHE = 'madar-static-v2';
 const OFFLINE_URL = '/tasks';
 
-// الملفات الأساسية للعمل offline
 const PRECACHE_URLS = [
   '/',
   '/tasks',
-  '/habits',
   '/manifest.json',
   '/favicon.svg',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
 ];
 
-// تثبيت Service Worker
+// Install
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(PRECACHE_URLS).catch(() => {
-        // تجاهل أخطاء الكاش في التثبيت الأول
-      });
-    })
+    caches.open(CACHE_NAME).then((cache) =>
+      cache.addAll(PRECACHE_URLS).catch(() => {})
+    )
   );
   self.skipWaiting();
 });
 
-// تفعيل وحذف الكاش القديم
+// Activate — clean old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => k !== CACHE_NAME && k !== STATIC_CACHE).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
 });
 
-// استراتيجية: Network First مع fallback للكاش
+// Fetch — Cache-First for static, Network-First for pages
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-
-  // تجاهل non-GET requests
   if (request.method !== 'GET') return;
-
-  // تجاهل API calls — دائماً من الشبكة
   if (request.url.includes('/api/')) return;
-
-  // تجاهل chrome-extension و non-http
   if (!request.url.startsWith('http')) return;
 
-  event.respondWith(
-    fetch(request)
-      .then((response) => {
-        // كاش النسخة الجديدة
-        if (response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, clone);
-          });
-        }
-        return response;
-      })
-      .catch(() => {
-        // offline — أرجع من الكاش
-        return caches.match(request).then((cached) => {
+  const url = new URL(request.url);
+
+  // Static assets (fonts, images, JS/CSS with hashes) — Cache First
+  if (url.pathname.startsWith('/_next/static/') ||
+      url.pathname.endsWith('.woff2') ||
+      url.pathname.startsWith('/icons/')) {
+    event.respondWith(
+      caches.open(STATIC_CACHE).then((cache) =>
+        cache.match(request).then((cached) => {
           if (cached) return cached;
-          // إذا صفحة HTML، أرجع صفحة المهام
+          return fetch(request).then((response) => {
+            if (response.ok) cache.put(request, response.clone());
+            return response;
+          });
+        })
+      ).catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Pages — Stale While Revalidate
+  event.respondWith(
+    caches.open(CACHE_NAME).then((cache) =>
+      cache.match(request).then((cached) => {
+        const networkFetch = fetch(request).then((response) => {
+          if (response.ok) cache.put(request, response.clone());
+          return response;
+        }).catch(() => {
+          if (cached) return cached;
           if (request.headers.get('accept')?.includes('text/html')) {
             return caches.match(OFFLINE_URL);
           }
           return new Response('Offline', { status: 503 });
         });
+        return cached || networkFetch;
       })
+    )
   );
 });
