@@ -207,7 +207,7 @@ export async function register(
   fullName: string,
   email: string,
   password: string,
-  role = 'User'
+  role: 'User' | 'BusinessOwner' = 'User'
 ): Promise<AuthResult> {
   const { data } = await api.post<AuthResult>('/api/auth/register', {
     fullName,

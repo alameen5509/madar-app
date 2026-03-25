@@ -4,7 +4,7 @@ import { useState, FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EightPointedStar, GeometricDivider } from "@/components/IslamicPattern";
-import { api } from "@/lib/api";
+import { register } from "@/lib/api";
 
 // ─── Full-page Islamic background pattern ────────────────────────────────────
 function FullPagePattern() {
@@ -133,6 +133,7 @@ export default function RegisterPage() {
   const [email, setEmail]             = useState("");
   const [password, setPassword]       = useState("");
   const [confirm, setConfirm]         = useState("");
+  const [role, setRole]               = useState<"User" | "BusinessOwner">("User");
   const [error, setError]             = useState("");
   const [success, setSuccess]         = useState(false);
   const [loading, setLoading]         = useState(false);
@@ -153,7 +154,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const { data } = await api.post("/api/auth/register", { fullName, email, password, role: "User" });
+      const data = await register(fullName, email, password, role);
 
       if (!data.succeeded) {
         setError(data.errors?.[0] ?? "حدث خطأ أثناء إنشاء الحساب");
@@ -228,6 +229,39 @@ export default function RegisterPage() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+              {/* Account type selector */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm text-white/70 font-medium">نوع الحساب</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    { value: "User" as const, label: "مستخدم", icon: "👤" },
+                    { value: "BusinessOwner" as const, label: "رجل أعمال", icon: "💼" },
+                  ]).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setRole(opt.value)}
+                      className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm
+                                 font-medium transition-all duration-200 border"
+                      style={{
+                        background: role === opt.value
+                          ? "rgba(201,168,76,0.15)"
+                          : "rgba(255,255,255,0.04)",
+                        borderColor: role === opt.value
+                          ? "rgba(201,168,76,0.5)"
+                          : "rgba(255,255,255,0.1)",
+                        color: role === opt.value
+                          ? "#E8C96A"
+                          : "rgba(255,255,255,0.5)",
+                      }}
+                    >
+                      <span>{opt.icon}</span>
+                      <span>{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <Field
                 label="الاسم الكامل"
                 type="text"

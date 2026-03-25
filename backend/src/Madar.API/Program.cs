@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -95,66 +96,52 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+// Seed roles on startup
+using (var scope = app.Services.CreateScope())
+{
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+    string[] roles = ["User", "BusinessOwner", "Admin"];
+    foreach (var role in roles)
+    {
+        if (!await roleManager.RoleExistsAsync(role))
+            await roleManager.CreateAsync(new IdentityRole<Guid> { Name = role });
+    }
+}
+
 // Auto-create missing tables and columns
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<Madar.Infrastructure.Persistence.MadarDbContext>();
     string[] sqls = [
-        // Missing columns on SmartTasks
         "ALTER TABLE SmartTasks ADD COLUMN Cost DECIMAL(18,2) NULL;",
         "ALTER TABLE SmartTasks ADD COLUMN CostCurrency VARCHAR(10) NULL DEFAULT 'SAR';",
         "ALTER TABLE SmartTasks ADD COLUMN AssignedToId CHAR(36) NULL;",
         "ALTER TABLE SmartTasks ADD COLUMN ProjectId CHAR(36) NULL;",
-        // Habits table
         @"CREATE TABLE IF NOT EXISTS Habits (
-            Id CHAR(36) NOT NULL PRIMARY KEY,
-            OwnerId CHAR(36) NOT NULL,
-            Title VARCHAR(300) NOT NULL,
-            Icon VARCHAR(10) NOT NULL DEFAULT '⭐',
-            Category VARCHAR(50) NOT NULL DEFAULT 'worship',
-            IsIdea TINYINT(1) NOT NULL DEFAULT 0,
-            Streak INT NOT NULL DEFAULT 0,
-            LastCompletedDate DATETIME(6) NULL,
-            CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
-        );",
-        // Projects table
+            Id CHAR(36) NOT NULL PRIMARY KEY, OwnerId CHAR(36) NOT NULL,
+            Title VARCHAR(300) NOT NULL, Icon VARCHAR(10) NOT NULL DEFAULT '⭐',
+            Category VARCHAR(50) NOT NULL DEFAULT 'worship', IsIdea TINYINT(1) NOT NULL DEFAULT 0,
+            Streak INT NOT NULL DEFAULT 0, LastCompletedDate DATETIME(6) NULL,
+            CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6));",
         @"CREATE TABLE IF NOT EXISTS Projects (
-            Id CHAR(36) NOT NULL PRIMARY KEY,
-            OwnerId CHAR(36) NOT NULL,
-            Title VARCHAR(400) NOT NULL,
-            Description TEXT NULL,
-            Budget DECIMAL(18,2) NOT NULL DEFAULT 0,
-            Currency VARCHAR(10) NOT NULL DEFAULT 'SAR',
+            Id CHAR(36) NOT NULL PRIMARY KEY, OwnerId CHAR(36) NOT NULL,
+            Title VARCHAR(400) NOT NULL, Description TEXT NULL,
+            Budget DECIMAL(18,2) NOT NULL DEFAULT 0, Currency VARCHAR(10) NOT NULL DEFAULT 'SAR',
             CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-            UpdatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
-        );",
-        // DeviceTokens table
+            UpdatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6));",
         @"CREATE TABLE IF NOT EXISTS DeviceTokens (
-            Id CHAR(36) NOT NULL PRIMARY KEY,
-            UserId CHAR(36) NOT NULL,
-            Token VARCHAR(512) NOT NULL,
-            Platform VARCHAR(20) NOT NULL,
-            CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
-        );",
-        // NotificationPreferences table
+            Id CHAR(36) NOT NULL PRIMARY KEY, UserId CHAR(36) NOT NULL,
+            Token VARCHAR(512) NOT NULL, Platform VARCHAR(20) NOT NULL,
+            CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6));",
         @"CREATE TABLE IF NOT EXISTS NotificationPreferences (
-            Id CHAR(36) NOT NULL PRIMARY KEY,
-            UserId CHAR(36) NOT NULL,
-            OverdueTasks TINYINT(1) NOT NULL DEFAULT 1,
-            PrayerReminders TINYINT(1) NOT NULL DEFAULT 1,
-            HabitReminders TINYINT(1) NOT NULL DEFAULT 1,
-            InboxMessages TINYINT(1) NOT NULL DEFAULT 1,
-            PrayerReminderMinutesBefore INT NOT NULL DEFAULT 15
-        );",
-        // WatchLinkRequests table
+            Id CHAR(36) NOT NULL PRIMARY KEY, UserId CHAR(36) NOT NULL,
+            OverdueTasks TINYINT(1) NOT NULL DEFAULT 1, PrayerReminders TINYINT(1) NOT NULL DEFAULT 1,
+            HabitReminders TINYINT(1) NOT NULL DEFAULT 1, InboxMessages TINYINT(1) NOT NULL DEFAULT 1,
+            PrayerReminderMinutesBefore INT NOT NULL DEFAULT 15);",
         @"CREATE TABLE IF NOT EXISTS WatchLinkRequests (
-            Id CHAR(36) NOT NULL PRIMARY KEY,
-            DeviceId VARCHAR(200) NOT NULL,
-            DeviceName VARCHAR(200) NULL,
-            Status VARCHAR(20) NULL,
-            UserId CHAR(36) NULL,
-            ExpiresAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
-        );",
+            Id CHAR(36) NOT NULL PRIMARY KEY, DeviceId VARCHAR(200) NOT NULL,
+            DeviceName VARCHAR(200) NULL, Status VARCHAR(20) NULL,
+            UserId CHAR(36) NULL, ExpiresAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6));",
     ];
     foreach (var sql in sqls)
     {
