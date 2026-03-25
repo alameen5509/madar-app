@@ -2249,7 +2249,7 @@ export default function TasksPage() {
   if (mode === "focus") {
     return (
       <div
-        className="fixed inset-0 z-40 flex flex-col items-center justify-center"
+        className="fixed inset-0 z-40 flex flex-col items-center overflow-y-auto"
         style={{ background: "linear-gradient(135deg, #2A2542 0%, #5E5495 100%)" }}
       >
         {/* pattern */}
@@ -2262,7 +2262,7 @@ export default function TasksPage() {
           <rect width="100%" height="100%" fill="url(#focus-bg)" />
         </svg>
 
-        <div className="relative z-10 flex flex-col items-center gap-6 w-full max-w-md px-6">
+        <div className="relative z-10 flex flex-col items-center gap-4 w-full max-w-md px-4 py-6 my-auto min-h-0">
 
           {/* Period info + next prayer */}
           {periodInfo && (
@@ -2641,14 +2641,14 @@ export default function TasksPage() {
             <p className="text-[#7C7A8E] text-xs">{gregorianDate}</p>
           </div>
         </div>
-        {/* الصف الثاني: أزرار ثانوية */}
-        <div className="flex items-center gap-1.5">
+        {/* الصف الثاني: أزرار ثانوية — تلتف على الشاشات الصغيرة */}
+        <div className="flex items-center gap-1.5 flex-wrap overflow-x-auto">
           <button onClick={() => setShowBatch(true)}
-            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
+            className="px-2 py-1.5 rounded-lg text-[11px] font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50 flex-shrink-0">
             متعدد
           </button>
           <button onClick={() => setShowMoodPanel(true)}
-            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all border"
+            className="px-2 py-1.5 rounded-lg text-[11px] font-semibold transition-all border flex-shrink-0"
             style={{
               background: mood === "low" ? "#FEF3C7" : mood === "good" ? "#D1FAE5" : "#F8F6F0",
               borderColor: mood === "low" ? "#F59E0B" : mood === "good" ? "#10B981" : "#E2D5B0",
@@ -2657,11 +2657,11 @@ export default function TasksPage() {
             {mood === "low" ? "😔" : mood === "good" ? "😊" : "🧠"}
           </button>
           <button onClick={() => setShowTasbeeh(true)}
-            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
-            📿 مسبحة
+            className="px-2 py-1.5 rounded-lg text-[11px] font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50 flex-shrink-0">
+            📿
           </button>
           <button onClick={() => setShowSectionEditor(!showSectionEditor)}
-            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
+            className="px-2 py-1.5 rounded-lg text-[11px] font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50 flex-shrink-0">
             ⚙
           </button>
         </div>

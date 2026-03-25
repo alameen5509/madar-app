@@ -71,7 +71,7 @@ export default function WorksPage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>الأعمال</h2>
-            {!loading && <p className="text-xs" style={{ color: "var(--muted)" }}>{jobCount} وظيفة · {entCount} عمل حر</p>}
+            {!loading && <p className="text-xs" style={{ color: "var(--muted)" }}>{jobCount} وظيفة · {entCount} رجل أعمال</p>}
           </div>
           <button onClick={() => setShowNew(true)}
             className="px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition"
@@ -84,7 +84,7 @@ export default function WorksPage() {
       <div className="px-8 py-6 space-y-5">
         {/* Tabs */}
         <div className="flex gap-2">
-          {[{ key: "all" as const, label: `الكل (${works.length})` }, { key: "job" as const, label: `وظائف (${jobCount})` }, { key: "entrepreneur" as const, label: `أعمال حرة (${entCount})` }].map(f => (
+          {[{ key: "all" as const, label: `الكل (${works.length})` }, { key: "job" as const, label: `وظائف (${jobCount})` }, { key: "entrepreneur" as const, label: `رجال أعمال (${entCount})` }].map(f => (
             <button key={f.key} onClick={() => setFilter(f.key)}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold transition"
               style={{ background: filter === f.key ? "#2D6B9E" : "var(--card)", color: filter === f.key ? "#fff" : "var(--muted)", border: `1px solid ${filter === f.key ? "#2D6B9E" : "var(--card-border)"}` }}>
@@ -123,7 +123,7 @@ export default function WorksPage() {
                       </span>
                       <span className="text-[9px] px-2 py-0.5 rounded-full font-medium"
                         style={{ background: w.type === "entrepreneur" ? "#D4AF3715" : "#2D6B9E15", color: w.type === "entrepreneur" ? "#D4AF37" : "#2D6B9E" }}>
-                        {w.type === "entrepreneur" ? "عمل حر" : "وظيفة"}
+                        {w.type === "entrepreneur" ? "رجل أعمال" : "وظيفة"}
                       </span>
                     </div>
                     <p className="text-[10px]" style={{ color: "var(--muted)" }}>
@@ -182,7 +182,7 @@ export default function WorksPage() {
                     className="rounded-2xl p-6 border-2 text-center transition-all hover:shadow-md hover:border-[#D4AF37]"
                     style={{ borderColor: "var(--card-border)" }}>
                     <span className="text-4xl block mb-3">🏢</span>
-                    <p className="text-sm font-bold" style={{ color: "var(--text)" }}>عمل حر</p>
+                    <p className="text-sm font-bold" style={{ color: "var(--text)" }}>رجل أعمال</p>
                     <p className="text-[10px] mt-1" style={{ color: "var(--muted)" }}>رجل أعمال / مشاريع</p>
                   </button>
                 </div>
@@ -203,7 +203,7 @@ export default function WorksPage() {
                 </>
               ) : (
                 <>
-                  <p className="text-xs font-bold" style={{ color: "#D4AF37" }}>🏢 عمل حر جديد</p>
+                  <p className="text-xs font-bold" style={{ color: "#D4AF37" }}>🏢 رجل أعمال جديد</p>
                   <input value={fName} onChange={e => setFName(e.target.value)} placeholder="اسم العمل *" autoFocus
                     className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={{ borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" }} />
                   <input value={fSector} onChange={e => setFSector(e.target.value)} placeholder="القطاع (تقنية، تجارة، عقار…)"
