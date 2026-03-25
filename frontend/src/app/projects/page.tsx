@@ -366,6 +366,7 @@ function NewProjectDialog({ circles, works, onClose, onCreated }: {
 }) {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
+  const [pLinkType, setPLinkType] = useState<"none" | "circle" | "job">("none");
   const [circleId, setCircleId] = useState("");
   const [workId, setWorkId] = useState("");
   const [targetDate, setTargetDate] = useState("");
@@ -448,24 +449,32 @@ function NewProjectDialog({ circles, works, onClose, onCreated }: {
             </div>
           </div>
 
-          {/* Link to work (optional) */}
+          {/* ربط بـ — خطوتين */}
           <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text)" }}>ربط بـ <span className="font-normal" style={{ color: "var(--muted)" }}>(اختياري)</span></label>
-            <select value={workId} onChange={e => setWorkId(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle}>
-              <option value="">بدون ربط</option>
-              {works.map(w => <option key={w.id} value={w.id}>{w.type === "job" ? "💼" : "🏢"} {w.name}</option>)}
-            </select>
-          </div>
-
-          {/* Circle (optional) */}
-          <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text)" }}>الدور <span className="font-normal" style={{ color: "var(--muted)" }}>(اختياري)</span></label>
-            <select value={circleId} onChange={e => setCircleId(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle}>
-              <option value="">بدون ربط</option>
-              {circles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text)" }}>ربط بـ</label>
+            <div className="flex gap-1.5 mb-2">
+              {([["none", "بدون ربط"], ["circle", "◎ دور"], ["job", "💼 وظيفة"]] as const).map(([k, l]) => (
+                <button key={k} type="button" onClick={() => { setPLinkType(k); setCircleId(""); setWorkId(""); }}
+                  className="flex-1 py-2 rounded-xl text-xs font-semibold transition"
+                  style={{ background: pLinkType === k ? "#5E5495" : "var(--bg)", color: pLinkType === k ? "#fff" : "var(--muted)", border: `1px solid ${pLinkType === k ? "#5E5495" : "var(--card-border)"}` }}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            {pLinkType === "circle" && (
+              <select value={circleId} onChange={e => setCircleId(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle}>
+                <option value="">اختر الدور...</option>
+                {circles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            )}
+            {pLinkType === "job" && (
+              <select value={workId} onChange={e => setWorkId(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle}>
+                <option value="">اختر الوظيفة...</option>
+                {works.filter(w => w.type === "job").map(w => <option key={w.id} value={w.id}>💼 {w.name}</option>)}
+              </select>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -561,6 +570,9 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
   const [editDate, setEditDate] = useState(goal.targetDate?.split("T")[0] ?? "");
   const [editWorkId, setEditWorkId] = useState(prefs.linkedWork[goal.id] ?? "");
   const [editCircleId, setEditCircleId] = useState(goal.lifeCircle?.id ?? "");
+  const [eLinkType, setELinkType] = useState<"none" | "circle" | "job">(
+    prefs.linkedWork[goal.id] ? "job" : goal.lifeCircle?.id ? "circle" : "none"
+  );
   // Parse existing rating
   const existingRating = (() => {
     const m = (goal.description ?? "").match(/\[rating:(\{.*?\})\]/);
@@ -901,24 +913,32 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
                 </div>
                 <Input label="تاريخ الانتهاء" type="date" value={editDate} onChange={setEditDate} />
 
-                {/* ربط بوظيفة */}
+                {/* ربط بـ */}
                 <div>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>ربط بوظيفة</label>
-                  <select value={editWorkId} onChange={e => setEditWorkId(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle}>
-                    <option value="">بدون ربط</option>
-                    {works.map(w => <option key={w.id} value={w.id}>{w.type === "job" ? "💼" : "🏢"} {w.name}</option>)}
-                  </select>
-                </div>
-
-                {/* ربط بدائرة */}
-                <div>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>الدور</label>
-                  <select value={editCircleId} onChange={e => setEditCircleId(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle}>
-                    <option value="">بدون</option>
-                    {circles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>ربط بـ</label>
+                  <div className="flex gap-1.5 mb-2">
+                    {([["none", "بدون ربط"], ["circle", "◎ دور"], ["job", "💼 وظيفة"]] as const).map(([k, l]) => (
+                      <button key={k} type="button" onClick={() => { setELinkType(k); setEditCircleId(""); setEditWorkId(""); }}
+                        className="flex-1 py-1.5 rounded-xl text-[11px] font-semibold transition"
+                        style={{ background: eLinkType === k ? "#5E5495" : "var(--bg)", color: eLinkType === k ? "#fff" : "var(--muted)", border: `1px solid ${eLinkType === k ? "#5E5495" : "var(--card-border)"}` }}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                  {eLinkType === "circle" && (
+                    <select value={editCircleId} onChange={e => setEditCircleId(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle}>
+                      <option value="">اختر الدور...</option>
+                      {circles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  )}
+                  {eLinkType === "job" && (
+                    <select value={editWorkId} onChange={e => setEditWorkId(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={inputStyle}>
+                      <option value="">اختر الوظيفة...</option>
+                      {works.filter(w => w.type === "job").map(w => <option key={w.id} value={w.id}>💼 {w.name}</option>)}
+                    </select>
+                  )}
                 </div>
 
                 {/* تقييم */}

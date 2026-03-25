@@ -70,7 +70,7 @@ export default function WorksPage() {
       <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b px-8 py-4 pr-16 md:pr-8" style={{ borderColor: "var(--card-border)" }}>
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>الأعمال</h2>
+            <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>وظائف / أعمال حرة</h2>
             {!loading && <p className="text-xs" style={{ color: "var(--muted)" }}>{jobCount} وظيفة · {entCount} رجل أعمال</p>}
           </div>
           <button onClick={() => setShowNew(true)}

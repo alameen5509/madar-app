@@ -249,6 +249,7 @@ export function NewTaskDialog({
   const [taskContext, setTaskContext] = useState("Anywhere");
   const [dueDate, setDueDate]       = useState(() => new Date().toISOString().slice(0, 10));
   const [goalId, setGoalId]         = useState(defaultGoalId ?? "");
+  const [linkType, setLinkType]     = useState<"none" | "circle" | "job">("none");
   const [workId, setWorkId]         = useState("");
   const [worksList, setWorksList]   = useState<{id: string; name: string; type: string}[]>([]);
   const [circleId, setCircleId]     = useState("");
@@ -413,28 +414,33 @@ export function NewTaskDialog({
                 </select>
               </div>
             )}
-            {/* Link to project */}
-            {goals.length > 0 && (
-              <div className="mb-3">
-                <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">ربط بمشروع <span className="text-[#7C7A8E] font-normal">(اختياري — يرث دائرة المشروع)</span></label>
-                <select value={goalId} onChange={(e) => { setGoalId(e.target.value); if (e.target.value) setCircleId(""); }}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition">
-                  <option value="">مهمة مستقلة</option>
-                  {goals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
-                </select>
+            {/* ربط بـ — خطوتين */}
+            <div className="mb-3">
+              <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">ربط بـ</label>
+              <div className="flex gap-1.5 mb-2">
+                {([["none", "بدون ربط"], ["circle", "◎ دور"], ["job", "💼 وظيفة"]] as const).map(([k, l]) => (
+                  <button key={k} type="button" onClick={() => { setLinkType(k); setCircleId(""); setWorkId(""); }}
+                    className="flex-1 py-2 rounded-xl text-xs font-semibold transition"
+                    style={{ background: linkType === k ? "#5E5495" : "#FDFAF6", color: linkType === k ? "#fff" : "#7C7A8E", border: `1px solid ${linkType === k ? "#5E5495" : "#E2D5B0"}` }}>
+                    {l}
+                  </button>
+                ))}
               </div>
-            )}
-            {/* Link to work/job */}
-            {worksList.length > 0 && (
-              <div className="mb-3">
-                <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">ربط بوظيفة <span className="text-[#7C7A8E] font-normal">(اختياري)</span></label>
+              {linkType === "circle" && (
+                <select value={circleId} onChange={(e) => setCircleId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition">
+                  <option value="">اختر الدور...</option>
+                  {circles.map((c) => <option key={c.id} value={c.id}>{c.iconKey ?? "◎"} {c.name}</option>)}
+                </select>
+              )}
+              {linkType === "job" && (
                 <select value={workId} onChange={(e) => setWorkId(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition">
-                  <option value="">بدون ربط</option>
-                  {worksList.map((w) => <option key={w.id} value={w.id}>{w.type === "job" ? "💼" : "🏢"} {w.name}</option>)}
+                  <option value="">اختر الوظيفة...</option>
+                  {worksList.filter(w => w.type === "job").map((w) => <option key={w.id} value={w.id}>💼 {w.name}</option>)}
                 </select>
-              </div>
-            )}
+              )}
+            </div>
             {/* Assign to user */}
             <div className="mt-3">
               <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">إسناد لشخص <span className="text-[#7C7A8E] font-normal">(اختياري)</span></label>
