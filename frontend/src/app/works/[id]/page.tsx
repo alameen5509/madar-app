@@ -15,11 +15,18 @@ interface WorkData {
 export default function WorkDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [work, setWork] = useState<WorkData | null>(null);
+  const [loadError, setLoadError] = useState("");
   const [showAddJob, setShowAddJob] = useState(false);
   const [jTitle, setJTitle] = useState(""); const [jDesc, setJDesc] = useState(""); const [jSalary, setJSalary] = useState("");
 
   const load = useCallback(async () => {
-    try { const { data } = await api.get(`/api/works/${id}`); setWork(data); } catch {}
+    setLoadError("");
+    try {
+      const { data } = await api.get(`/api/works/${id}`);
+      setWork(data);
+    } catch {
+      setLoadError("تعذّر تحميل بيانات العمل");
+    }
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
@@ -29,6 +36,13 @@ export default function WorkDetailPage({ params }: { params: Promise<{ id: strin
     await api.post(`/api/works/${id}/jobs`, { title: jTitle.trim(), description: jDesc.trim() || undefined, salary: Number(jSalary) || 0 }).catch(() => {});
     setJTitle(""); setJDesc(""); setJSalary(""); setShowAddJob(false); load();
   }
+
+  if (loadError) return (
+    <main className="flex-1 flex flex-col items-center justify-center gap-3" style={{ background: "var(--bg)" }}>
+      <p style={{ color: "var(--muted)" }}>{loadError}</p>
+      <button onClick={load} className="text-sm font-medium hover:underline" style={{ color: "#C9A84C" }}>إعادة المحاولة</button>
+    </main>
+  );
 
   if (!work) return (
     <main className="flex-1 flex items-center justify-center" style={{ background: "var(--bg)" }}>
