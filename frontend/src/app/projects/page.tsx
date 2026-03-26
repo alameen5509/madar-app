@@ -178,20 +178,11 @@ export default function ProjectsPage() {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            {hasFocus && (
-              <Link href="/projects/focus"
-                className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-white hover:opacity-90 transition"
-                style={{ background: "linear-gradient(135deg, #D4AF37, #F59E0B)" }}>
-                🎯 بدء جلسة تركيز
-              </Link>
-            )}
-            <button onClick={() => setShowNew(true)}
-              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-white hover:opacity-90 transition"
-              style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
-              + مشروع جديد
-            </button>
-          </div>
+          <button onClick={() => setShowNew(true)}
+            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-white hover:opacity-90 transition"
+            style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
+            + مشروع جديد
+          </button>
         </div>
 
         {/* Tag filter */}

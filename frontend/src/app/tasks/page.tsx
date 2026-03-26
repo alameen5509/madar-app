@@ -1877,6 +1877,12 @@ export default function TasksPage() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [showDeferMenu, setShowDeferMenu] = useState(false);
 
+  /* ── Quick Ideas (💡) ── */
+  const [focusIdeas, setFocusIdeas] = useState<{ id: string; text: string; type: "task" | "idea" | "note" | "question"; time: Date }[]>([]);
+  const [showIdeaInput, setShowIdeaInput] = useState(false);
+  const [ideaText, setIdeaText] = useState("");
+  const [ideaType, setIdeaType] = useState<"task" | "idea" | "note" | "question">("idea");
+
   /* refs */
   const modeRef      = useRef<Mode>("idle");
   const sessRef      = useRef(0);
@@ -2207,6 +2213,13 @@ export default function TasksPage() {
   function handleSetMood(m: Mood) {
     setMood(m);
     setShowMoodPanel(false);
+  }
+
+  function addFocusIdea() {
+    if (!ideaText.trim()) return;
+    setFocusIdeas(prev => [...prev, { id: crypto.randomUUID(), text: ideaText.trim(), type: ideaType, time: new Date() }]);
+    setIdeaText("");
+    setShowIdeaInput(false);
   }
 
   async function toggle(id: string, currentDone: boolean) {
@@ -2565,7 +2578,75 @@ export default function TasksPage() {
               </div>
             )}
           </div>
+          {/* ── Ideas list inside focus ── */}
+          {focusIdeas.length > 0 && (
+            <div className="w-full mt-2 pt-3 border-t border-white/10">
+              <p className="text-white/30 text-[10px] mb-2">💡 أفكار الجلسة ({focusIdeas.length})</p>
+              <div className="space-y-1 max-h-28 overflow-y-auto">
+                {focusIdeas.map(idea => {
+                  const icons: Record<string, string> = { task: "✅", idea: "💡", note: "📝", question: "❓" };
+                  const colors: Record<string, string> = { task: "#3D8C5A", idea: "#F59E0B", note: "#3B82F6", question: "#8B5CF6" };
+                  return (
+                    <div key={idea.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5">
+                      <span style={{ color: colors[idea.type] }}>{icons[idea.type]}</span>
+                      <span className="text-white/60 text-xs flex-1 truncate">{idea.text}</span>
+                      <span className="text-white/20 text-[9px]">{idea.time.toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* ── Floating Idea Button ── */}
+        <button onClick={() => setShowIdeaInput(true)}
+          className="fixed bottom-6 left-6 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-2xl transition hover:scale-110 z-50"
+          style={{ background: "linear-gradient(135deg, #F59E0B, #D4AF37)", color: "#fff" }}>
+          💡
+        </button>
+
+        {/* ── Idea Input Modal ── */}
+        {showIdeaInput && (
+          <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4" dir="rtl">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowIdeaInput(false)} />
+            <div className="relative z-10 w-full max-w-sm rounded-2xl shadow-2xl p-5 space-y-3" style={{ background: "#2A2542", border: "1px solid rgba(255,255,255,0.15)" }}>
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-sm text-white">💡 فكرة سريعة</h4>
+                <button onClick={() => setShowIdeaInput(false)} className="text-white/40 hover:text-white/70">✕</button>
+              </div>
+              <input value={ideaText} onChange={e => setIdeaText(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") addFocusIdea(); }}
+                placeholder="اكتب فكرتك..."
+                autoFocus
+                className="w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none"
+                style={{ background: "rgba(255,255,255,0.08)", borderColor: "rgba(255,255,255,0.15)", color: "#fff" }} />
+              <div className="flex gap-1.5">
+                {([
+                  { key: "task" as const, label: "مهمة", icon: "✅", color: "#3D8C5A" },
+                  { key: "idea" as const, label: "فكرة", icon: "💡", color: "#F59E0B" },
+                  { key: "note" as const, label: "ملاحظة", icon: "📝", color: "#3B82F6" },
+                  { key: "question" as const, label: "سؤال", icon: "❓", color: "#8B5CF6" },
+                ]).map(it => (
+                  <button key={it.key} onClick={() => setIdeaType(it.key)}
+                    className="flex-1 py-2 rounded-lg text-[10px] font-semibold transition"
+                    style={{
+                      background: ideaType === it.key ? it.color : "rgba(255,255,255,0.08)",
+                      color: ideaType === it.key ? "#fff" : "rgba(255,255,255,0.5)",
+                      border: `1px solid ${ideaType === it.key ? it.color : "rgba(255,255,255,0.1)"}`,
+                    }}>
+                    {it.icon} {it.label}
+                  </button>
+                ))}
+              </div>
+              <button onClick={addFocusIdea} disabled={!ideaText.trim()}
+                className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-30"
+                style={{ background: "#F59E0B" }}>
+                حفظ
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
