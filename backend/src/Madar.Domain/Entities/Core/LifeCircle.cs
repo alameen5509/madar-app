@@ -34,6 +34,7 @@ public class Goal
     public GoalStatus Status { get; set; } = GoalStatus.Active;
     public DateTime? TargetDate { get; set; }
     public int PriorityWeight { get; set; } = 5;
+    public string? FocusType { get; set; }   // "Tech" | "NonTech" | null
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public ApplicationUser Owner { get; set; } = default!;
     public LifeCircle LifeCircle { get; set; } = default!;

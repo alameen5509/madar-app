@@ -103,6 +103,7 @@ export interface Goal {
   status: 'Active' | 'Paused' | 'Completed' | 'Archived' | 'Draft' | 'Critical';
   targetDate?: string;
   priorityWeight: number;
+  focusType?: 'Tech' | 'NonTech' | null;
   progressPercent: number;
   lifeCircle?: { id: string; name: string; color: string };
 }

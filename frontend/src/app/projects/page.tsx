@@ -9,6 +9,11 @@ import {
   type Goal, type LifeCircle, type SmartTask,
 } from "@/lib/api";
 
+async function setFocusApi(goalId: string, focusType: string | null): Promise<{ id: string; focusType: string | null }> {
+  const { data } = await api.post(`/api/goals/${goalId}/focus`, { focusType });
+  return data;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    CONSTANTS
    ═══════════════════════════════════════════════════════════════════════ */
@@ -122,10 +127,28 @@ export default function ProjectsPage() {
     ? goals.filter(g => (prefs.tags[g.id] ?? []).includes(tagFilter))
     : goals;
 
+  const techFocus = goals.find(g => g.focusType === "Tech");
+  const nonTechFocus = goals.find(g => g.focusType === "NonTech");
+  const hasFocus = !!(techFocus || nonTechFocus);
   const critical = sortedGoals(filteredGoals.filter(g => g.status === "Critical"));
   const active = sortedGoals(filteredGoals.filter(g => g.status === "Active"));
   const completed = filteredGoals.filter(g => g.status === "Completed");
   const drafts = filteredGoals.filter(g => g.status === "Draft" || g.status === "Archived" || g.status === "Paused");
+
+  // All non-completed/non-archived goals for dropdown selection
+  const selectableGoals = goals.filter(g => g.status !== "Completed" && g.status !== "Archived");
+
+  async function handleSetFocus(goalId: string, focusType: string | null) {
+    try {
+      const res = await setFocusApi(goalId, focusType);
+      setGoals(prev => prev.map(g => {
+        if (g.id === res.id) return { ...g, focusType: res.focusType as Goal["focusType"] };
+        // If another goal had same focusType, clear it
+        if (focusType && g.focusType === focusType && g.id !== res.id) return { ...g, focusType: null };
+        return g;
+      }));
+    } catch {}
+  }
 
   // All tags
   const allTags = [...new Set(Object.values(prefs.tags).flat())];
@@ -149,15 +172,26 @@ export default function ProjectsPage() {
             {!loading && (
               <div className="flex items-center gap-3 mt-1">
                 <span className="text-xs" style={{ color: "var(--muted)" }}>{stats.total} مشروع</span>
+                {techFocus && <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#3B82F615", color: "#3B82F6" }}>💻 {techFocus.title}</span>}
+                {nonTechFocus && <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#D4AF3715", color: "#D4AF37" }}>🌿 {nonTechFocus.title}</span>}
                 {stats.critical > 0 && <span className="text-xs font-bold px-2 py-0.5 rounded-full animate-pulse" style={{ background: "#DC262615", color: "#DC2626" }}>⚠️ {stats.critical} حرجة</span>}
               </div>
             )}
           </div>
-          <button onClick={() => setShowNew(true)}
-            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-white hover:opacity-90 transition"
-            style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
-            + مشروع جديد
-          </button>
+          <div className="flex items-center gap-2">
+            {hasFocus && (
+              <Link href="/projects/focus"
+                className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-white hover:opacity-90 transition"
+                style={{ background: "linear-gradient(135deg, #D4AF37, #F59E0B)" }}>
+                🎯 بدء جلسة تركيز
+              </Link>
+            )}
+            <button onClick={() => setShowNew(true)}
+              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-white hover:opacity-90 transition"
+              style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
+              + مشروع جديد
+            </button>
+          </div>
         </div>
 
         {/* Tag filter */}
@@ -191,6 +225,36 @@ export default function ProjectsPage() {
         {/* ═══ Collapsible Sections ═══ */}
         {!loading && !error && (
           <div className="space-y-4">
+            {/* ═══ التركيز الآن — أعلى شيء ═══ */}
+            <div className="rounded-2xl border-2 overflow-hidden" style={{ borderColor: "#D4AF37", background: "linear-gradient(135deg, #D4AF3706, #2C2C5406)" }}>
+              <div className="flex items-center gap-2 px-4 py-3" style={{ background: "#D4AF3710" }}>
+                <span className="text-sm">🎯</span>
+                <span className="font-bold text-sm" style={{ color: "#D4AF37" }}>التركيز الآن</span>
+              </div>
+              <div className="px-4 pb-4 pt-2 space-y-3">
+                {/* ── تركيز تقني ── */}
+                <FocusSlot
+                  label="تقني" icon="💻" color="#3B82F6"
+                  goal={techFocus} goals={selectableGoals} circleMap={circleMap}
+                  focusType="Tech"
+                  onSelect={(id) => handleSetFocus(id, "Tech")}
+                  onClear={() => techFocus && handleSetFocus(techFocus.id, null)}
+                  onClick={(g) => setSelected(g)}
+                />
+                {/* ── تركيز غير تقني ── */}
+                <FocusSlot
+                  label="غير تقني" icon="🌿" color="#D4AF37"
+                  goal={nonTechFocus} goals={selectableGoals} circleMap={circleMap}
+                  focusType="NonTech"
+                  onSelect={(id) => handleSetFocus(id, "NonTech")}
+                  onClear={() => nonTechFocus && handleSetFocus(nonTechFocus.id, null)}
+                  onClick={(g) => setSelected(g)}
+                />
+                {/* ── مفكّرة الجلسة ── */}
+                {hasFocus && <FocusScratchpad />}
+              </div>
+            </div>
+
             {/* حرجة — مفتوحة دائماً */}
             {critical.length > 0 && (
               <CollapsibleSection icon="⚠️" label="حرجة" count={critical.length} color="#DC2626" defaultOpen isCritical>
@@ -242,6 +306,176 @@ export default function ProjectsPage() {
         />
       )}
     </main>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FOCUS SLOT — خانة اختيار تركيز (تقني / غير تقني)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+function FocusSlot({ label, icon, color, goal, goals, circleMap, focusType, onSelect, onClear, onClick }: {
+  label: string; icon: string; color: string;
+  goal?: Goal; goals: Goal[]; circleMap: Map<string, LifeCircle>;
+  focusType: string;
+  onSelect: (goalId: string) => void;
+  onClear: () => void;
+  onClick: (g: Goal) => void;
+}) {
+  // Exclude the goal already assigned to the OTHER focus slot
+  const available = goals.filter(g => !g.focusType || g.focusType === focusType);
+
+  if (goal) {
+    const circle = goal.lifeCircle ? circleMap.get(goal.lifeCircle.id) : undefined;
+    return (
+      <div className="rounded-xl border p-3 flex items-center gap-3 cursor-pointer hover:shadow-sm transition"
+        style={{ borderColor: `${color}40`, background: `${color}06` }}
+        onClick={() => onClick(goal)}>
+        <span className="text-lg flex-shrink-0">{icon}</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: `${color}15`, color }}>{label}</span>
+            <span className="font-bold text-sm truncate" style={{ color: "var(--text)" }}>{goal.title}</span>
+          </div>
+          {circle && (
+            <span className="text-[10px] mt-0.5 inline-block" style={{ color: circle.colorHex ?? "var(--muted)" }}>{circle.name}</span>
+          )}
+        </div>
+        <button onClick={(e) => { e.stopPropagation(); onClear(); }}
+          className="text-[10px] px-2 py-1 rounded-lg font-semibold transition hover:opacity-80 flex-shrink-0"
+          style={{ background: `${color}15`, color }}>
+          إلغاء
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border-2 border-dashed p-3 flex items-center gap-3"
+      style={{ borderColor: `${color}25` }}>
+      <span className="text-lg flex-shrink-0 opacity-40">{icon}</span>
+      <div className="flex-1 min-w-0">
+        <span className="text-[10px] font-bold" style={{ color }}>{label}</span>
+        <select
+          value=""
+          onChange={e => { if (e.target.value) onSelect(e.target.value); }}
+          className="w-full mt-1 px-3 py-2 rounded-lg border text-xs focus:outline-none"
+          style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }}>
+          <option value="">اختر مشروع {label}...</option>
+          {available.map(g => (
+            <option key={g.id} value={g.id}>{g.title}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FOCUS SCRATCHPAD — مفكّرة مؤقتة تُحذف عند مغادرة الصفحة
+   ═══════════════════════════════════════════════════════════════════════ */
+
+interface ScratchItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+function FocusScratchpad() {
+  const [items, setItems] = useState<ScratchItem[]>([]);
+  const [input, setInput] = useState("");
+  const [open, setOpen] = useState(true);
+
+  function addItem() {
+    const text = input.trim();
+    if (!text) return;
+    setItems(prev => [...prev, { id: crypto.randomUUID(), text, done: false }]);
+    setInput("");
+  }
+
+  function toggleItem(id: string) {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, done: !i.done } : i));
+  }
+
+  function removeItem(id: string) {
+    setItems(prev => prev.filter(i => i.id !== id));
+  }
+
+  const doneCount = items.filter(i => i.done).length;
+
+  return (
+    <div className="rounded-xl border overflow-hidden" style={{ borderColor: "#D4AF3730", background: "var(--card)" }}>
+      <button onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 w-full px-3 py-2.5 transition-colors"
+        style={{ background: "#D4AF3708" }}>
+        <span className={`text-[10px] transition-transform duration-200 ${open ? "rotate-180" : ""}`} style={{ color: "#D4AF37" }}>▼</span>
+        <span className="text-xs">📋</span>
+        <span className="font-bold text-xs" style={{ color: "#D4AF37" }}>مفكّرة الجلسة</span>
+        {items.length > 0 && (
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#D4AF3715", color: "#D4AF37" }}>
+            {doneCount}/{items.length}
+          </span>
+        )}
+        <div className="flex-1" />
+        <span className="text-[9px]" style={{ color: "var(--muted)" }}>تُحذف عند المغادرة</span>
+      </button>
+
+      {open && (
+        <div className="px-3 pb-3 pt-1 space-y-2">
+          {/* Input */}
+          <div className="flex gap-2">
+            <input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") addItem(); }}
+              placeholder="أضف ملاحظة أو مهمة سريعة..."
+              className="flex-1 px-3 py-2 rounded-lg border text-xs focus:outline-none"
+              style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }}
+            />
+            <button onClick={addItem} disabled={!input.trim()}
+              className="px-3 py-2 rounded-lg text-xs font-bold text-white disabled:opacity-30 transition"
+              style={{ background: "#D4AF37" }}>
+              +
+            </button>
+          </div>
+
+          {/* Items list */}
+          {items.length > 0 && (
+            <div className="space-y-1">
+              {items.map(item => (
+                <div key={item.id}
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg group transition"
+                  style={{ background: item.done ? "#3D8C5A08" : "var(--bg)" }}>
+                  <button onClick={() => toggleItem(item.id)}
+                    className="w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition text-[10px]"
+                    style={{
+                      borderColor: item.done ? "#3D8C5A" : "var(--card-border)",
+                      background: item.done ? "#3D8C5A" : "transparent",
+                      color: item.done ? "#fff" : "transparent",
+                    }}>
+                    {item.done ? "✓" : ""}
+                  </button>
+                  <span className={`flex-1 text-xs ${item.done ? "line-through" : ""}`}
+                    style={{ color: item.done ? "var(--muted)" : "var(--text)" }}>
+                    {item.text}
+                  </span>
+                  <button onClick={() => removeItem(item.id)}
+                    className="text-[10px] opacity-0 group-hover:opacity-100 transition px-1"
+                    style={{ color: "#DC2626" }}>
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {items.length === 0 && (
+            <p className="text-center py-3 text-[10px]" style={{ color: "var(--muted)" }}>
+              اكتب أي ملاحظات أو مهام سريعة لهذه الجلسة
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

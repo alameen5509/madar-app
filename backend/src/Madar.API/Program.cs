@@ -358,4 +358,16 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// ═══ Auto-add FocusType column to Goals if missing ═══
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<Madar.Infrastructure.Persistence.MadarDbContext>();
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE Goals ADD COLUMN FocusType VARCHAR(20) NULL;");
+    }
+    catch { /* column already exists */ }
+}
+
 app.Run();

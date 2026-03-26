@@ -33,6 +33,7 @@ public class GoalsController : BaseController
                 status          = g.Status.ToString(),
                 targetDate      = g.TargetDate,
                 priorityWeight  = g.PriorityWeight,
+                focusType       = g.FocusType,
                 progressPercent = g.LinkedTasks.Count == 0
                     ? 0
                     : (int)Math.Round(
@@ -104,6 +105,7 @@ public class GoalsController : BaseController
             status          = goal.Status.ToString(),
             targetDate      = goal.TargetDate,
             priorityWeight  = goal.PriorityWeight,
+            focusType       = goal.FocusType,
             progressPercent = 0,
             lifeCircle = goal.LifeCircle == null ? null : new
             {
@@ -157,6 +159,7 @@ public class GoalsController : BaseController
             status          = goal.Status.ToString(),
             targetDate      = goal.TargetDate,
             priorityWeight  = goal.PriorityWeight,
+            focusType       = goal.FocusType,
             lifeCircle = goal.LifeCircle == null ? null : new
             {
                 id    = goal.LifeCircle.Id,
@@ -164,6 +167,50 @@ public class GoalsController : BaseController
                 color = goal.LifeCircle.ColorHex ?? "#5E5495"
             }
         });
+    }
+
+    /// <summary>تعيين / إلغاء تركيز مشروع (Tech أو NonTech — واحد من كل نوع)</summary>
+    [HttpPost("{id:guid}/focus")]
+    public async Task<IActionResult> SetFocus(
+        Guid id,
+        [FromBody] SetFocusRequest req,
+        CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var focusType = req.FocusType;   // "Tech" | "NonTech" | null (to clear)
+
+        var goal = await _db.Goals
+            .FirstOrDefaultAsync(g => g.Id == id && g.OwnerId == userId, ct);
+        if (goal is null) return NotFound();
+
+        // If clearing focus
+        if (string.IsNullOrEmpty(focusType))
+        {
+            goal.FocusType = null;
+            await _db.SaveChangesAsync(ct);
+            return Ok(new { id = goal.Id, focusType = (string?)null });
+        }
+
+        // Validate type
+        if (focusType != "Tech" && focusType != "NonTech")
+            return BadRequest(new { error = "focusType must be Tech or NonTech" });
+
+        // Remove same focusType from any other goal of this user
+        var existing = await _db.Goals
+            .Where(g => g.OwnerId == userId && g.FocusType == focusType && g.Id != id)
+            .ToListAsync(ct);
+        foreach (var g in existing) g.FocusType = null;
+
+        // Toggle: if same goal already has this type → clear it, otherwise set
+        if (goal.FocusType == focusType)
+            goal.FocusType = null;
+        else
+            goal.FocusType = focusType;
+
+        await _db.SaveChangesAsync(ct);
+
+        return Ok(new { id = goal.Id, focusType = goal.FocusType });
     }
 
     /// <summary>حذف هدف / مشروع</summary>
@@ -226,4 +273,9 @@ public class UpdateGoalRequest
     public string? Status { get; set; }
     public Guid? LifeCircleId { get; set; }
     public Guid? WorkId { get; set; }
+}
+
+public class SetFocusRequest
+{
+    public string? FocusType { get; set; }  // "Tech" | "NonTech" | null
 }
