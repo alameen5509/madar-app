@@ -1890,6 +1890,8 @@ export default function TasksPage() {
 
   // Reminders
   const [dueReminders, setDueReminders] = useState<{id:string;title:string;assignedPersonName?:string;assignedPersonRelation?:string;reminderFrequency?:string;nextReminderAt?:string}[]>([]);
+  const [setupReminderId, setSetupReminderId] = useState<string | null>(null);
+  const [rmForm, setRmForm] = useState({ freq: "weekly", days: "7", person: "", relation: "" });
   const [showDeferMenu, setShowDeferMenu] = useState(false);
 
   /* ── Quick Ideas (💡) ── */
@@ -3258,16 +3260,17 @@ export default function TasksPage() {
                         )}
                       </div>
                       {/* أزرار التذكير */}
-                      {t.reminder && t.reminder.frequency !== "none" && t.reminder.nextAt && new Date(t.reminder.nextAt) <= new Date() && (
-                        <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                          <button onClick={async () => {
-                            try { await api.post(`/api/reminders/${t.id}/done`, {}); fetchTasks(); } catch {}
-                          }} className="text-[8px] px-1.5 py-1 rounded-lg font-bold" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>تم ✓</button>
-                          <button onClick={async () => {
-                            try { await api.post(`/api/reminders/${t.id}/snooze`, { hours: 1 }); fetchTasks(); } catch {}
-                          }} className="text-[8px] px-1.5 py-1 rounded-lg font-bold" style={{ background: "#F59E0B15", color: "#F59E0B" }}>⏰</button>
-                        </div>
-                      )}
+                      <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                        {t.reminder && t.reminder.frequency !== "none" && t.reminder.nextAt && new Date(t.reminder.nextAt) <= new Date() ? (<>
+                          <button onClick={async () => { try { await api.post(`/api/reminders/${t.id}/done`, {}); fetchTasks(); } catch {} }}
+                            className="text-[8px] px-1.5 py-1 rounded-lg font-bold" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>تم ✓</button>
+                          <button onClick={async () => { try { await api.post(`/api/reminders/${t.id}/snooze`, { hours: 1 }); fetchTasks(); } catch {} }}
+                            className="text-[8px] px-1.5 py-1 rounded-lg font-bold" style={{ background: "#F59E0B15", color: "#F59E0B" }}>⏰</button>
+                        </>) : !t.done && t.context !== "habit" && (!t.reminder || t.reminder.frequency === "none") ? (
+                          <button onClick={() => { setSetupReminderId(setupReminderId === t.id ? null : t.id); setRmForm({ freq: "weekly", days: "7", person: "", relation: "" }); }}
+                            className="text-[9px] px-1.5 py-1 rounded-lg transition hover:scale-110" style={{ color: setupReminderId === t.id ? "#F59E0B" : "var(--muted)" }}>🔔</button>
+                        ) : null}
+                      </div>
                       {/* المشروع المرتبط */}
                       {t.circleColor ? (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium"
@@ -3278,6 +3281,40 @@ export default function TasksPage() {
                         <span className="text-[10px] text-[#7C7A8E] flex-shrink-0">{t.circle}</span>
                       ) : null}
                     </div>
+                    {/* Reminder setup form */}
+                    {setupReminderId === t.id && (
+                      <div className="pr-10 pb-2 pt-1 space-y-2 border-t" style={{ borderColor: "#F59E0B20" }}>
+                        <p className="text-[10px] font-bold" style={{ color: "#F59E0B" }}>🔔 إعداد تذكير</p>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {[["daily","يومي"],["weekly","أسبوعي"],["monthly","شهري"],["custom","مخصص"]].map(([k,l]) => (
+                            <button key={k} onClick={() => setRmForm({...rmForm, freq: k, days: k==="daily"?"1":k==="weekly"?"7":k==="monthly"?"30":rmForm.days})}
+                              className="text-[9px] px-2 py-1 rounded-lg font-semibold transition"
+                              style={{ background: rmForm.freq === k ? "#F59E0B" : "var(--bg)", color: rmForm.freq === k ? "#fff" : "var(--muted)", border: "1px solid var(--card-border)" }}>
+                              {l}
+                            </button>
+                          ))}
+                        </div>
+                        {rmForm.freq === "custom" && (
+                          <input value={rmForm.days} onChange={e => setRmForm({...rmForm, days: e.target.value})} placeholder="كل كم يوم؟" type="number"
+                            className="w-24 px-2 py-1 rounded-lg border text-[10px]" style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
+                        )}
+                        <div className="flex gap-2">
+                          <input value={rmForm.person} onChange={e => setRmForm({...rmForm, person: e.target.value})} placeholder="اسم الشخص (اختياري)"
+                            className="flex-1 px-2 py-1 rounded-lg border text-[10px]" style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
+                          <input value={rmForm.relation} onChange={e => setRmForm({...rmForm, relation: e.target.value})} placeholder="العلاقة"
+                            className="w-20 px-2 py-1 rounded-lg border text-[10px]" style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={async () => {
+                            try {
+                              await api.patch(`/api/reminders/${t.id}/set`, { frequency: rmForm.freq, intervalDays: parseInt(rmForm.days) || 7, personName: rmForm.person || undefined, personRelation: rmForm.relation || undefined });
+                              setSetupReminderId(null); fetchTasks();
+                            } catch {}
+                          }} className="text-[9px] px-3 py-1.5 rounded-lg font-bold text-white" style={{ background: "#F59E0B" }}>تفعيل التذكير</button>
+                          <button onClick={() => setSetupReminderId(null)} className="text-[9px] px-2 py-1.5 rounded-lg" style={{ color: "var(--muted)" }}>إلغاء</button>
+                        </div>
+                      </div>
+                    )}
                     {/* Subtasks */}
                     {expandedTask === t.id && (
                       <div className="pr-10 pb-2 space-y-1">
