@@ -676,6 +676,8 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
   const [showEdit, setShowEdit] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+  const bulkMode = selectedTaskIds.size > 0;
   const [nt, setNt] = useState({ title: "", desc: "", priority: 3, dueDate: "", context: "Anywhere", isUrgent: false, isWork: false });
   const [editTitle, setEditTitle] = useState(goal.title);
   // Strip rating tag from description for editing
@@ -913,28 +915,97 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold" style={{ color: "var(--text)" }}>المهام ({tasks.length})</span>
-              <button onClick={() => setShowAddTask(true)} className="text-[10px] font-bold px-3 py-1 rounded-lg text-white" style={{ background: "#D4AF37" }}>+ مهمة</button>
+              <div className="flex items-center gap-1.5">
+                {tasks.length > 0 && (
+                  <button onClick={() => {
+                    if (bulkMode) setSelectedTaskIds(new Set());
+                    else setSelectedTaskIds(new Set(tasks.map(t => t.id)));
+                  }}
+                    className="text-[10px] px-2 py-1 rounded-lg font-semibold transition"
+                    style={{ background: bulkMode ? "#5E549515" : "var(--bg)", color: bulkMode ? "#5E5495" : "var(--muted)", border: `1px solid ${bulkMode ? "#5E5495" : "var(--card-border)"}` }}>
+                    {bulkMode ? `✓ ${selectedTaskIds.size} محدد` : "تحديد"}
+                  </button>
+                )}
+                <button onClick={() => setShowAddTask(true)} className="text-[10px] font-bold px-3 py-1 rounded-lg text-white" style={{ background: "#D4AF37" }}>+ مهمة</button>
+              </div>
             </div>
+
+            {/* Bulk actions toolbar */}
+            {bulkMode && (
+              <div className="flex items-center gap-1.5 mb-2 p-2 rounded-lg" style={{ background: "#5E549508", border: "1px solid #5E549520" }}>
+                <button onClick={async () => {
+                  for (const id of selectedTaskIds) await api.patch(`/api/tasks/${id}/status`, { status: "Completed" }).catch(() => {});
+                  setTasks(prev => prev.map(t => selectedTaskIds.has(t.id) ? { ...t, status: "Completed" as SmartTask["status"] } : t));
+                  setSelectedTaskIds(new Set());
+                }}
+                  className="text-[10px] px-2.5 py-1.5 rounded-lg font-semibold" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>
+                  ✅ إنجاز
+                </button>
+                <button onClick={async () => {
+                  for (const id of selectedTaskIds) await api.patch(`/api/tasks/${id}/status`, { status: "InProgress" }).catch(() => {});
+                  setTasks(prev => prev.map(t => selectedTaskIds.has(t.id) ? { ...t, status: "InProgress" as SmartTask["status"] } : t));
+                  setSelectedTaskIds(new Set());
+                }}
+                  className="text-[10px] px-2.5 py-1.5 rounded-lg font-semibold" style={{ background: "#F59E0B15", color: "#F59E0B" }}>
+                  🔄 جاري
+                </button>
+                <button onClick={async () => {
+                  for (const id of selectedTaskIds) await api.patch(`/api/tasks/${id}/status`, { status: "Deferred" }).catch(() => {});
+                  setTasks(prev => prev.map(t => selectedTaskIds.has(t.id) ? { ...t, status: "Deferred" as SmartTask["status"] } : t));
+                  setSelectedTaskIds(new Set());
+                }}
+                  className="text-[10px] px-2.5 py-1.5 rounded-lg font-semibold" style={{ background: "#8B5CF615", color: "#8B5CF6" }}>
+                  ⏳ تأجيل
+                </button>
+                <div className="flex-1" />
+                <button onClick={async () => {
+                  if (!confirm(`حذف ${selectedTaskIds.size} مهمة؟`)) return;
+                  for (const id of selectedTaskIds) await api.delete(`/api/tasks/${id}`).catch(() => {});
+                  setTasks(prev => prev.filter(t => !selectedTaskIds.has(t.id)));
+                  setSelectedTaskIds(new Set()); onRefresh();
+                }}
+                  className="text-[10px] px-2.5 py-1.5 rounded-lg font-semibold" style={{ background: "#DC262615", color: "#DC2626" }}>
+                  🗑️ حذف
+                </button>
+                <button onClick={() => setSelectedTaskIds(new Set())}
+                  className="text-[10px] px-2 py-1.5 rounded-lg" style={{ color: "var(--muted)" }}>✕</button>
+              </div>
+            )}
+
             {loadingTasks && <p className="text-center py-4 animate-pulse text-xs" style={{ color: "var(--muted)" }}>جارٍ التحميل...</p>}
             <div className="space-y-1.5">
               {[...pendingTasks, ...completedTasks].map(t => {
                 const st = TASK_STATUS[t.status] ?? TASK_STATUS.Inbox;
                 const isDone = t.status === "Completed";
                 const pri = t.userPriority <= 2 ? { l: "عالية", c: "#DC2626" } : t.userPriority <= 3 ? { l: "متوسطة", c: "#D4AF37" } : { l: "منخفضة", c: "#6B7280" };
+                const isSelected = selectedTaskIds.has(t.id);
                 return (
-                  <div key={t.id} className={`rounded-lg border px-3 py-2.5 ${isDone ? "opacity-50" : ""}`} style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+                  <div key={t.id} className={`rounded-lg border px-3 py-2.5 transition ${isDone ? "opacity-50" : ""} ${isSelected ? "ring-2 ring-[#5E5495]" : ""}`}
+                    style={{ background: isSelected ? "#5E549508" : "var(--card)", borderColor: isSelected ? "#5E5495" : "var(--card-border)" }}>
                     <div className="flex items-center gap-2">
-                      {/* Complete button */}
-                      <button onClick={() => {
-                        const next = isDone ? "Todo" : "Completed";
-                        api.patch(`/api/tasks/${t.id}/status`, { status: next }).then(() => {
-                          setTasks(prev => prev.map(x => x.id === t.id ? { ...x, status: next as SmartTask["status"] } : x));
-                        }).catch(() => {});
-                      }}
-                        className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition text-[9px]"
-                        style={{ borderColor: isDone ? "#3D8C5A" : st.color, background: isDone ? "#3D8C5A" : "transparent", color: isDone ? "#fff" : "transparent" }}>
-                        {isDone ? "✓" : ""}
-                      </button>
+                      {/* Checkbox or Complete button */}
+                      {bulkMode ? (
+                        <button onClick={() => setSelectedTaskIds(prev => {
+                          const s = new Set(prev);
+                          if (s.has(t.id)) s.delete(t.id); else s.add(t.id);
+                          return s;
+                        })}
+                          className="w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition text-[9px]"
+                          style={{ borderColor: isSelected ? "#5E5495" : "var(--card-border)", background: isSelected ? "#5E5495" : "transparent", color: isSelected ? "#fff" : "transparent" }}>
+                          {isSelected ? "✓" : ""}
+                        </button>
+                      ) : (
+                        <button onClick={() => {
+                          const next = isDone ? "Todo" : "Completed";
+                          api.patch(`/api/tasks/${t.id}/status`, { status: next }).then(() => {
+                            setTasks(prev => prev.map(x => x.id === t.id ? { ...x, status: next as SmartTask["status"] } : x));
+                          }).catch(() => {});
+                        }}
+                          className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition text-[9px]"
+                          style={{ borderColor: isDone ? "#3D8C5A" : st.color, background: isDone ? "#3D8C5A" : "transparent", color: isDone ? "#fff" : "transparent" }}>
+                          {isDone ? "✓" : ""}
+                        </button>
+                      )}
 
                       {/* Title + date */}
                       <div className="flex-1 min-w-0">
@@ -946,20 +1017,22 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
                         </div>
                       </div>
 
-                      {/* Actions */}
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button onClick={() => setEditingTaskId(editingTaskId === t.id ? null : t.id)}
-                          className="text-[10px] px-1.5 py-1 rounded hover:bg-black/5 transition" title="تعديل">✏️</button>
-                        <button onClick={async () => {
-                          if (!confirm(`حذف "${t.title}"؟`)) return;
-                          try { await api.delete(`/api/tasks/${t.id}`); setTasks(prev => prev.filter(x => x.id !== t.id)); onRefresh(); } catch {}
-                        }}
-                          className="text-[10px] px-1.5 py-1 rounded hover:bg-black/5 transition" title="حذف">🗑️</button>
-                      </div>
+                      {/* Actions — hidden in bulk mode */}
+                      {!bulkMode && (
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button onClick={() => setEditingTaskId(editingTaskId === t.id ? null : t.id)}
+                            className="text-[10px] px-1.5 py-1 rounded hover:bg-black/5 transition" title="تعديل">✏️</button>
+                          <button onClick={async () => {
+                            if (!confirm(`حذف "${t.title}"؟`)) return;
+                            try { await api.delete(`/api/tasks/${t.id}`); setTasks(prev => prev.filter(x => x.id !== t.id)); onRefresh(); } catch {}
+                          }}
+                            className="text-[10px] px-1.5 py-1 rounded hover:bg-black/5 transition" title="حذف">🗑️</button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Inline edit form */}
-                    {editingTaskId === t.id && (
+                    {editingTaskId === t.id && !bulkMode && (
                       <TaskInlineEdit task={t} onSave={async (updates) => {
                         try {
                           await api.patch(`/api/tasks/${t.id}`, updates);
