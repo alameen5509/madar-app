@@ -108,7 +108,7 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
             g.HasKey(x => x.Id);
             g.Property(x => x.Title).HasMaxLength(300).IsRequired();
             g.Property(x => x.FocusType).HasMaxLength(20);
-            g.HasOne(x => x.LifeCircle).WithMany(x => x.Goals).HasForeignKey(x => x.LifeCircleId).OnDelete(DeleteBehavior.Cascade);
+            g.HasOne(x => x.LifeCircle).WithMany(x => x.Goals).HasForeignKey(x => x.LifeCircleId).OnDelete(DeleteBehavior.SetNull);
             g.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
         });
 

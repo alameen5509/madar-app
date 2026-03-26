@@ -37,7 +37,6 @@ const NAV_ITEMS = [
   { icon: "🔑", label: "الحسابات",           href: "/accounts",    badgeKey: null, fixed: false },
   { icon: "👥", label: "المستخدمون",        href: "/users",       badgeKey: null, fixed: false },
   { icon: "◆", label: "الذكاء الاصطناعي",  href: "/ai",          badgeKey: null, fixed: false },
-  { icon: "⌚", label: "ربط الساعة",         href: "/watch-login", badgeKey: null, fixed: false },
   { icon: "📜", label: "التاريخ",            href: "/history",     badgeKey: null, fixed: false },
   { icon: "◉", label: "الإعدادات",          href: "/settings",    badgeKey: null, fixed: true },
 ];

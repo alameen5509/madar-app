@@ -358,16 +358,14 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// ═══ Auto-add FocusType column to Goals if missing ═══
+// ═══ Auto-migrate Goals table ═══
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<Madar.Infrastructure.Persistence.MadarDbContext>();
-    try
-    {
-        await db.Database.ExecuteSqlRawAsync(
-            "ALTER TABLE Goals ADD COLUMN FocusType VARCHAR(20) NULL;");
-    }
-    catch { /* column already exists */ }
+    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals ADD COLUMN FocusType VARCHAR(20) NULL;"); } catch { }
+    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals MODIFY COLUMN LifeCircleId CHAR(36) NULL;"); } catch { }
+    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals DROP FOREIGN KEY FK_Goals_LifeCircles_LifeCircleId;"); } catch { }
+    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals ADD CONSTRAINT FK_Goals_LifeCircles_LifeCircleId FOREIGN KEY (LifeCircleId) REFERENCES LifeCircles(Id) ON DELETE SET NULL;"); } catch { }
 }
 
 app.Run();

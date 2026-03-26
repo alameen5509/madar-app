@@ -518,7 +518,7 @@ namespace Madar.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
 
-                    b.Property<Guid>("LifeCircleId")
+                    b.Property<Guid?>("LifeCircleId")
                         .HasColumnType("char(36)");
 
                     b.Property<Guid>("OwnerId")
@@ -1956,8 +1956,7 @@ namespace Madar.Infrastructure.Persistence.Migrations
                     b.HasOne("Madar.Domain.Entities.Core.LifeCircle", "LifeCircle")
                         .WithMany("Goals")
                         .HasForeignKey("LifeCircleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Madar.Domain.Entities.Identity.ApplicationUser", "Owner")
                         .WithMany()

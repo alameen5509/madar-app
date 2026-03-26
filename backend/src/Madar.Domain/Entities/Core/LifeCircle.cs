@@ -28,7 +28,7 @@ public class Goal
 {
     public Guid Id { get; set; }
     public Guid OwnerId { get; set; }
-    public Guid LifeCircleId { get; set; }
+    public Guid? LifeCircleId { get; set; }
     public string Title { get; set; } = default!;
     public string? Description { get; set; }
     public GoalStatus Status { get; set; } = GoalStatus.Active;
@@ -37,6 +37,6 @@ public class Goal
     public string? FocusType { get; set; }   // "Tech" | "NonTech" | null
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public ApplicationUser Owner { get; set; } = default!;
-    public LifeCircle LifeCircle { get; set; } = default!;
+    public LifeCircle? LifeCircle { get; set; };
     public ICollection<SmartTask> LinkedTasks { get; set; } = [];
 }

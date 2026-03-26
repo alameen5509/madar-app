@@ -59,24 +59,16 @@ public class GoalsController : BaseController
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        var circleId = req.LifeCircleId;
-        if (circleId == null || circleId == Guid.Empty)
-        {
-            circleId = await _db.LifeCircles
-                .Where(c => c.OwnerId == userId && c.IsActive)
-                .OrderBy(c => c.DisplayOrder)
-                .Select(c => c.Id)
-                .FirstOrDefaultAsync(ct);
-        }
-
-        if (circleId == null || circleId == Guid.Empty)
-            return BadRequest(new { error = "لا توجد دوائر حياة." });
+        // LifeCircleId only if user explicitly sent one
+        Guid? circleId = (req.LifeCircleId.HasValue && req.LifeCircleId.Value != Guid.Empty)
+            ? req.LifeCircleId.Value
+            : null;
 
         var goal = new Goal
         {
             Id             = Guid.NewGuid(),
             OwnerId        = userId,
-            LifeCircleId   = circleId.Value,
+            LifeCircleId   = circleId,
             Title          = req.Title,
             Description    = req.Description,
             TargetDate     = req.TargetDate,
