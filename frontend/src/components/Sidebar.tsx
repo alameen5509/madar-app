@@ -34,6 +34,7 @@ const NAV_ITEMS = [
   { icon: "✦", label: "صندوق الوارد",      href: "/inbox",       badgeKey: "inbox" as const, fixed: false },
   { icon: "◑", label: "الإحصائيات",         href: "/energy",      badgeKey: null, fixed: false },
   { icon: "◇", label: "الإدارة المالية",    href: "/finance",     badgeKey: "dues" as const, fixed: false },
+  { icon: "🍽️", label: "التغذية",            href: "/nutrition",   badgeKey: null, fixed: false },
   { icon: "🔑", label: "الحسابات",           href: "/accounts",    badgeKey: null, fixed: false },
   { icon: "👥", label: "المستخدمون",        href: "/users",       badgeKey: null, fixed: false },
   { icon: "◆", label: "الذكاء الاصطناعي",  href: "/ai",          badgeKey: null, fixed: false },
