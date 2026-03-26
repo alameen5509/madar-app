@@ -2,67 +2,76 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 
-type Tab = "plan" | "meals" | "ingredients" | "shopping";
-type MealType = "breakfast" | "lunch" | "dinner" | "snack";
+type Tab = "dishes" | "ingredients" | "plan" | "shopping";
 
-interface Meal { id: string; name: string; description?: string; mealType: string; prepTime?: number; calories?: number; servings?: number; }
+interface Dish { id: string; name: string; description?: string; imageUrl?: string; suitableFor: string; frequency: string; preferredDays?: string; isDailyFavorite: boolean; isForGuests: boolean; prepTime?: number; servings?: number; }
 interface Ingredient { id: string; name: string; category: string; unit: string; currentStock: number; minStock: number; brands?: Brand[]; }
 interface Brand { id: string; brandName: string; quality: string; isPreferred: boolean; lastPrice?: number; avgPrice?: number; }
-interface MealPlan { planDate: string; breakfastName?: string; lunchName?: string; dinnerName?: string; snack1Name?: string; snack2Name?: string; breakfastMealId?: string; lunchMealId?: string; dinnerMealId?: string; }
 
-const MEAL_TYPES: { key: MealType; label: string; icon: string }[] = [
+const MEAL_TYPES = [
   { key: "breakfast", label: "فطور", icon: "🌅" },
   { key: "lunch", label: "غداء", icon: "🍲" },
   { key: "dinner", label: "عشاء", icon: "🌙" },
-  { key: "snack", label: "وجبة خفيفة", icon: "🍎" },
+  { key: "snack", label: "خفيفة", icon: "🍎" },
 ];
+const FREQ = [
+  { key: "daily", label: "يومي ⭐" },
+  { key: "weekly", label: "أسبوعي 📅" },
+  { key: "occasional", label: "متناوب 🔀" },
+  { key: "guests", label: "ضيوف 👥" },
+];
+const DAYS = ["سبت","أحد","اثنين","ثلاثاء","أربعاء","خميس","جمعة"];
+const CATEGORIES = ["خضار","فواكه","لحوم","دجاج","أسماك","ألبان","بقالة","توابل","مجمدات","مشروبات","أخرى"];
 
-const CATEGORIES = ["خضار", "فواكه", "لحوم", "دجاج", "أسماك", "ألبان", "بقالة", "توابل", "مجمدات", "مشروبات", "أخرى"];
-const PRICE_COLORS: Record<string, string> = { "مخفض": "#3D8C5A", "عادي": "#D4AF37", "غالي": "#DC2626" };
+function parseSuitable(s: string): string[] { try { return JSON.parse(s); } catch { return []; } }
 
 export default function NutritionPage() {
-  const [tab, setTab] = useState<Tab>("meals");
-  const [meals, setMeals] = useState<Meal[]>([]);
+  const [tab, setTab] = useState<Tab>("dishes");
+  const [dishes, setDishes] = useState<Dish[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [plans, setPlans] = useState<MealPlan[]>([]);
+  const [plans, setPlans] = useState<{ date: string; meals: Record<string, { id: string; name: string; image?: string }[]> }[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Forms
-  const [showNewMeal, setShowNewMeal] = useState(false);
+  // Dish form
+  const [showNew, setShowNew] = useState(false);
+  const [nd, setNd] = useState({ name: "", desc: "", img: "", suitable: ["lunch"] as string[], freq: "occasional", days: [] as number[], daily: false, guests: false, prep: "", srv: "4" });
+  // Ingredient form
   const [showNewIng, setShowNewIng] = useState(false);
-  const [mealFilter, setMealFilter] = useState<string | null>(null);
-
-  // New meal form
-  const [nm, setNm] = useState({ name: "", desc: "", type: "lunch" as string, prep: "", cal: "", srv: "4" });
-  // New ingredient form
   const [ni, setNi] = useState({ name: "", category: "بقالة", unit: "كيلو", stock: "0", min: "0" });
-  // New brand
-  const [addBrandIngId, setAddBrandIngId] = useState<string | null>(null);
+  // Brand form
+  const [addBrandId, setAddBrandId] = useState<string | null>(null);
   const [nb, setNb] = useState({ name: "", quality: "جيدة", preferred: false });
-  // Record price
-  const [recordPriceIngId, setRecordPriceIngId] = useState<string | null>(null);
+  // Price form
+  const [recordPriceId, setRecordPriceId] = useState<string | null>(null);
   const [np, setNp] = useState({ brandId: "", price: "", qty: "1", store: "" });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [m, i, p] = await Promise.all([
-        api.get("/api/nutrition/meals").then(r => r.data ?? []).catch(() => []),
+      const [d, i, p] = await Promise.all([
+        api.get("/api/nutrition/dishes").then(r => r.data ?? []).catch(() => []),
         api.get("/api/nutrition/ingredients").then(r => r.data ?? []).catch(() => []),
         api.get("/api/nutrition/meal-plans").then(r => r.data ?? []).catch(() => []),
       ]);
-      setMeals(m); setIngredients(i); setPlans(p);
+      setDishes(d); setIngredients(i); setPlans(p);
     } catch {}
     setLoading(false);
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  async function createMeal() {
-    if (!nm.name.trim()) return;
+  async function createDish() {
+    if (!nd.name.trim()) return;
     try {
-      await api.post("/api/nutrition/meals", { name: nm.name, description: nm.desc || undefined, mealType: nm.type, prepTime: parseInt(nm.prep) || undefined, calories: parseInt(nm.cal) || undefined, servings: parseInt(nm.srv) || 4 });
-      setNm({ name: "", desc: "", type: "lunch", prep: "", cal: "", srv: "4" }); setShowNewMeal(false); fetchData();
+      await api.post("/api/nutrition/dishes", {
+        name: nd.name, description: nd.desc || undefined, imageUrl: nd.img || undefined,
+        suitableFor: nd.suitable, frequency: nd.guests ? "guests" : nd.freq,
+        preferredDays: nd.days.length > 0 ? nd.days : undefined,
+        isDailyFavorite: nd.daily, isForGuests: nd.guests,
+        prepTime: parseInt(nd.prep) || undefined, servings: parseInt(nd.srv) || 4,
+      });
+      setNd({ name: "", desc: "", img: "", suitable: ["lunch"], freq: "occasional", days: [], daily: false, guests: false, prep: "", srv: "4" });
+      setShowNew(false); fetchData();
     } catch {}
   }
 
@@ -75,51 +84,46 @@ export default function NutritionPage() {
   }
 
   async function addBrand() {
-    if (!addBrandIngId || !nb.name.trim()) return;
-    try {
-      await api.post(`/api/nutrition/ingredients/${addBrandIngId}/brands`, { brandName: nb.name, quality: nb.quality, isPreferred: nb.preferred });
-      setNb({ name: "", quality: "جيدة", preferred: false }); setAddBrandIngId(null); fetchData();
-    } catch {}
+    if (!addBrandId || !nb.name.trim()) return;
+    try { await api.post(`/api/nutrition/ingredients/${addBrandId}/brands`, { brandName: nb.name, quality: nb.quality, isPreferred: nb.preferred }); setNb({ name: "", quality: "جيدة", preferred: false }); setAddBrandId(null); fetchData(); } catch {}
   }
 
   async function recordPrice() {
-    if (!recordPriceIngId || !np.price) return;
+    if (!recordPriceId || !np.price) return;
     try {
-      const res = await api.post(`/api/nutrition/ingredients/${recordPriceIngId}/prices`, { brandId: np.brandId || undefined, price: parseFloat(np.price), quantity: parseFloat(np.qty) || 1, store: np.store || undefined });
-      alert(`تم التسجيل — التصنيف: ${res.data.priceType}`);
-      setNp({ brandId: "", price: "", qty: "1", store: "" }); setRecordPriceIngId(null); fetchData();
+      const res = await api.post(`/api/nutrition/ingredients/${recordPriceId}/prices`, { brandId: np.brandId || undefined, price: parseFloat(np.price), quantity: parseFloat(np.qty) || 1, store: np.store || undefined });
+      alert(`تم — التصنيف: ${res.data.priceType}`);
+      setNp({ brandId: "", price: "", qty: "1", store: "" }); setRecordPriceId(null); fetchData();
     } catch {}
   }
 
-  async function deleteMeal(id: string) {
-    if (!confirm("حذف الوجبة؟")) return;
-    try { await api.delete(`/api/nutrition/meals/${id}`); fetchData(); } catch {}
+  async function autoGenerate() {
+    try { await api.post("/api/nutrition/meal-plans/auto-generate"); alert("تم توليد خطة الأسبوع"); fetchData(); }
+    catch { alert("أضف أطباق أولاً"); }
   }
 
-  const filteredMeals = mealFilter ? meals.filter(m => m.mealType === mealFilter) : meals;
+  // Group dishes
+  const dailyDishes = dishes.filter(d => d.isDailyFavorite);
+  const weeklyDishes = dishes.filter(d => d.frequency === "weekly" && !d.isDailyFavorite);
+  const occasionalDishes = dishes.filter(d => d.frequency === "occasional" && !d.isDailyFavorite && !d.isForGuests);
+  const guestDishes = dishes.filter(d => d.isForGuests);
   const lowStock = ingredients.filter(i => i.currentStock <= i.minStock && i.minStock > 0);
 
-  const tabs: { key: Tab; label: string; icon: string }[] = [
-    { key: "meals", label: "الوجبات", icon: "🍽️" },
-    { key: "ingredients", label: "المواد", icon: "🧺" },
-    { key: "plan", label: "خطة الأسبوع", icon: "📅" },
-    { key: "shopping", label: "التسوق", icon: "🛒" },
-  ];
+  const is = { background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" };
 
   return (
     <main className="flex-1 overflow-y-auto" dir="rtl" style={{ background: "var(--bg)" }}>
       <header className="sticky top-0 z-20 backdrop-blur border-b px-4 sm:px-6 py-3 pr-14 md:pr-6" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
         <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>🍽️ التغذية المنزلية</h2>
         <div className="flex items-center gap-3 mt-1">
-          <span className="text-xs" style={{ color: "var(--muted)" }}>{meals.length} وجبة · {ingredients.length} مادة</span>
-          {lowStock.length > 0 && <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#DC262615", color: "#DC2626" }}>⚠️ {lowStock.length} مادة ناقصة</span>}
+          <span className="text-xs" style={{ color: "var(--muted)" }}>{dishes.length} طبق · {ingredients.length} مادة</span>
+          {lowStock.length > 0 && <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#DC262615", color: "#DC2626" }}>⚠️ {lowStock.length} ناقصة</span>}
         </div>
         <div className="flex gap-1.5 mt-2">
-          {tabs.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition"
-              style={{ background: tab === t.key ? "#5E5495" : "var(--bg)", color: tab === t.key ? "#fff" : "var(--muted)", border: `1px solid ${tab === t.key ? "#5E5495" : "var(--card-border)"}` }}>
-              {t.icon} {t.label}
+          {([ ["dishes","الأطباق","🍽️"], ["ingredients","المواد","🧺"], ["plan","خطة الأسبوع","📅"], ["shopping","التسوق","🛒"] ] as [Tab,string,string][]).map(([k,l,ic]) => (
+            <button key={k} onClick={() => setTab(k)} className="px-3 py-1.5 rounded-lg text-xs font-semibold transition"
+              style={{ background: tab === k ? "#5E5495" : "var(--bg)", color: tab === k ? "#fff" : "var(--muted)", border: `1px solid ${tab === k ? "#5E5495" : "var(--card-border)"}` }}>
+              {ic} {l}
             </button>
           ))}
         </div>
@@ -128,230 +132,224 @@ export default function NutritionPage() {
       <div className="px-4 sm:px-6 py-4 space-y-4 max-w-3xl mx-auto">
         {loading && <p className="text-center py-8 animate-pulse text-sm" style={{ color: "var(--muted)" }}>جارٍ التحميل...</p>}
 
-        {/* ═══ MEALS TAB ═══ */}
-        {!loading && tab === "meals" && (
-          <>
-            <div className="flex items-center justify-between">
-              <div className="flex gap-1.5">
-                <button onClick={() => setMealFilter(null)} className="px-2.5 py-1 rounded-full text-[10px] font-semibold" style={{ background: !mealFilter ? "#5E5495" : "var(--bg)", color: !mealFilter ? "#fff" : "var(--muted)" }}>الكل</button>
-                {MEAL_TYPES.map(mt => (
-                  <button key={mt.key} onClick={() => setMealFilter(mealFilter === mt.key ? null : mt.key)}
-                    className="px-2.5 py-1 rounded-full text-[10px] font-semibold" style={{ background: mealFilter === mt.key ? "#D4AF37" : "var(--bg)", color: mealFilter === mt.key ? "#fff" : "var(--muted)" }}>
-                    {mt.icon} {mt.label}
-                  </button>
-                ))}
-              </div>
-              <button onClick={() => setShowNewMeal(true)} className="text-[10px] font-bold px-3 py-1.5 rounded-lg text-white" style={{ background: "#D4AF37" }}>+ وجبة</button>
-            </div>
+        {/* ═══ DISHES ═══ */}
+        {!loading && tab === "dishes" && (<>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold" style={{ color: "var(--text)" }}>الأطباق</span>
+            <button onClick={() => setShowNew(true)} className="text-[10px] font-bold px-3 py-1.5 rounded-lg text-white" style={{ background: "#D4AF37" }}>+ طبق جديد</button>
+          </div>
 
-            {showNewMeal && (
-              <div className="rounded-xl border p-4 space-y-2" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-                <input value={nm.name} onChange={e => setNm({...nm, name: e.target.value})} placeholder="اسم الوجبة *" className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
-                <textarea value={nm.desc} onChange={e => setNm({...nm, desc: e.target.value})} placeholder="وصف (اختياري)" rows={2} className="w-full px-3 py-2 rounded-lg border text-xs resize-none focus:outline-none" style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
-                <div className="flex gap-2">
-                  <select value={nm.type} onChange={e => setNm({...nm, type: e.target.value})} className="flex-1 px-2 py-1.5 rounded-lg border text-xs" style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }}>
-                    {MEAL_TYPES.map(mt => <option key={mt.key} value={mt.key}>{mt.icon} {mt.label}</option>)}
-                  </select>
-                  <input value={nm.prep} onChange={e => setNm({...nm, prep: e.target.value})} placeholder="وقت التحضير (دقيقة)" type="number" className="flex-1 px-2 py-1.5 rounded-lg border text-xs" style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
-                  <input value={nm.srv} onChange={e => setNm({...nm, srv: e.target.value})} placeholder="أشخاص" type="number" className="w-16 px-2 py-1.5 rounded-lg border text-xs" style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <button onClick={() => setShowNewMeal(false)} className="px-3 py-1.5 rounded-lg text-[10px]" style={{ color: "var(--muted)" }}>إلغاء</button>
-                  <button onClick={createMeal} disabled={!nm.name.trim()} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#D4AF37" }}>إضافة</button>
+          {showNew && (
+            <div className="rounded-xl border p-4 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+              <input value={nd.name} onChange={e => setNd({...nd, name: e.target.value})} placeholder="اسم الطبق *" className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={is} />
+              <textarea value={nd.desc} onChange={e => setNd({...nd, desc: e.target.value})} placeholder="وصف (اختياري)" rows={2} className="w-full px-3 py-2 rounded-lg border text-xs resize-none focus:outline-none" style={is} />
+              <input value={nd.img} onChange={e => setNd({...nd, img: e.target.value})} placeholder="رابط الصورة (اختياري)" className="w-full px-3 py-2 rounded-lg border text-xs focus:outline-none" style={is} />
+              {/* Suitable for */}
+              <div>
+                <p className="text-[10px] font-bold mb-1" style={{ color: "var(--text)" }}>مناسب لـ:</p>
+                <div className="flex gap-1.5">
+                  {MEAL_TYPES.map(mt => (
+                    <button key={mt.key} onClick={() => setNd({...nd, suitable: nd.suitable.includes(mt.key) ? nd.suitable.filter(s => s !== mt.key) : [...nd.suitable, mt.key]})}
+                      className="px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition"
+                      style={{ background: nd.suitable.includes(mt.key) ? "#D4AF37" : "var(--bg)", color: nd.suitable.includes(mt.key) ? "#fff" : "var(--muted)", border: `1px solid ${nd.suitable.includes(mt.key) ? "#D4AF37" : "var(--card-border)"}` }}>
+                      {mt.icon} {mt.label}
+                    </button>
+                  ))}
                 </div>
               </div>
-            )}
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              {filteredMeals.map(m => {
-                const mt = MEAL_TYPES.find(t => t.key === m.mealType);
-                return (
-                  <div key={m.id} className="rounded-xl border p-4" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{m.name}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: "#D4AF3715", color: "#D4AF37" }}>{mt?.icon} {mt?.label}</span>
-                          {m.prepTime && <span className="text-[9px]" style={{ color: "var(--muted)" }}>{m.prepTime} د</span>}
-                          {m.servings && <span className="text-[9px]" style={{ color: "var(--muted)" }}>{m.servings} أشخاص</span>}
-                        </div>
-                      </div>
-                      <button onClick={() => deleteMeal(m.id)} className="text-[10px] px-1.5 py-1 rounded hover:bg-black/5" style={{ color: "#DC2626" }}>🗑️</button>
-                    </div>
-                    {m.description && <p className="text-[10px] mt-2" style={{ color: "var(--muted)" }}>{m.description}</p>}
+              {/* Frequency */}
+              <div>
+                <p className="text-[10px] font-bold mb-1" style={{ color: "var(--text)" }}>التكرار:</p>
+                <div className="flex gap-1.5 flex-wrap">
+                  {FREQ.map(f => (
+                    <button key={f.key} onClick={() => setNd({...nd, freq: f.key, daily: f.key === "daily", guests: f.key === "guests" })}
+                      className="px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition"
+                      style={{ background: (nd.daily && f.key==="daily") || (nd.guests && f.key==="guests") || (!nd.daily && !nd.guests && nd.freq===f.key) ? "#5E5495" : "var(--bg)", color: (nd.daily && f.key==="daily") || (nd.guests && f.key==="guests") || (!nd.daily && !nd.guests && nd.freq===f.key) ? "#fff" : "var(--muted)", border: `1px solid var(--card-border)` }}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Days (for weekly) */}
+              {nd.freq === "weekly" && (
+                <div>
+                  <p className="text-[10px] font-bold mb-1" style={{ color: "var(--text)" }}>الأيام المحددة:</p>
+                  <div className="flex gap-1">
+                    {DAYS.map((d, i) => (
+                      <button key={i} onClick={() => setNd({...nd, days: nd.days.includes(i) ? nd.days.filter(x => x !== i) : [...nd.days, i]})}
+                        className="w-9 h-9 rounded-lg text-[9px] font-bold transition"
+                        style={{ background: nd.days.includes(i) ? "#D4AF37" : "var(--bg)", color: nd.days.includes(i) ? "#fff" : "var(--muted)", border: `1px solid var(--card-border)` }}>
+                        {d}
+                      </button>
+                    ))}
                   </div>
-                );
-              })}
-            </div>
-            {filteredMeals.length === 0 && <p className="text-center py-8 text-sm" style={{ color: "var(--muted)" }}>لا توجد وجبات — أضف وجبتك الأولى</p>}
-          </>
-        )}
-
-        {/* ═══ INGREDIENTS TAB ═══ */}
-        {!loading && tab === "ingredients" && (
-          <>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold" style={{ color: "var(--text)" }}>المواد والماركات</span>
-              <button onClick={() => setShowNewIng(true)} className="text-[10px] font-bold px-3 py-1.5 rounded-lg text-white" style={{ background: "#D4AF37" }}>+ مادة</button>
-            </div>
-
-            {showNewIng && (
-              <div className="rounded-xl border p-4 space-y-2" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-                <input value={ni.name} onChange={e => setNi({...ni, name: e.target.value})} placeholder="اسم المادة *" className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
-                <div className="flex gap-2">
-                  <select value={ni.category} onChange={e => setNi({...ni, category: e.target.value})} className="flex-1 px-2 py-1.5 rounded-lg border text-xs" style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }}>
-                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                  <select value={ni.unit} onChange={e => setNi({...ni, unit: e.target.value})} className="px-2 py-1.5 rounded-lg border text-xs" style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }}>
-                    {["كيلو","جرام","لتر","مل","حبة","علبة","كيس"].map(u => <option key={u} value={u}>{u}</option>)}
-                  </select>
                 </div>
-                <div className="flex gap-2">
-                  <input value={ni.stock} onChange={e => setNi({...ni, stock: e.target.value})} placeholder="المخزون الحالي" type="number" className="flex-1 px-2 py-1.5 rounded-lg border text-xs" style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
-                  <input value={ni.min} onChange={e => setNi({...ni, min: e.target.value})} placeholder="الحد الأدنى" type="number" className="flex-1 px-2 py-1.5 rounded-lg border text-xs" style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <button onClick={() => setShowNewIng(false)} className="px-3 py-1.5 rounded-lg text-[10px]" style={{ color: "var(--muted)" }}>إلغاء</button>
-                  <button onClick={createIngredient} disabled={!ni.name.trim()} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#D4AF37" }}>إضافة</button>
-                </div>
+              )}
+              <div className="flex gap-2">
+                <input value={nd.prep} onChange={e => setNd({...nd, prep: e.target.value})} placeholder="وقت التحضير (دقيقة)" type="number" className="flex-1 px-2 py-1.5 rounded-lg border text-xs" style={is} />
+                <input value={nd.srv} onChange={e => setNd({...nd, srv: e.target.value})} placeholder="أشخاص" type="number" className="w-20 px-2 py-1.5 rounded-lg border text-xs" style={is} />
               </div>
-            )}
-
-            {/* Low stock alert */}
-            {lowStock.length > 0 && (
-              <div className="rounded-xl border p-3" style={{ borderColor: "#DC262630", background: "#DC262606" }}>
-                <p className="text-[10px] font-bold mb-1" style={{ color: "#DC2626" }}>⚠️ مواد ناقصة:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {lowStock.map(i => <span key={i.id} className="text-[9px] px-2 py-0.5 rounded-full" style={{ background: "#DC262615", color: "#DC2626" }}>{i.name} ({i.currentStock}/{i.minStock} {i.unit})</span>)}
-                </div>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setShowNew(false)} className="px-3 py-1.5 rounded-lg text-[10px]" style={{ color: "var(--muted)" }}>إلغاء</button>
+                <button onClick={createDish} disabled={!nd.name.trim()} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#D4AF37" }}>إضافة</button>
               </div>
-            )}
+            </div>
+          )}
 
-            <div className="space-y-2">
-              {ingredients.map(ing => {
-                const stockPct = ing.minStock > 0 ? Math.min(100, (ing.currentStock / ing.minStock) * 100) : 100;
-                const stockColor = stockPct < 30 ? "#DC2626" : stockPct < 70 ? "#F59E0B" : "#3D8C5A";
-                return (
-                  <div key={ing.id} className="rounded-xl border p-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm" style={{ color: "var(--text)" }}>{ing.name}</span>
-                          <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: "var(--bg)", color: "var(--muted)" }}>{ing.category}</span>
+          {/* Dish sections */}
+          {[{ title: "⭐ يومية مفضلة", items: dailyDishes }, { title: "📅 أسبوعية", items: weeklyDishes }, { title: "🔀 متناوبة", items: occasionalDishes }, { title: "👥 للضيوف", items: guestDishes }]
+            .filter(s => s.items.length > 0).map(section => (
+            <div key={section.title}>
+              <p className="text-xs font-bold mb-2" style={{ color: "var(--text)" }}>{section.title}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {section.items.map(d => {
+                  const suitable = parseSuitable(d.suitableFor);
+                  return (
+                    <div key={d.id} className="rounded-xl border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+                      {d.imageUrl && <img src={d.imageUrl} alt={d.name} className="w-full h-32 object-cover" />}
+                      <div className="p-3">
+                        <div className="flex items-start justify-between">
+                          <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{d.name}</p>
+                          <button onClick={async () => { if (confirm("حذف؟")) { try { await api.delete(`/api/nutrition/dishes/${d.id}`); fetchData(); } catch {} } }}
+                            className="text-[10px] px-1 rounded" style={{ color: "#DC2626" }}>🗑️</button>
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--card-border)" }}>
-                            <div className="h-full rounded-full" style={{ width: `${stockPct}%`, background: stockColor }} />
-                          </div>
-                          <span className="text-[9px] font-bold" style={{ color: stockColor }}>{ing.currentStock} {ing.unit}</span>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          {suitable.map(s => { const mt = MEAL_TYPES.find(m => m.key === s); return mt ? <span key={s} className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ background: "#D4AF3715", color: "#D4AF37" }}>{mt.icon} {mt.label}</span> : null; })}
+                          {d.prepTime && <span className="text-[8px]" style={{ color: "var(--muted)" }}>{d.prepTime}د</span>}
+                          {d.servings && <span className="text-[8px]" style={{ color: "var(--muted)" }}>{d.servings} أشخاص</span>}
                         </div>
-                      </div>
-                      <div className="flex gap-1">
-                        <button onClick={() => setAddBrandIngId(addBrandIngId === ing.id ? null : ing.id)} className="text-[9px] px-2 py-1 rounded-lg" style={{ background: "#5E549515", color: "#5E5495" }}>+ ماركة</button>
-                        <button onClick={() => setRecordPriceIngId(recordPriceIngId === ing.id ? null : ing.id)} className="text-[9px] px-2 py-1 rounded-lg" style={{ background: "#D4AF3715", color: "#D4AF37" }}>💰 سعر</button>
+                        {d.description && <p className="text-[10px] mt-1" style={{ color: "var(--muted)" }}>{d.description}</p>}
                       </div>
                     </div>
-
-                    {/* Brands */}
-                    {ing.brands && ing.brands.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        {ing.brands.map(b => (
-                          <div key={b.id} className="flex items-center gap-2 text-[10px] px-2 py-1 rounded-lg" style={{ background: "var(--bg)" }}>
-                            {b.isPreferred && <span style={{ color: "#D4AF37" }}>⭐</span>}
-                            <span style={{ color: "var(--text)" }}>{b.brandName}</span>
-                            <span style={{ color: "var(--muted)" }}>({b.quality})</span>
-                            {b.lastPrice != null && <span className="font-bold" style={{ color: PRICE_COLORS["عادي"] }}>{b.lastPrice} ر.س</span>}
-                            {b.avgPrice != null && <span style={{ color: "var(--muted)" }}>متوسط: {Number(b.avgPrice).toFixed(1)}</span>}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Add brand form */}
-                    {addBrandIngId === ing.id && (
-                      <div className="mt-2 p-2 rounded-lg space-y-1.5" style={{ background: "var(--bg)" }}>
-                        <input value={nb.name} onChange={e => setNb({...nb, name: e.target.value})} placeholder="اسم الماركة" className="w-full px-2 py-1.5 rounded-lg border text-[10px]" style={{ borderColor: "var(--card-border)", color: "var(--text)", background: "var(--card)" }} />
-                        <div className="flex gap-2">
-                          <select value={nb.quality} onChange={e => setNb({...nb, quality: e.target.value})} className="flex-1 px-2 py-1 rounded-lg border text-[10px]" style={{ borderColor: "var(--card-border)", color: "var(--text)", background: "var(--card)" }}>
-                            <option value="ممتازة">ممتازة</option><option value="جيدة">جيدة</option><option value="مقبولة">مقبولة</option>
-                          </select>
-                          <label className="flex items-center gap-1 text-[10px]" style={{ color: "var(--text)" }}>
-                            <input type="checkbox" checked={nb.preferred} onChange={e => setNb({...nb, preferred: e.target.checked})} /> مفضلة
-                          </label>
-                          <button onClick={addBrand} disabled={!nb.name.trim()} className="px-3 py-1 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>إضافة</button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Record price form */}
-                    {recordPriceIngId === ing.id && (
-                      <div className="mt-2 p-2 rounded-lg space-y-1.5" style={{ background: "#D4AF3708" }}>
-                        <div className="flex gap-2">
-                          <select value={np.brandId} onChange={e => setNp({...np, brandId: e.target.value})} className="flex-1 px-2 py-1.5 rounded-lg border text-[10px]" style={{ borderColor: "var(--card-border)", color: "var(--text)", background: "var(--card)" }}>
-                            <option value="">اختر الماركة</option>
-                            {(ing.brands ?? []).map(b => <option key={b.id} value={b.id}>{b.brandName}</option>)}
-                          </select>
-                          <input value={np.price} onChange={e => setNp({...np, price: e.target.value})} placeholder="السعر" type="number" className="w-20 px-2 py-1.5 rounded-lg border text-[10px]" style={{ borderColor: "var(--card-border)", color: "var(--text)", background: "var(--card)" }} />
-                        </div>
-                        <div className="flex gap-2">
-                          <input value={np.qty} onChange={e => setNp({...np, qty: e.target.value})} placeholder="الكمية" type="number" className="flex-1 px-2 py-1.5 rounded-lg border text-[10px]" style={{ borderColor: "var(--card-border)", color: "var(--text)", background: "var(--card)" }} />
-                          <input value={np.store} onChange={e => setNp({...np, store: e.target.value})} placeholder="المتجر" className="flex-1 px-2 py-1.5 rounded-lg border text-[10px]" style={{ borderColor: "var(--card-border)", color: "var(--text)", background: "var(--card)" }} />
-                          <button onClick={recordPrice} disabled={!np.price} className="px-3 py-1 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#D4AF37" }}>تسجيل</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-            {ingredients.length === 0 && <p className="text-center py-8 text-sm" style={{ color: "var(--muted)" }}>لا توجد مواد — أضف مادتك الأولى</p>}
-          </>
-        )}
+          ))}
+          {dishes.length === 0 && <p className="text-center py-8 text-sm" style={{ color: "var(--muted)" }}>لا توجد أطباق — أضف طبقك الأول</p>}
+        </>)}
 
-        {/* ═══ MEAL PLAN TAB ═══ */}
-        {!loading && tab === "plan" && (
-          <>
-            <p className="text-xs font-bold" style={{ color: "var(--text)" }}>خطة الأسبوع</p>
-            {plans.length > 0 ? (
-              <div className="space-y-2">
-                {plans.map(p => (
-                  <div key={p.planDate} className="rounded-xl border p-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-                    <p className="text-xs font-bold mb-2" style={{ color: "var(--text)" }}>{new Date(p.planDate).toLocaleDateString("ar-SA", { weekday: "long", month: "short", day: "numeric" })}</p>
-                    <div className="grid grid-cols-3 gap-2 text-[10px]">
-                      <div className="rounded-lg p-2 text-center" style={{ background: "var(--bg)" }}>
-                        <span style={{ color: "var(--muted)" }}>🌅 فطور</span>
-                        <p className="font-bold mt-0.5" style={{ color: p.breakfastName ? "var(--text)" : "var(--muted)" }}>{p.breakfastName ?? "—"}</p>
-                      </div>
-                      <div className="rounded-lg p-2 text-center" style={{ background: "var(--bg)" }}>
-                        <span style={{ color: "var(--muted)" }}>🍲 غداء</span>
-                        <p className="font-bold mt-0.5" style={{ color: p.lunchName ? "var(--text)" : "var(--muted)" }}>{p.lunchName ?? "—"}</p>
-                      </div>
-                      <div className="rounded-lg p-2 text-center" style={{ background: "var(--bg)" }}>
-                        <span style={{ color: "var(--muted)" }}>🌙 عشاء</span>
-                        <p className="font-bold mt-0.5" style={{ color: p.dinnerName ? "var(--text)" : "var(--muted)" }}>{p.dinnerName ?? "—"}</p>
+        {/* ═══ INGREDIENTS ═══ */}
+        {!loading && tab === "ingredients" && (<>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold" style={{ color: "var(--text)" }}>المواد والماركات</span>
+            <button onClick={() => setShowNewIng(true)} className="text-[10px] font-bold px-3 py-1.5 rounded-lg text-white" style={{ background: "#D4AF37" }}>+ مادة</button>
+          </div>
+          {showNewIng && (
+            <div className="rounded-xl border p-4 space-y-2" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+              <input value={ni.name} onChange={e => setNi({...ni, name: e.target.value})} placeholder="اسم المادة *" className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={is} />
+              <div className="flex gap-2">
+                <select value={ni.category} onChange={e => setNi({...ni, category: e.target.value})} className="flex-1 px-2 py-1.5 rounded-lg border text-xs" style={is}>{CATEGORIES.map(c => <option key={c}>{c}</option>)}</select>
+                <select value={ni.unit} onChange={e => setNi({...ni, unit: e.target.value})} className="px-2 py-1.5 rounded-lg border text-xs" style={is}>{["كيلو","جرام","لتر","مل","حبة","علبة","كيس"].map(u => <option key={u}>{u}</option>)}</select>
+              </div>
+              <div className="flex gap-2">
+                <input value={ni.stock} onChange={e => setNi({...ni, stock: e.target.value})} placeholder="المخزون" type="number" className="flex-1 px-2 py-1.5 rounded-lg border text-xs" style={is} />
+                <input value={ni.min} onChange={e => setNi({...ni, min: e.target.value})} placeholder="الحد الأدنى" type="number" className="flex-1 px-2 py-1.5 rounded-lg border text-xs" style={is} />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setShowNewIng(false)} className="px-3 py-1.5 rounded-lg text-[10px]" style={{ color: "var(--muted)" }}>إلغاء</button>
+                <button onClick={createIngredient} disabled={!ni.name.trim()} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#D4AF37" }}>إضافة</button>
+              </div>
+            </div>
+          )}
+          {lowStock.length > 0 && (
+            <div className="rounded-xl border p-3" style={{ borderColor: "#DC262630", background: "#DC262606" }}>
+              <p className="text-[10px] font-bold mb-1" style={{ color: "#DC2626" }}>⚠️ مواد ناقصة:</p>
+              <div className="flex flex-wrap gap-1.5">{lowStock.map(i => <span key={i.id} className="text-[9px] px-2 py-0.5 rounded-full" style={{ background: "#DC262615", color: "#DC2626" }}>{i.name}</span>)}</div>
+            </div>
+          )}
+          <div className="space-y-2">
+            {ingredients.map(ing => {
+              const pct = ing.minStock > 0 ? Math.min(100, (ing.currentStock / ing.minStock) * 100) : 100;
+              const sc = pct < 30 ? "#DC2626" : pct < 70 ? "#F59E0B" : "#3D8C5A";
+              return (
+                <div key={ing.id} className="rounded-xl border p-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2"><span className="font-bold text-sm" style={{ color: "var(--text)" }}>{ing.name}</span><span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: "var(--bg)", color: "var(--muted)" }}>{ing.category}</span></div>
+                      <div className="flex items-center gap-2 mt-1"><div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--card-border)" }}><div className="h-full rounded-full" style={{ width: `${pct}%`, background: sc }} /></div><span className="text-[9px] font-bold" style={{ color: sc }}>{ing.currentStock} {ing.unit}</span></div>
+                    </div>
+                    <button onClick={() => setAddBrandId(addBrandId === ing.id ? null : ing.id)} className="text-[9px] px-2 py-1 rounded-lg" style={{ background: "#5E549515", color: "#5E5495" }}>+ ماركة</button>
+                    <button onClick={() => setRecordPriceId(recordPriceId === ing.id ? null : ing.id)} className="text-[9px] px-2 py-1 rounded-lg" style={{ background: "#D4AF3715", color: "#D4AF37" }}>💰</button>
+                  </div>
+                  {(ing.brands ?? []).length > 0 && <div className="mt-2 space-y-1">{(ing.brands??[]).map(b => (
+                    <div key={b.id} className="flex items-center gap-2 text-[10px] px-2 py-1 rounded-lg" style={{ background: "var(--bg)" }}>
+                      {b.isPreferred && <span style={{ color: "#D4AF37" }}>⭐</span>}
+                      <span style={{ color: "var(--text)" }}>{b.brandName}</span>
+                      <span style={{ color: "var(--muted)" }}>({b.quality})</span>
+                      {b.lastPrice != null && <span className="font-bold" style={{ color: "#D4AF37" }}>{b.lastPrice} ر.س</span>}
+                    </div>
+                  ))}</div>}
+                  {addBrandId === ing.id && (
+                    <div className="mt-2 p-2 rounded-lg space-y-1.5" style={{ background: "var(--bg)" }}>
+                      <input value={nb.name} onChange={e => setNb({...nb, name: e.target.value})} placeholder="اسم الماركة" className="w-full px-2 py-1.5 rounded-lg border text-[10px]" style={is} />
+                      <div className="flex gap-2">
+                        <select value={nb.quality} onChange={e => setNb({...nb, quality: e.target.value})} className="flex-1 px-2 py-1 rounded-lg border text-[10px]" style={is}><option>ممتازة</option><option>جيدة</option><option>مقبولة</option></select>
+                        <label className="flex items-center gap-1 text-[10px]" style={{ color: "var(--text)" }}><input type="checkbox" checked={nb.preferred} onChange={e => setNb({...nb, preferred: e.target.checked})} /> مفضلة</label>
+                        <button onClick={addBrand} disabled={!nb.name.trim()} className="px-3 py-1 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>+</button>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-3xl mb-2">📅</p>
-                <p className="text-sm" style={{ color: "var(--muted)" }}>لا توجد خطة لهذا الأسبوع — أضف وجبات أولاً</p>
-              </div>
-            )}
-          </>
-        )}
+                  )}
+                  {recordPriceId === ing.id && (
+                    <div className="mt-2 p-2 rounded-lg space-y-1.5" style={{ background: "#D4AF3708" }}>
+                      <div className="flex gap-2">
+                        <select value={np.brandId} onChange={e => setNp({...np, brandId: e.target.value})} className="flex-1 px-2 py-1.5 rounded-lg border text-[10px]" style={is}><option value="">الماركة</option>{(ing.brands??[]).map(b => <option key={b.id} value={b.id}>{b.brandName}</option>)}</select>
+                        <input value={np.price} onChange={e => setNp({...np, price: e.target.value})} placeholder="السعر" type="number" className="w-20 px-2 py-1.5 rounded-lg border text-[10px]" style={is} />
+                      </div>
+                      <div className="flex gap-2">
+                        <input value={np.qty} onChange={e => setNp({...np, qty: e.target.value})} placeholder="الكمية" type="number" className="flex-1 px-2 py-1.5 rounded-lg border text-[10px]" style={is} />
+                        <input value={np.store} onChange={e => setNp({...np, store: e.target.value})} placeholder="المتجر" className="flex-1 px-2 py-1.5 rounded-lg border text-[10px]" style={is} />
+                        <button onClick={recordPrice} disabled={!np.price} className="px-3 py-1 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#D4AF37" }}>تسجيل</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {ingredients.length === 0 && <p className="text-center py-8 text-sm" style={{ color: "var(--muted)" }}>لا توجد مواد</p>}
+        </>)}
 
-        {/* ═══ SHOPPING TAB ═══ */}
+        {/* ═══ PLAN ═══ */}
+        {!loading && tab === "plan" && (<>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold" style={{ color: "var(--text)" }}>خطة الأسبوع</span>
+            <button onClick={autoGenerate} className="text-[10px] font-bold px-3 py-1.5 rounded-lg text-white" style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>🤖 توليد تلقائي</button>
+          </div>
+          {plans.length > 0 ? plans.map(p => (
+            <div key={p.date} className="rounded-xl border p-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+              <p className="text-xs font-bold mb-2" style={{ color: "var(--text)" }}>{new Date(p.date + "T00:00:00").toLocaleDateString("ar-SA", { weekday: "long", month: "short", day: "numeric" })}</p>
+              <div className="grid grid-cols-3 gap-2">
+                {["breakfast","lunch","dinner"].map(mt => {
+                  const mealDishes = p.meals[mt] ?? [];
+                  const mtInfo = MEAL_TYPES.find(m => m.key === mt);
+                  return (
+                    <div key={mt} className="rounded-lg p-2" style={{ background: "var(--bg)" }}>
+                      <p className="text-[9px] text-center mb-1" style={{ color: "var(--muted)" }}>{mtInfo?.icon} {mtInfo?.label}</p>
+                      {mealDishes.length > 0 ? mealDishes.map(d => (
+                        <div key={d.id} className="text-center mb-1">
+                          {d.image && <img src={d.image} alt="" className="w-full h-12 object-cover rounded mb-0.5" />}
+                          <p className="text-[9px] font-bold" style={{ color: "var(--text)" }}>{d.name}</p>
+                        </div>
+                      )) : <p className="text-[9px] text-center" style={{ color: "var(--muted)" }}>—</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )) : (
+            <div className="text-center py-8"><p className="text-3xl mb-2">📅</p><p className="text-sm" style={{ color: "var(--muted)" }}>لا توجد خطة — أضف أطباق ثم اضغط "توليد تلقائي"</p></div>
+          )}
+        </>)}
+
+        {/* ═══ SHOPPING ═══ */}
         {!loading && tab === "shopping" && (
           <div className="text-center py-8">
             <p className="text-3xl mb-2">🛒</p>
             <p className="text-sm font-bold" style={{ color: "var(--text)" }}>قائمة التسوق</p>
-            <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>أضف وجبات وخطة أسبوعية أولاً لتوليد قائمة التسوق تلقائيًا</p>
-            <button onClick={async () => {
-              try { const { data } = await api.post("/api/nutrition/shopping/generate"); alert(`تم توليد القائمة — ${data.itemCount} مادة`); } catch { alert("أضف خطة أسبوعية أولاً"); }
-            }} className="mt-3 px-6 py-2 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>
+            <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>أضف أطباق ومقادير وخطة أسبوعية لتوليد قائمة تسوق تلقائية</p>
+            <button onClick={async () => { try { const { data } = await api.post("/api/nutrition/shopping/generate"); alert(`تم — ${data.itemCount} مادة | التكلفة المتوقعة: ${data.totalEstimatedCost} ر.س`); } catch { alert("أضف خطة أسبوعية أولاً"); } }}
+              className="mt-3 px-6 py-2 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>
               🛒 توليد قائمة التسوق
             </button>
           </div>
