@@ -19,7 +19,7 @@ public class NutritionController : ControllerBase
 
     [HttpGet("dishes")]
     public async Task<IActionResult> GetDishes(CancellationToken ct) =>
-        Ok(await Q("SELECT * FROM Dishes WHERE UserId=@uid AND IsActive=1 ORDER BY Category, Name", P("@uid", Uid), ct));
+        Ok(await Q("SELECT * FROM Dishes WHERE UserId=@uid AND IsActive=1 ORDER BY Category, Name", Ps("@uid", Uid), ct));
 
     [HttpPost("dishes")]
     public async Task<IActionResult> CreateDish([FromBody] DishReq req, CancellationToken ct)
@@ -50,15 +50,15 @@ public class NutritionController : ControllerBase
     {
         var d = await Q("SELECT * FROM Dishes WHERE Id=@id AND UserId=@uid", [P("@id",id),P("@uid",Uid)], ct);
         if (d.Count == 0) return NotFound();
-        d[0]["ingredients"] = await Q("SELECT di.*,i.Name as IngredientName,i.Category FROM DishIngredients di JOIN Ingredients i ON di.IngredientId=i.Id WHERE di.DishId=@did", P("@did",id), ct);
+        d[0]["ingredients"] = await Q("SELECT di.*,i.Name as IngredientName,i.Category FROM DishIngredients di JOIN Ingredients i ON di.IngredientId=i.Id WHERE di.DishId=@did", Ps("@did",id), ct);
         return Ok(d[0]);
     }
 
     [HttpDelete("dishes/{id}")]
     public async Task<IActionResult> DeleteDish(string id, CancellationToken ct)
     {
-        await E("DELETE FROM DishIngredients WHERE DishId=@id", P("@id",id), ct);
-        await E("DELETE FROM MealDishes WHERE DishId=@id", P("@id",id), ct);
+        await E("DELETE FROM DishIngredients WHERE DishId=@id", Ps("@id",id), ct);
+        await E("DELETE FROM MealDishes WHERE DishId=@id", Ps("@id",id), ct);
         return (await E("DELETE FROM Dishes WHERE Id=@id AND UserId=@uid", [P("@id",id),P("@uid",Uid)], ct)) > 0 ? NoContent() : NotFound();
     }
 
@@ -67,7 +67,7 @@ public class NutritionController : ControllerBase
     [HttpGet("meals")]
     public async Task<IActionResult> GetMeals(CancellationToken ct)
     {
-        var meals = await Q("SELECT * FROM Meals WHERE UserId=@uid AND IsActive=1 ORDER BY IsDailyFavorite DESC, Frequency, Name", P("@uid",Uid), ct);
+        var meals = await Q("SELECT * FROM Meals WHERE UserId=@uid AND IsActive=1 ORDER BY IsDailyFavorite DESC, Frequency, Name", Ps("@uid",Uid), ct);
         foreach (var m in meals)
             m["dishes"] = await Q("SELECT md.*,d.Name as DishName,d.ImageUrl as DishImage,d.Category FROM MealDishes md JOIN Dishes d ON md.DishId=d.Id WHERE md.MealId=@mid ORDER BY md.DisplayOrder",
                 P("@mid",m["id"]?.ToString()??""), ct);
@@ -95,7 +95,7 @@ public class NutritionController : ControllerBase
         await E("UPDATE Meals SET Name=COALESCE(@n,Name),MealTime=COALESCE(@mt,MealTime),Frequency=COALESCE(@f,Frequency),IsDailyFavorite=COALESCE(@df,IsDailyFavorite),IsForGuests=COALESCE(@fg,IsForGuests) WHERE Id=@id AND UserId=@uid",
             [P("@id",id),P("@uid",Uid),P("@n",req.Name),P("@mt",req.MealTime),P("@f",req.Frequency),P("@df",req.IsDailyFavorite),P("@fg",req.IsForGuests)], ct);
         if (req.DishIds != null) {
-            await E("DELETE FROM MealDishes WHERE MealId=@mid", P("@mid",id), ct);
+            await E("DELETE FROM MealDishes WHERE MealId=@mid", Ps("@mid",id), ct);
             for (int i = 0; i < req.DishIds.Count; i++)
                 await E("INSERT INTO MealDishes (Id,MealId,DishId,DisplayOrder) VALUES(@id,@mid,@did,@o)",
                     [P("@id",NewId()),P("@mid",id),P("@did",req.DishIds[i]),P("@o",i)], ct);
@@ -106,14 +106,14 @@ public class NutritionController : ControllerBase
     [HttpDelete("meals/{id}")]
     public async Task<IActionResult> DeleteMeal(string id, CancellationToken ct)
     {
-        await E("DELETE FROM MealDishes WHERE MealId=@id", P("@id",id), ct);
+        await E("DELETE FROM MealDishes WHERE MealId=@id", Ps("@id",id), ct);
         return (await E("DELETE FROM Meals WHERE Id=@id AND UserId=@uid", [P("@id",id),P("@uid",Uid)], ct)) > 0 ? NoContent() : NotFound();
     }
 
     [HttpPost("meals/{mealId}/dishes")]
     public async Task<IActionResult> AddDishToMeal(string mealId, [FromBody] AddDishReq req, CancellationToken ct)
     {
-        var ord = await Q("SELECT MAX(DisplayOrder) as mx FROM MealDishes WHERE MealId=@mid", P("@mid",mealId), ct);
+        var ord = await Q("SELECT MAX(DisplayOrder) as mx FROM MealDishes WHERE MealId=@mid", Ps("@mid",mealId), ct);
         var next = (ord.Count > 0 && ord[0]["mx"] != null ? Convert.ToInt32(ord[0]["mx"]) : -1) + 1;
         await E("INSERT INTO MealDishes (Id,MealId,DishId,DisplayOrder) VALUES(@id,@mid,@did,@o)",
             [P("@id",NewId()),P("@mid",mealId),P("@did",req.DishId??""),P("@o",next)], ct);
@@ -132,7 +132,7 @@ public class NutritionController : ControllerBase
     [HttpGet("ingredients")]
     public async Task<IActionResult> GetIngredients(CancellationToken ct)
     {
-        var items = await Q("SELECT * FROM Ingredients WHERE UserId=@uid ORDER BY Category, Name", P("@uid",Uid), ct);
+        var items = await Q("SELECT * FROM Ingredients WHERE UserId=@uid ORDER BY Category, Name", Ps("@uid",Uid), ct);
         foreach (var i in items)
             i["brands"] = await Q(@"SELECT ib.*,
                 (SELECT Price FROM IngredientPrices WHERE BrandId=ib.Id ORDER BY PurchaseDate DESC LIMIT 1) as LastPrice,
@@ -197,7 +197,7 @@ public class NutritionController : ControllerBase
     public async Task<IActionResult> AutoGenerate([FromQuery] string? weekStart, CancellationToken ct)
     {
         var s = weekStart != null ? DateTime.Parse(weekStart) : StartOfWeek(DateTime.UtcNow);
-        var meals = await Q("SELECT * FROM Meals WHERE UserId=@uid AND IsActive=1 AND IsForGuests=0", P("@uid",Uid), ct);
+        var meals = await Q("SELECT * FROM Meals WHERE UserId=@uid AND IsActive=1 AND IsForGuests=0", Ps("@uid",Uid), ct);
         if (meals.Count == 0) return BadRequest(new { error = "لا توجد وجبات" });
         await E("DELETE FROM MealPlans WHERE UserId=@uid AND PlanDate>=@s AND PlanDate<@e AND IsAutoGenerated=1", [P("@uid",Uid),P("@s",s),P("@e",s.AddDays(7))], ct);
 
@@ -277,7 +277,7 @@ public class NutritionController : ControllerBase
     [HttpPatch("shopping/items/{itemId}/purchase")]
     public async Task<IActionResult> Purchase(string itemId, [FromBody] PurchaseReq req, CancellationToken ct)
     {
-        var items = await Q("SELECT si.*,sl.UserId FROM ShoppingListItems si JOIN ShoppingLists sl ON si.ShoppingListId=sl.Id WHERE si.Id=@id", P("@id",itemId), ct);
+        var items = await Q("SELECT si.*,sl.UserId FROM ShoppingListItems si JOIN ShoppingLists sl ON si.ShoppingListId=sl.Id WHERE si.Id=@id", Ps("@id",itemId), ct);
         if (items.Count==0) return NotFound(); if (items[0]["userId"]?.ToString()!=Uid) return Forbid();
         var iid = items[0]["ingredientId"]?.ToString()??""; var qty = req.Quantity??Convert.ToDecimal(items[0]["toBuyQuantity"]??0);
         var cost = (req.ActualPrice??0)*qty; var pt = "عادي";
@@ -301,7 +301,7 @@ public class NutritionController : ControllerBase
     static string NewId() => Guid.NewGuid().ToString();
     static DateTime StartOfWeek(DateTime dt) { int diff = ((int)dt.DayOfWeek + 1) % 7; return dt.AddDays(-diff).Date; }
     static MySqlParameter P(string name, object? val) => new(name, val ?? DBNull.Value);
-    static List<MySqlParameter> P(string n, object? v) => [new(n, v ?? DBNull.Value)];
+    static List<MySqlParameter> Ps(string n, object? v) => [new(n, v ?? DBNull.Value)];
 
     private async Task<List<Dictionary<string, object?>>> Q(string sql, List<MySqlParameter> ps, CancellationToken ct)
     {
