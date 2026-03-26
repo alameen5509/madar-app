@@ -1,7 +1,7 @@
 namespace Madar.Domain.Enums;
 
 public enum CircleTier { Base = 0, First = 1, Second = 2, Business = 3, Third = 4, Fourth = 5, Fifth = 6 }
-public enum GoalStatus { Active, Paused, Completed, Archived, Draft, Critical }
+public enum GoalStatus { Active, Paused, Completed, Archived, Draft, Critical, Suspended }
 public enum TaskStatus { Inbox, Todo, Scheduled, InProgress, Completed, Deferred, Cancelled }
 public enum TaskType { Action, Project, Event, Habit, Reference }
 public enum TaskContext { Anywhere, Home, Office, Car, Online, Phone }

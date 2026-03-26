@@ -100,10 +100,12 @@ export interface Goal {
   id: string;
   title: string;
   description?: string;
-  status: 'Active' | 'Paused' | 'Completed' | 'Archived' | 'Draft' | 'Critical';
+  status: 'Active' | 'Paused' | 'Completed' | 'Archived' | 'Draft' | 'Critical' | 'Suspended';
   targetDate?: string;
   priorityWeight: number;
   focusType?: 'Tech' | 'NonTech' | null;
+  suspendedUntil?: string;
+  suspendReason?: string;
   progressPercent: number;
   lifeCircle?: { id: string; name: string; color: string };
 }

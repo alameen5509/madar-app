@@ -20,6 +20,17 @@ public class GoalsController : BaseController
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
+        // Auto-unsuspend expired suspensions
+        var expired = await _db.Goals
+            .Where(g => g.OwnerId == userId && g.Status == GoalStatus.Suspended
+                        && g.SuspendedUntil != null && g.SuspendedUntil <= DateTime.UtcNow)
+            .ToListAsync(ct);
+        if (expired.Count > 0)
+        {
+            foreach (var g in expired) { g.Status = GoalStatus.Active; g.SuspendedUntil = null; g.SuspendReason = null; }
+            await _db.SaveChangesAsync(ct);
+        }
+
         var goals = await _db.Goals
             .Include(g => g.LifeCircle)
             .Include(g => g.LinkedTasks)
@@ -34,6 +45,8 @@ public class GoalsController : BaseController
                 targetDate      = g.TargetDate,
                 priorityWeight  = g.PriorityWeight,
                 focusType       = g.FocusType,
+                suspendedUntil  = g.SuspendedUntil,
+                suspendReason   = g.SuspendReason,
                 progressPercent = g.LinkedTasks.Count == 0
                     ? 0
                     : (int)Math.Round(
@@ -205,6 +218,34 @@ public class GoalsController : BaseController
         return Ok(new { id = goal.Id, focusType = goal.FocusType });
     }
 
+    /// <summary>تعليق مشروع</summary>
+    [HttpPatch("{id:guid}/suspend")]
+    public async Task<IActionResult> Suspend(Guid id, [FromBody] SuspendRequest req, CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var goal = await _db.Goals.FirstOrDefaultAsync(g => g.Id == id && g.OwnerId == userId, ct);
+        if (goal is null) return NotFound();
+        goal.Status = GoalStatus.Suspended;
+        goal.SuspendedUntil = req.SuspendedUntil;
+        goal.SuspendReason = req.Reason;
+        await _db.SaveChangesAsync(ct);
+        return Ok(new { id = goal.Id, status = "Suspended", goal.SuspendedUntil, goal.SuspendReason });
+    }
+
+    /// <summary>رفع التعليق</summary>
+    [HttpPatch("{id:guid}/unsuspend")]
+    public async Task<IActionResult> Unsuspend(Guid id, CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var goal = await _db.Goals.FirstOrDefaultAsync(g => g.Id == id && g.OwnerId == userId, ct);
+        if (goal is null) return NotFound();
+        goal.Status = GoalStatus.Active;
+        goal.SuspendedUntil = null;
+        goal.SuspendReason = null;
+        await _db.SaveChangesAsync(ct);
+        return Ok(new { id = goal.Id, status = "Active" });
+    }
+
     /// <summary>حذف هدف / مشروع</summary>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteGoal(Guid id, CancellationToken ct)
@@ -270,4 +311,10 @@ public class UpdateGoalRequest
 public class SetFocusRequest
 {
     public string? FocusType { get; set; }  // "Tech" | "NonTech" | null
+}
+
+public class SuspendRequest
+{
+    public DateTime? SuspendedUntil { get; set; }
+    public string? Reason { get; set; }
 }

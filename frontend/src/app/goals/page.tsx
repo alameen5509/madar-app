@@ -58,7 +58,7 @@ function GoalCard({ goal }: { goal: Goal }) {
             <span className="text-[#7C7A8E] text-xs">📅 {formatDate(goal.targetDate)}</span>
             {goal.status !== "Active" && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
-                {{ Paused: "موقوف", Completed: "مكتمل", Archived: "مؤرشف", Draft: "مسودة", Critical: "حرجة" }[goal.status] ?? goal.status}
+                {{ Paused: "موقوف", Completed: "مكتمل", Archived: "مؤرشف", Draft: "مسودة", Critical: "حرجة", Suspended: "معلق" }[goal.status] ?? goal.status}
               </span>
             )}
           </div>

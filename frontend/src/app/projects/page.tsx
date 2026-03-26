@@ -19,10 +19,11 @@ async function setFocusApi(goalId: string, focusType: string | null): Promise<{ 
    ═══════════════════════════════════════════════════════════════════════ */
 
 const STATUSES = [
-  { key: "Draft",     label: "مسودة",  color: "#6B7280", icon: "📝" },
-  { key: "Active",    label: "قائم",   color: "#3D8C5A", icon: "🟢" },
-  { key: "Critical",  label: "حرجة",  color: "#DC2626", icon: "⚠️" },
-  { key: "Completed", label: "مكتمل", color: "#2D6B9E", icon: "✅" },
+  { key: "Draft",     label: "مسودة",    color: "#6B7280", icon: "📝" },
+  { key: "Active",    label: "قائم",     color: "#3D8C5A", icon: "🟢" },
+  { key: "Critical",  label: "حرجة",    color: "#DC2626", icon: "⚠️" },
+  { key: "Suspended", label: "معلق",    color: "#F59E0B", icon: "⏸️" },
+  { key: "Completed", label: "مكتمل",   color: "#2D6B9E", icon: "✅" },
 ] as const;
 
 const STATUS_MAP = Object.fromEntries(STATUSES.map(s => [s.key, s]));
@@ -131,6 +132,7 @@ export default function ProjectsPage() {
   const nonTechFocus = goals.find(g => g.focusType === "NonTech");
   const critical = sortedGoals(filteredGoals.filter(g => g.status === "Critical"));
   const active = sortedGoals(filteredGoals.filter(g => g.status === "Active"));
+  const suspended = filteredGoals.filter(g => g.status === "Suspended");
   const completed = filteredGoals.filter(g => g.status === "Completed");
   const drafts = filteredGoals.filter(g => g.status === "Draft" || g.status === "Archived" || g.status === "Paused");
 
@@ -256,6 +258,35 @@ export default function ProjectsPage() {
                 ? active.map(g => <ProjectCard key={g.id} goal={g} circleMap={circleMap} prefs={prefs} onTogglePin={togglePin} onClick={() => setSelected(g)} daysLeft={daysLeft(g.targetDate)} />)
                 : <EmptySection text="لا توجد مشاريع قائمة" />}
             </CollapsibleSection>
+
+            {/* معلق — مغلقة افتراضياً */}
+            {suspended.length > 0 && (
+              <CollapsibleSection icon="⏸️" label="معلق" count={suspended.length} color="#F59E0B" defaultOpen={false}>
+                {suspended.map(g => {
+                  const daysUntil = g.suspendedUntil ? Math.ceil((new Date(g.suspendedUntil).getTime() - Date.now()) / 86400000) : null;
+                  return (
+                    <div key={g.id} onClick={() => setSelected(g)} className="rounded-xl border p-3 cursor-pointer hover:shadow-sm transition opacity-70"
+                      style={{ background: "var(--card)", borderColor: "#F59E0B30" }}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">⏸️</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate" style={{ color: "var(--text)" }}>{g.title}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {g.suspendReason && <span className="text-[9px]" style={{ color: "var(--muted)" }}>{g.suspendReason}</span>}
+                            {daysUntil !== null && daysUntil > 0 && <span className="text-[9px] font-bold" style={{ color: "#F59E0B" }}>ينتهي خلال {daysUntil} يوم</span>}
+                            {daysUntil !== null && daysUntil <= 0 && <span className="text-[9px] font-bold" style={{ color: "#3D8C5A" }}>انتهى التعليق</span>}
+                          </div>
+                        </div>
+                        <button onClick={(e) => { e.stopPropagation(); api.patch(`/api/goals/${g.id}/unsuspend`).then(() => fetchData()).catch(() => {}); }}
+                          className="text-[10px] px-2 py-1 rounded-lg font-semibold" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>
+                          رفع التعليق
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </CollapsibleSection>
+            )}
 
             {/* مسودة — مغلقة افتراضياً */}
             {drafts.length > 0 && (
@@ -727,8 +758,24 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
   const progress = progressMode === "auto" ? autoProgress : manualProg;
   const status = STATUS_MAP[goal.status] ?? STATUS_MAP.Active;
 
+  const [showSuspend, setShowSuspend] = useState(false);
+  const [suspendDate, setSuspendDate] = useState("");
+  const [suspendReason, setSuspendReason] = useState("");
+
   async function handleChangeStatus(s: string) {
+    if (s === "Suspended") { setShowSuspend(true); return; }
     try { await updateGoal(goal.id, { status: s }); onRefresh(); } catch {}
+  }
+
+  async function handleSuspend() {
+    try {
+      await api.patch(`/api/goals/${goal.id}/suspend`, { suspendedUntil: suspendDate || null, reason: suspendReason || null });
+      setShowSuspend(false); onRefresh();
+    } catch {}
+  }
+
+  async function handleUnsuspend() {
+    try { await api.patch(`/api/goals/${goal.id}/unsuspend`); onRefresh(); } catch {}
   }
 
   async function handleSaveEdit() {
@@ -837,6 +884,9 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
               </div>
             </div>
             <div className="flex items-center gap-1.5">
+              {goal.status === "Suspended" && (
+                <button onClick={handleUnsuspend} className="text-xs px-2 py-1 rounded-lg font-semibold" style={{ background: "#3D8C5A20", color: "#3D8C5A" }}>▶ رفع التعليق</button>
+              )}
               <Link href={`/projects/${goal.id}/board`} className="text-xs px-2 py-1 rounded-lg font-semibold" style={{ background: "#5E549520", color: "#5E5495" }}>🎨</Link>
               <button onClick={() => setShowEdit(true)} className="text-xs px-2 py-1 rounded-lg font-semibold" style={{ background: "#2D6B9E20", color: "#2D6B9E" }}>✎</button>
               <button onClick={handleDelete} disabled={deleting} className="text-xs px-2 py-1 rounded-lg font-semibold" style={{ background: "#DC262620", color: "#DC2626" }}>{deleting ? "…" : "🗑"}</button>
@@ -1050,6 +1100,30 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
             )}
           </div>
         </div>
+
+        {/* Suspend Dialog */}
+        {showSuspend && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" dir="rtl">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowSuspend(false)} />
+            <div className="relative z-10 rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-3" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+              <h4 className="font-bold text-sm" style={{ color: "var(--text)" }}>⏸️ تعليق المشروع</h4>
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>سبب التعليق</label>
+                <input value={suspendReason} onChange={e => setSuspendReason(e.target.value)} placeholder="مثال: في انتظار موافقة..."
+                  className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none" style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text)" }}>تاريخ العودة المتوقع</label>
+                <input type="date" value={suspendDate} onChange={e => setSuspendDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none" style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setShowSuspend(false)} className="flex-1 py-2 rounded-xl text-xs font-semibold" style={{ background: "var(--bg)", color: "var(--muted)" }}>إلغاء</button>
+                <button onClick={handleSuspend} className="flex-1 py-2 rounded-xl text-xs font-bold text-white" style={{ background: "#F59E0B" }}>⏸️ تعليق</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Edit Dialog */}
         {/* Add Task Modal */}
