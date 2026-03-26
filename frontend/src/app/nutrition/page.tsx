@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 
-type Tab = "plan" | "meals" | "dishes" | "stock" | "shopping";
+type Tab = "plan" | "meals" | "dishes" | "juices" | "stock" | "shopping";
 interface Dish { id:string; name:string; description?:string; imageUrl?:string; category:string; prepTime?:number; servings?:number; ingredients?:{id:string;ingredientName:string;quantity:number;unit:string}[]; }
 interface Meal { id:string; name:string; mealTime:string; frequency:string; preferredDays?:string; isDailyFavorite:boolean; isForGuests:boolean; dishes?:{dishId:string;dishName:string;dishImage?:string;category:string}[]; }
 interface Ingredient { id:string; name:string; category:string; unit:string; currentStock:number; minStock:number; brands?:{id:string;brandName:string;quality:string;isPreferred:boolean;lastPrice?:number;avgPrice?:number}[]; }
@@ -92,11 +92,11 @@ export default function NutritionPage() {
       <header className="sticky top-0 z-20 backdrop-blur border-b px-4 sm:px-6 py-3 pr-14 md:pr-6" style={{background:"var(--card)",borderColor:"var(--card-border)"}}>
         <h2 className="font-bold text-lg" style={{color:"var(--text)"}}>🍽️ التغذية المنزلية</h2>
         <div className="flex items-center gap-3 mt-1">
-          <span className="text-xs" style={{color:"var(--muted)"}}>{dishes.length} صحن · {meals.length} وجبة · {ingredients.length} مادة</span>
+          <span className="text-xs" style={{color:"var(--muted)"}}>{dishes.filter(d=>d.category!=="عصير"&&d.category!=="مشروب").length} صحن · {dishes.filter(d=>d.category==="عصير"||d.category==="مشروب").length} عصير · {meals.length} وجبة</span>
           {lowStock.length>0&&<span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{background:"#DC262615",color:"#DC2626"}}>⚠️ {lowStock.length} ناقصة</span>}
         </div>
         <div className="flex gap-1 mt-2 overflow-x-auto pb-0.5">
-          {([["plan","خطة الأسبوع","📅"],["meals","الوجبات","🍱"],["dishes","الصحون","🍽️"],["stock","المخزون","🧺"],["shopping","التسوق","🛒"]] as [Tab,string,string][]).map(([k,l,ic])=>(
+          {([["plan","خطة الأسبوع","📅"],["meals","الوجبات","🍱"],["dishes","الصحون","🍽️"],["juices","العصيرات","🥤"],["stock","المخزون","🧺"],["shopping","التسوق","🛒"]] as [Tab,string,string][]).map(([k,l,ic])=>(
             <button key={k} onClick={()=>setTab(k)} className="px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition whitespace-nowrap flex-shrink-0"
               style={{background:tab===k?"#5E5495":"var(--bg)",color:tab===k?"#fff":"var(--muted)",border:`1px solid ${tab===k?"#5E5495":"var(--card-border)"}`}}>
               {ic} {l}
@@ -200,7 +200,7 @@ export default function NutritionPage() {
               <input value={nd.name} onChange={e=>setNd({...nd,name:e.target.value})} placeholder="اسم الصحن *" className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={is}/>
               <input value={nd.img} onChange={e=>setNd({...nd,img:e.target.value})} placeholder="رابط الصورة (اختياري)" className="w-full px-3 py-2 rounded-lg border text-xs focus:outline-none" style={is}/>
               <div className="flex gap-2">
-                <select value={nd.cat} onChange={e=>setNd({...nd,cat:e.target.value})} className="flex-1 px-2 py-1.5 rounded-lg border text-xs" style={is}>{["أساسي","جانبي","حلوى","مشروب","سلطة","شوربة"].map(c=><option key={c}>{c}</option>)}</select>
+                <select value={nd.cat} onChange={e=>setNd({...nd,cat:e.target.value})} className="flex-1 px-2 py-1.5 rounded-lg border text-xs" style={is}>{["أساسي","جانبي","حلوى","عصير","مشروب","سلطة","شوربة"].map(c=><option key={c}>{c}</option>)}</select>
                 <input value={nd.prep} onChange={e=>setNd({...nd,prep:e.target.value})} placeholder="وقت (دقيقة)" type="number" className="w-24 px-2 py-1.5 rounded-lg border text-xs" style={is}/>
                 <input value={nd.srv} onChange={e=>setNd({...nd,srv:e.target.value})} placeholder="أشخاص" type="number" className="w-16 px-2 py-1.5 rounded-lg border text-xs" style={is}/>
               </div>
@@ -237,7 +237,7 @@ export default function NutritionPage() {
             </div>
           )}
           <div className="grid gap-3 sm:grid-cols-2">
-            {dishes.map(d=>(
+            {dishes.filter(d=>d.category!=="عصير"&&d.category!=="مشروب").map(d=>(
               <div key={d.id} className="rounded-xl border overflow-hidden" style={{background:"var(--card)",borderColor:"var(--card-border)"}}>
                 {d.imageUrl&&<img src={d.imageUrl} alt={d.name} className="w-full h-32 object-cover"/>}
                 <div className="p-3">
@@ -261,7 +261,51 @@ export default function NutritionPage() {
               </div>
             ))}
           </div>
-          {dishes.length===0&&<p className="text-center py-8 text-sm" style={{color:"var(--muted)"}}>لا توجد صحون — أضف صحنك الأول</p>}
+          {dishes.filter(d=>d.category!=="عصير"&&d.category!=="مشروب").length===0&&<p className="text-center py-8 text-sm" style={{color:"var(--muted)"}}>لا توجد صحون — أضف صحنك الأول</p>}
+        </>)}
+
+        {/* ═══ JUICES ═══ */}
+        {!loading&&tab==="juices"&&(<>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold" style={{color:"var(--text)"}}>🥤 العصيرات والمشروبات</span>
+            <button onClick={()=>{setShowNewDish(true);setNd({...nd,cat:"عصير"});setNdIngs([{name:"",qty:"",unit:"جرام"}]);setTab("dishes");}} className="text-[10px] font-bold px-3 py-1.5 rounded-lg text-white" style={{background:"#2ABFBF"}}>+ عصير جديد</button>
+          </div>
+          {(()=>{
+            const juices=dishes.filter(d=>d.category==="عصير"||d.category==="مشروب");
+            return juices.length>0?(
+              <div className="grid gap-3 sm:grid-cols-2">
+                {juices.map(d=>(
+                  <div key={d.id} className="rounded-xl border overflow-hidden" style={{background:"var(--card)",borderColor:"var(--card-border)"}}>
+                    {d.imageUrl&&<img src={d.imageUrl} alt={d.name} className="w-full h-32 object-cover"/>}
+                    <div className="p-3">
+                      <div className="flex items-start justify-between">
+                        <div className="cursor-pointer" onClick={()=>loadDishIngs(d.id)}>
+                          <p className="font-bold text-sm" style={{color:"var(--text)"}}>{d.name}</p>
+                          <div className="flex gap-1.5 mt-0.5">
+                            <span className="text-[8px] px-1.5 py-0.5 rounded-full" style={{background:"#2ABFBF15",color:"#2ABFBF"}}>{d.category==="عصير"?"🥤 عصير":"☕ مشروب"}</span>
+                            {d.prepTime&&<span className="text-[8px]" style={{color:"var(--muted)"}}>{d.prepTime}د</span>}
+                            {d.servings&&<span className="text-[8px]" style={{color:"var(--muted)"}}>{d.servings} أشخاص</span>}
+                          </div>
+                        </div>
+                        <button onClick={async()=>{if(confirm("حذف؟")){try{await api.delete(`/api/nutrition/dishes/${d.id}`);fetchData();}catch{}}}} className="text-[10px]" style={{color:"#DC2626"}}>🗑️</button>
+                      </div>
+                      {d.description&&<p className="text-[10px] mt-1" style={{color:"var(--muted)"}}>{d.description}</p>}
+                      {expDish===d.id&&d.ingredients&&(
+                        <div className="mt-2 pt-2 border-t space-y-1" style={{borderColor:"var(--card-border)"}}>
+                          <p className="text-[9px] font-bold" style={{color:"#2ABFBF"}}>المقادير:</p>
+                          {d.ingredients.length>0?d.ingredients.map(i=>(<div key={i.id} className="flex gap-2 text-[10px]" style={{color:"var(--text)"}}>
+                            <span>•</span><span>{i.ingredientName}</span><span style={{color:"var(--muted)"}}>{i.quantity} {i.unit}</span></div>))
+                            :<p className="text-[9px]" style={{color:"var(--muted)"}}>لا توجد مقادير</p>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ):(
+              <div className="text-center py-8"><p className="text-3xl mb-2">🥤</p><p className="text-sm" style={{color:"var(--muted)"}}>لا توجد عصيرات — أضف عصيرك الأول</p></div>
+            );
+          })()}
         </>)}
 
         {/* ═══ STOCK ═══ */}
