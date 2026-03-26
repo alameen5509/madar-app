@@ -21,11 +21,17 @@ public class CircleGroupsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken ct)
     {
-        var groups = await Q("SELECT * FROM CircleGroups WHERE UserId=@uid ORDER BY Priority, CreatedAt",
-            [new("@uid", Uid)], ct);
+        var uid = Uid;
+        // Also try lowercase — TiDB may store GUIDs differently
+        var groups = await Q(@"SELECT * FROM CircleGroups
+            WHERE UserId=@uid OR UserId=@uidLower
+            ORDER BY Priority, CreatedAt",
+            [new("@uid", uid), new("@uidLower", uid.ToLowerInvariant())], ct);
 
-        var circles = await Q("SELECT * FROM UserCircles WHERE UserId=@uid ORDER BY Priority, CreatedAt",
-            [new("@uid", Uid)], ct);
+        var circles = await Q(@"SELECT * FROM UserCircles
+            WHERE UserId=@uid OR UserId=@uidLower
+            ORDER BY Priority, CreatedAt",
+            [new("@uid", uid), new("@uidLower", uid.ToLowerInvariant())], ct);
 
         // Nest circles inside groups
         var result = groups.Select(g => {
@@ -122,7 +128,8 @@ public class CircleGroupsController : ControllerBase
     private async Task<List<Dictionary<string, object?>>> Q(string sql, List<MySqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection();
-        await conn.OpenAsync(ct);
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync(ct);
         try {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = sql;
@@ -136,19 +143,20 @@ public class CircleGroupsController : ControllerBase
                 rows.Add(row);
             }
             return rows;
-        } finally { await conn.CloseAsync(); }
+        } finally { if (!wasOpen) await conn.CloseAsync(); }
     }
 
     private async Task<int> E(string sql, List<MySqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection();
-        await conn.OpenAsync(ct);
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync(ct);
         try {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = sql;
             foreach (var p in ps) cmd.Parameters.Add(p);
             return await cmd.ExecuteNonQueryAsync(ct);
-        } finally { await conn.CloseAsync(); }
+        } finally { if (!wasOpen) await conn.CloseAsync(); }
     }
 }
 
