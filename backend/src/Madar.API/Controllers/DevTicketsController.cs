@@ -130,8 +130,10 @@ public class DevTicketsController : ControllerBase
     // ─── AI Generation ────────────────────────────────────────────────
     private async Task<string> GenerateCommand(string userInput, string? extraInstruction, string userId, CancellationToken ct)
     {
-        var apiKey = _config["Anthropic:ApiKey"];
-        if (string.IsNullOrEmpty(apiKey) || apiKey == "YOUR_CLAUDE_API_KEY_HERE")
+        var apiKey = _config["Anthropic:ApiKey"]
+            ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
+            ?? "";
+        if (string.IsNullOrEmpty(apiKey) || apiKey.Contains("PLACEHOLDER") || apiKey.Contains("YOUR_"))
             return $"[AI غير متاح] الطلب: {userInput}";
 
         // Gather context
