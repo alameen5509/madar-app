@@ -70,7 +70,7 @@ public class NutritionController : ControllerBase
         var meals = await Q("SELECT * FROM Meals WHERE UserId=@uid AND IsActive=1 ORDER BY IsDailyFavorite DESC, Frequency, Name", Ps("@uid",Uid), ct);
         foreach (var m in meals)
             m["dishes"] = await Q("SELECT md.*,d.Name as DishName,d.ImageUrl as DishImage,d.Category FROM MealDishes md JOIN Dishes d ON md.DishId=d.Id WHERE md.MealId=@mid ORDER BY md.DisplayOrder",
-                P("@mid",m["id"]?.ToString()??""), ct);
+                Ps("@mid",m["id"]?.ToString()??""), ct);
         return Ok(meals);
     }
 
@@ -138,7 +138,7 @@ public class NutritionController : ControllerBase
                 (SELECT Price FROM IngredientPrices WHERE BrandId=ib.Id ORDER BY PurchaseDate DESC LIMIT 1) as LastPrice,
                 (SELECT AVG(Price) FROM (SELECT Price FROM IngredientPrices WHERE BrandId=ib.Id ORDER BY PurchaseDate DESC LIMIT 5) sub) as AvgPrice
                 FROM IngredientBrands ib WHERE ib.IngredientId=@iid AND ib.IsActive=1 ORDER BY ib.IsPreferred DESC",
-                P("@iid",i["id"]?.ToString()??""), ct);
+                Ps("@iid",i["id"]?.ToString()??""), ct);
         return Ok(items);
     }
 
@@ -292,7 +292,7 @@ public class NutritionController : ControllerBase
             [P("@id",NewId()),P("@iid",iid),P("@bid",req.BrandId),P("@p",req.ActualPrice??0),P("@q",qty),P("@pt",pt),P("@st",req.Store)], ct);
         await E("UPDATE Ingredients SET CurrentStock=CurrentStock+@q WHERE Id=@iid",[P("@iid",iid),P("@q",qty)], ct);
         var lid = items[0]["shoppingListId"]?.ToString()??"";
-        await E("UPDATE ShoppingLists SET TotalActualCost=(SELECT COALESCE(SUM(ActualCost),0) FROM ShoppingListItems WHERE ShoppingListId=@lid AND IsPurchased=1) WHERE Id=@lid",P("@lid",lid), ct);
+        await E("UPDATE ShoppingLists SET TotalActualCost=(SELECT COALESCE(SUM(ActualCost),0) FROM ShoppingListItems WHERE ShoppingListId=@lid AND IsPurchased=1) WHERE Id=@lid",Ps("@lid",lid), ct);
         return Ok(new { itemId, priceType = pt, actualCost = cost });
     }
 
@@ -301,7 +301,7 @@ public class NutritionController : ControllerBase
     static string NewId() => Guid.NewGuid().ToString();
     static DateTime StartOfWeek(DateTime dt) { int diff = ((int)dt.DayOfWeek + 1) % 7; return dt.AddDays(-diff).Date; }
     static MySqlParameter P(string name, object? val) => new(name, val ?? DBNull.Value);
-    static List<MySqlParameter> Ps(string n, object? v) => [new(n, v ?? DBNull.Value)];
+    static List<MySqlParameter> Ps(string n, object? v) => [P(n, v)];
 
     private async Task<List<Dictionary<string, object?>>> Q(string sql, List<MySqlParameter> ps, CancellationToken ct)
     {
