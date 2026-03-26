@@ -750,8 +750,11 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
   useEffect(() => {
     setLoadingTasks(true);
     getGoalTasks(goal.id).then(setTasks).catch(() => {}).finally(() => setLoadingTasks(false));
+    // Fetch reminders for these tasks
+    api.get("/api/reminders").then(r => setTaskReminders(new Map((r.data ?? []).map((rm: Record<string, string>) => [rm.id, rm])))).catch(() => {});
   }, [goal.id]);
 
+  const [taskReminders, setTaskReminders] = useState<Map<string, Record<string, string>>>(new Map());
   const pendingTasks = tasks.filter(t => t.status !== "Completed");
   const completedTasks = tasks.filter(t => t.status === "Completed");
   const autoProgress = tasks.length > 0 ? Math.round((completedTasks.length / tasks.length) * 100) : 0;
@@ -1057,7 +1060,7 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
                         </button>
                       )}
 
-                      {/* Title + date */}
+                      {/* Title + date + reminder */}
                       <div className="flex-1 min-w-0">
                         <p className={`text-xs font-medium truncate ${isDone ? "line-through" : ""}`} style={{ color: isDone ? "var(--muted)" : "var(--text)" }}>{t.title}</p>
                         <div className="flex items-center gap-2 mt-0.5">
@@ -1065,7 +1068,23 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
                           <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: `${pri.c}15`, color: pri.c }}>{pri.l}</span>
                           {t.dueDate && <span className="text-[9px]" style={{ color: "var(--muted)" }}>{new Date(t.dueDate).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>}
                         </div>
+                        {(() => { const rm = taskReminders.get(t.id); return rm && rm.reminderFrequency && rm.reminderFrequency !== "none" ? (
+                          <p className="text-[9px] mt-0.5" style={{ color: "#F59E0B" }}>
+                            🔔 {rm.assignedPersonName ? `👤 ${rm.assignedPersonName}` : ""} {rm.assignedPersonRelation ? `(${rm.assignedPersonRelation})` : ""} · {rm.reminderFrequency === "daily" ? "يومي" : rm.reminderFrequency === "weekly" ? "أسبوعي" : rm.reminderFrequency === "monthly" ? "شهري" : "مخصص"}
+                            {rm.nextReminderAt && ` · ${new Date(rm.nextReminderAt).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}`}
+                          </p>
+                        ) : null; })()}
                       </div>
+
+                      {/* Reminder actions */}
+                      {(() => { const rm = taskReminders.get(t.id); return rm && rm.reminderFrequency && rm.reminderFrequency !== "none" && rm.nextReminderAt && new Date(rm.nextReminderAt) <= new Date() ? (
+                        <div className="flex gap-1 flex-shrink-0">
+                          <button onClick={async (e) => { e.stopPropagation(); try { await api.post(`/api/reminders/${t.id}/done`, {}); api.get("/api/reminders").then(r => setTaskReminders(new Map((r.data ?? []).map((x: Record<string, string>) => [x.id, x])))).catch(() => {}); } catch {} }}
+                            className="text-[8px] px-1.5 py-1 rounded-lg font-bold" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>تم ✓</button>
+                          <button onClick={async (e) => { e.stopPropagation(); try { await api.post(`/api/reminders/${t.id}/snooze`, { hours: 1 }); api.get("/api/reminders").then(r => setTaskReminders(new Map((r.data ?? []).map((x: Record<string, string>) => [x.id, x])))).catch(() => {}); } catch {} }}
+                            className="text-[8px] px-1.5 py-1 rounded-lg font-bold" style={{ background: "#F59E0B15", color: "#F59E0B" }}>⏰</button>
+                        </div>
+                      ) : null; })()}
 
                       {/* Actions — hidden in bulk mode */}
                       {!bulkMode && (

@@ -121,6 +121,8 @@ interface TaskRow {
   createdAt?: string;
   goalId?: string;
   goalTitle?: string;
+  // Reminder
+  reminder?: { frequency: string; personName?: string; personRelation?: string; nextAt?: string; lastAt?: string; status?: string; logCount?: number; };
 }
 
 function toRow(t: SmartTask, circleOrderMap?: Map<string, number>): TaskRow {
@@ -2059,8 +2061,19 @@ export default function TasksPage() {
         return a.circleOrder - b.circleOrder;
       });
       setTasks(rows);
-      // Fetch due reminders
-      api.get("/api/reminders/due").then(r => setDueReminders(r.data ?? [])).catch(() => {});
+      // Fetch reminders and merge into tasks
+      api.get("/api/reminders").then(r => {
+        const reminders = (r.data ?? []) as {id:string;reminderFrequency?:string;assignedPersonName?:string;assignedPersonRelation?:string;nextReminderAt?:string;lastRemindedAt?:string;reminderStatus?:string}[];
+        const remMap = new Map(reminders.map(rm => [rm.id, rm]));
+        setTasks(prev => prev.map(t => {
+          const rm = remMap.get(t.id);
+          if (!rm) return t;
+          return { ...t, reminder: { frequency: rm.reminderFrequency ?? "", personName: rm.assignedPersonName ?? undefined, personRelation: rm.assignedPersonRelation ?? undefined, nextAt: rm.nextReminderAt ?? undefined, lastAt: rm.lastRemindedAt ?? undefined, status: rm.reminderStatus ?? "active" } };
+        }));
+        // Due reminders
+        const due = reminders.filter(rm => rm.reminderStatus === "active" && rm.nextReminderAt && new Date(rm.nextReminderAt) <= new Date());
+        setDueReminders(due.map(rm => ({ id: rm.id, title: reminders.find(r => r.id === rm.id)?.assignedPersonName ?? "", assignedPersonName: rm.assignedPersonName, assignedPersonRelation: rm.assignedPersonRelation, reminderFrequency: rm.reminderFrequency, nextReminderAt: rm.nextReminderAt })));
+      }).catch(() => {});
     }
     catch { setError("تعذّر تحميل المهام."); }
     finally { setLoading(false); }
@@ -3226,7 +3239,7 @@ export default function TasksPage() {
                         {t.done && <span className="text-white text-[10px]">✓</span>}
                       </div>
                       )}
-                      {/* اسم المهمة + المشروع */}
+                      {/* اسم المهمة + المشروع + التذكير */}
                       <div onClick={() => t.context !== "habit" ? setEditingTask(t) : undefined}
                         className="flex-1 min-w-0 cursor-pointer hover:underline">
                         <p className={`text-sm truncate ${t.done ? "line-through text-[#7C7A8E]" : "text-[#1A1830] font-medium"}`}>
@@ -3237,7 +3250,24 @@ export default function TasksPage() {
                             📁 {t.goalTitle}
                           </p>
                         )}
+                        {t.reminder && t.reminder.frequency !== "none" && (
+                          <p className="text-[9px] truncate" style={{ color: "#F59E0B" }}>
+                            🔔 {t.reminder.personName ? `👤 ${t.reminder.personName}` : ""} {t.reminder.personRelation ? `(${t.reminder.personRelation})` : ""} · {t.reminder.frequency === "daily" ? "يومي" : t.reminder.frequency === "weekly" ? "أسبوعي" : t.reminder.frequency === "monthly" ? "شهري" : "مخصص"}
+                            {t.reminder.nextAt && ` · القادم: ${new Date(t.reminder.nextAt).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}`}
+                          </p>
+                        )}
                       </div>
+                      {/* أزرار التذكير */}
+                      {t.reminder && t.reminder.frequency !== "none" && t.reminder.nextAt && new Date(t.reminder.nextAt) <= new Date() && (
+                        <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                          <button onClick={async () => {
+                            try { await api.post(`/api/reminders/${t.id}/done`, {}); fetchTasks(); } catch {}
+                          }} className="text-[8px] px-1.5 py-1 rounded-lg font-bold" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>تم ✓</button>
+                          <button onClick={async () => {
+                            try { await api.post(`/api/reminders/${t.id}/snooze`, { hours: 1 }); fetchTasks(); } catch {}
+                          }} className="text-[8px] px-1.5 py-1 rounded-lg font-bold" style={{ background: "#F59E0B15", color: "#F59E0B" }}>⏰</button>
+                        </div>
+                      )}
                       {/* المشروع المرتبط */}
                       {t.circleColor ? (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium"

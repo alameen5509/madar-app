@@ -40,11 +40,19 @@ public class RemindersController : ControllerBase
         var rows = await Q(@"SELECT t.Id, t.Title, t.Description, t.Status,
             t.ReminderFrequency, t.ReminderIntervalDays, t.NextReminderAt, t.LastRemindedAt,
             t.SnoozedUntil, t.ReminderStatus, t.AssignedPersonName, t.AssignedPersonRelation,
-            t.ReminderStartDate
+            t.ReminderStartDate,
+            (SELECT COUNT(*) FROM ReminderLogs rl WHERE rl.TaskId=t.Id) as LogCount
             FROM SmartTasks t
             WHERE t.OwnerId=@uid AND t.ReminderFrequency IS NOT NULL AND t.ReminderFrequency != 'none'
             ORDER BY t.NextReminderAt",
             Ps("@uid", Uid), ct);
+        // Add recent logs for each task
+        foreach (var r in rows)
+        {
+            var tid = r["id"]?.ToString() ?? "";
+            r["recentLogs"] = await Q("SELECT RemindedAt, Notes FROM ReminderLogs WHERE TaskId=@tid ORDER BY RemindedAt DESC LIMIT 10",
+                Ps("@tid", tid), ct);
+        }
         return Ok(rows);
     }
 
