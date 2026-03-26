@@ -25,6 +25,7 @@ export default function DevTicketsPage() {
   const [request, setRequest] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
 
   // Context
   const [context, setContext] = useState("");
@@ -75,7 +76,7 @@ export default function DevTicketsPage() {
 
   async function handleCreate() {
     if (!request.trim()) return;
-    setCreating(true);
+    setCreating(true); setError("");
     try {
       const { data } = await api.post("/api/dev-tickets", {
         userRequest: request.trim(),
@@ -84,7 +85,10 @@ export default function DevTicketsPage() {
       setTickets(prev => [data, ...prev]);
       setRequest(""); setImages([]);
       setExpandedId(data.id);
-    } catch {}
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "فشل إنشاء الطلب — تحقق من الاتصال";
+      setError(msg);
+    }
     setCreating(false);
   }
 
@@ -108,7 +112,10 @@ export default function DevTicketsPage() {
 
   async function saveContext() {
     setSavingCtx(true);
-    try { await api.put("/api/dev-tickets/context", { content: context }); setCtxSaved(true); setTimeout(() => setCtxSaved(false), 2000); } catch {}
+    try {
+      await api.put("/api/dev-tickets/context", { content: context });
+      setCtxSaved(true); setTimeout(() => setCtxSaved(false), 2000);
+    } catch { alert("فشل حفظ السياق"); }
     setSavingCtx(false);
   }
 
@@ -198,6 +205,7 @@ export default function DevTicketsPage() {
                 )}
               </div>
 
+              {error && <p className="text-xs font-semibold px-3 py-2 rounded-lg" style={{ background: "#DC262610", color: "#DC2626" }}>{error}</p>}
               <button onClick={handleCreate} disabled={creating || !request.trim()}
                 className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-40 transition hover:opacity-90"
                 style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>
