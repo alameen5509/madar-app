@@ -119,6 +119,8 @@ interface TaskRow {
   hasSubtasks: boolean;
   context: string;
   createdAt?: string;
+  goalId?: string;
+  goalTitle?: string;
 }
 
 function toRow(t: SmartTask, circleOrderMap?: Map<string, number>): TaskRow {
@@ -141,6 +143,8 @@ function toRow(t: SmartTask, circleOrderMap?: Map<string, number>): TaskRow {
     hasSubtasks: false,
     context: (t.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere",
     createdAt: t.createdAt,
+    goalId: t.goal?.id,
+    goalTitle: t.goal?.title,
   };
 }
 
@@ -956,8 +960,11 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
                       {t.isRecurring && <span className="text-[10px]">🔄</span>}
                       {t.isWork && <span className="text-[10px]">💼</span>}
                       {t.context !== "Anywhere" && t.context !== "habit" && <span className="text-[10px]">{ctxIcon(t.context)}</span>}
-                      <span className="text-sm flex-1 truncate" style={{ color: "var(--text)" }}>{t.title}</span>
-                      <span className="text-[10px]" style={{ color: "var(--muted)" }}>~30 د</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm truncate block" style={{ color: "var(--text)" }}>{t.title}</span>
+                        {t.goalTitle && <span className="text-[9px] truncate block" style={{ color: "#D4AF37" }}>📁 {t.goalTitle}</span>}
+                      </div>
+                      <span className="text-[10px] flex-shrink-0" style={{ color: "var(--muted)" }}>~30 د</span>
                     </div>
                   ))}
                 </div>
@@ -1519,7 +1526,10 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
                       {ctxIcon(t.context)} {TASK_CONTEXTS.find(c => c.key === t.context)?.label ?? t.context}
                     </span>
                   )}
-                  <span className="text-sm flex-1 truncate" style={{ color: "var(--text)" }}>{t.title}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm truncate block" style={{ color: "var(--text)" }}>{t.title}</span>
+                    {t.goalTitle && <span className="text-[9px] truncate block" style={{ color: "#D4AF37" }}>📁 {t.goalTitle}</span>}
+                  </div>
                 </div>
               ))}
             </div>
@@ -3182,11 +3192,18 @@ export default function TasksPage() {
                         {t.done && <span className="text-white text-[10px]">✓</span>}
                       </div>
                       )}
-                      {/* اسم المهمة — لفتح التفاصيل */}
-                      <p onClick={() => t.context !== "habit" ? setEditingTask(t) : undefined}
-                        className={`flex-1 text-sm cursor-pointer hover:underline ${t.done ? "line-through text-[#7C7A8E]" : "text-[#1A1830] font-medium"}`}>
-                        {t.title}
-                      </p>
+                      {/* اسم المهمة + المشروع */}
+                      <div onClick={() => t.context !== "habit" ? setEditingTask(t) : undefined}
+                        className="flex-1 min-w-0 cursor-pointer hover:underline">
+                        <p className={`text-sm truncate ${t.done ? "line-through text-[#7C7A8E]" : "text-[#1A1830] font-medium"}`}>
+                          {t.title}
+                        </p>
+                        {t.goalTitle && (
+                          <p className="text-[10px] truncate" style={{ color: "#D4AF37" }}>
+                            📁 {t.goalTitle}
+                          </p>
+                        )}
+                      </div>
                       {/* المشروع المرتبط */}
                       {t.circleColor ? (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium"
