@@ -22,7 +22,6 @@ export default function DevTicketsPage() {
   const [tab, setTab] = useState<"tickets" | "context">("tickets");
 
   // New ticket
-  const [title, setTitle] = useState("");
   const [request, setRequest] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
@@ -79,12 +78,11 @@ export default function DevTicketsPage() {
     setCreating(true);
     try {
       const { data } = await api.post("/api/dev-tickets", {
-        title: title.trim() || undefined,
         userRequest: request.trim(),
         screenshots: images.length > 0 ? images : undefined,
       });
       setTickets(prev => [data, ...prev]);
-      setTitle(""); setRequest(""); setImages([]);
+      setRequest(""); setImages([]);
       setExpandedId(data.id);
     } catch {}
     setCreating(false);
@@ -175,12 +173,8 @@ export default function DevTicketsPage() {
             {/* New ticket form */}
             <div className="rounded-2xl border p-4 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
               <p className="text-xs font-bold" style={{ color: "var(--text)" }}>طلب جديد</p>
-              <input value={title} onChange={e => setTitle(e.target.value)}
-                placeholder="عنوان مختصر (اختياري)..."
-                className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none"
-                style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
               <textarea value={request} onChange={e => setRequest(e.target.value)}
-                rows={3} placeholder="اكتب طلبك بالعربي... مثال: أضف زر تصدير PDF في صفحة التقارير"
+                rows={4} placeholder="اكتب تفاصيل طلبك بالعربي...\nمثال: أضف زر تصدير PDF في صفحة التقارير مع اختيار الفترة الزمنية"
                 className="w-full px-3 py-2 rounded-xl border text-sm resize-none focus:outline-none"
                 style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
 

@@ -40,8 +40,9 @@ public class DevTicketsController : ControllerBase
         var id = Guid.NewGuid().ToString();
         var userRequest = req.UserRequest?.Trim();
         if (string.IsNullOrEmpty(userRequest)) return BadRequest(new { error = "الطلب مطلوب" });
-        var title = req.Title?.Trim();
-        if (string.IsNullOrEmpty(title)) title = userRequest.Length > 60 ? userRequest[..60] + "..." : userRequest;
+        // Auto-generate title from first line
+        var firstLine = userRequest.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? userRequest;
+        var title = firstLine.Length > 60 ? firstLine[..60] + "..." : firstLine;
 
         var aiCommand = await GenerateCommand(userRequest, null, Uid, ct);
         var screenshots = req.Screenshots != null ? JsonSerializer.Serialize(req.Screenshots) : null;
