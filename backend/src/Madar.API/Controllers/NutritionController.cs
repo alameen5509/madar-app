@@ -350,3 +350,7 @@ public class NutritionController : ControllerBase
 public class DishReq { public string? Name{get;set;} public string? Description{get;set;} public string? ImageUrl{get;set;} public List<string>? SuitableFor{get;set;} public string? Frequency{get;set;} public List<int>? PreferredDays{get;set;} public bool? IsDailyFavorite{get;set;} public bool? IsForGuests{get;set;} public int? PrepTime{get;set;} public int? Calories{get;set;} public int? Servings{get;set;} }
 public class DishIngReq { public string? IngredientId{get;set;} public decimal? Quantity{get;set;} public string? Unit{get;set;} }
 public class MealPlanReq { public DateTime Date{get;set;} public string? MealType{get;set;} public List<string>? DishIds{get;set;} public bool? IsGuestDay{get;set;} }
+public class IngredientReq { public string? Name{get;set;} public string? Category{get;set;} public string? Unit{get;set;} public decimal? CurrentStock{get;set;} public decimal? MinStock{get;set;} }
+public class BrandReq { public string? BrandName{get;set;} public string? Quality{get;set;} public string? Notes{get;set;} public bool? IsPreferred{get;set;} }
+public class PriceReq { public string? BrandId{get;set;} public decimal? Price{get;set;} public decimal? Quantity{get;set;} public string? Unit{get;set;} public string? Store{get;set;} public string? Notes{get;set;} }
+public class PurchaseReq { public string? BrandId{get;set;} public decimal? ActualPrice{get;set;} public decimal? Quantity{get;set;} public string? Store{get;set;} }
