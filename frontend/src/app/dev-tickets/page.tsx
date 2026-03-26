@@ -37,6 +37,7 @@ export default function DevTicketsPage() {
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [retryNotes, setRetryNotes] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
+  const [showCommandId, setShowCommandId] = useState<string | null>(null);
 
   const pasteRef = useRef<HTMLDivElement>(null);
 
@@ -256,18 +257,25 @@ export default function DevTicketsPage() {
 
                       {ticket.aiCommand && (
                         <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <p className="text-[10px] font-bold" style={{ color: "#D4AF37" }}>🤖 الأمر المُولَّد:</p>
+                          <div className="flex items-center justify-between">
+                            <button onClick={() => setShowCommandId(showCommandId === ticket.id ? null : ticket.id)}
+                              className="text-[10px] font-bold flex items-center gap-1 transition hover:opacity-80"
+                              style={{ color: "#D4AF37" }}>
+                              🤖 الأمر المُولَّد
+                              <span className={`transition-transform text-[8px] ${showCommandId === ticket.id ? "rotate-180" : ""}`}>▼</span>
+                            </button>
                             <button onClick={() => copy(ticket.aiCommand!, ticket.id)}
                               className="text-[10px] px-2.5 py-1 rounded-lg font-semibold transition"
                               style={{ background: copied === ticket.id ? "#3D8C5A15" : "#D4AF3715", color: copied === ticket.id ? "#3D8C5A" : "#D4AF37" }}>
-                              {copied === ticket.id ? "✓ تم النسخ" : "📋 نسخ الأمر"}
+                              {copied === ticket.id ? "✓ تم النسخ" : "📋 نسخ"}
                             </button>
                           </div>
-                          <pre className="text-xs leading-relaxed p-3 rounded-lg overflow-x-auto whitespace-pre-wrap" dir="rtl"
-                            style={{ background: "#1A1830", color: "#E2D5B0", fontFamily: "inherit" }}>
-                            {ticket.aiCommand}
-                          </pre>
+                          {showCommandId === ticket.id && (
+                            <pre className="text-xs leading-relaxed p-3 rounded-lg overflow-x-auto whitespace-pre-wrap mt-1.5" dir="rtl"
+                              style={{ background: "#1A1830", color: "#E2D5B0", fontFamily: "inherit" }}>
+                              {ticket.aiCommand}
+                            </pre>
+                          )}
                         </div>
                       )}
 
