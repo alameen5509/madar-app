@@ -1136,7 +1136,7 @@ namespace Madar.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsShariaOrFamilyDuty")
                         .HasColumnType("tinyint(1)");
 
-                    b.Property<Guid>("LifeCircleId")
+                    b.Property<Guid?>("LifeCircleId")
                         .HasColumnType("char(36)");
 
                     b.Property<Guid>("OwnerId")
@@ -2203,8 +2203,7 @@ namespace Madar.Infrastructure.Persistence.Migrations
                     b.HasOne("Madar.Domain.Entities.Core.LifeCircle", "LifeCircle")
                         .WithMany("Tasks")
                         .HasForeignKey("LifeCircleId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Madar.Domain.Entities.Identity.ApplicationUser", "Owner")
                         .WithMany("Tasks")

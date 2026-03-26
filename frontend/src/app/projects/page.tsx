@@ -129,7 +129,6 @@ export default function ProjectsPage() {
 
   const techFocus = goals.find(g => g.focusType === "Tech");
   const nonTechFocus = goals.find(g => g.focusType === "NonTech");
-  const hasFocus = !!(techFocus || nonTechFocus);
   const critical = sortedGoals(filteredGoals.filter(g => g.status === "Critical"));
   const active = sortedGoals(filteredGoals.filter(g => g.status === "Active"));
   const completed = filteredGoals.filter(g => g.status === "Completed");
@@ -241,8 +240,6 @@ export default function ProjectsPage() {
                   onClear={() => nonTechFocus && handleSetFocus(nonTechFocus.id, null)}
                   onClick={(g) => setSelected(g)}
                 />
-                {/* ── مفكّرة الجلسة ── */}
-                {hasFocus && <FocusScratchpad />}
               </div>
             </div>
 
@@ -357,115 +354,6 @@ function FocusSlot({ label, icon, color, goal, goals, circleMap, focusType, onSe
           ))}
         </select>
       </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   FOCUS SCRATCHPAD — مفكّرة مؤقتة تُحذف عند مغادرة الصفحة
-   ═══════════════════════════════════════════════════════════════════════ */
-
-interface ScratchItem {
-  id: string;
-  text: string;
-  done: boolean;
-}
-
-function FocusScratchpad() {
-  const [items, setItems] = useState<ScratchItem[]>([]);
-  const [input, setInput] = useState("");
-  const [open, setOpen] = useState(true);
-
-  function addItem() {
-    const text = input.trim();
-    if (!text) return;
-    setItems(prev => [...prev, { id: crypto.randomUUID(), text, done: false }]);
-    setInput("");
-  }
-
-  function toggleItem(id: string) {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, done: !i.done } : i));
-  }
-
-  function removeItem(id: string) {
-    setItems(prev => prev.filter(i => i.id !== id));
-  }
-
-  const doneCount = items.filter(i => i.done).length;
-
-  return (
-    <div className="rounded-xl border overflow-hidden" style={{ borderColor: "#D4AF3730", background: "var(--card)" }}>
-      <button onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 w-full px-3 py-2.5 transition-colors"
-        style={{ background: "#D4AF3708" }}>
-        <span className={`text-[10px] transition-transform duration-200 ${open ? "rotate-180" : ""}`} style={{ color: "#D4AF37" }}>▼</span>
-        <span className="text-xs">📋</span>
-        <span className="font-bold text-xs" style={{ color: "#D4AF37" }}>مفكّرة الجلسة</span>
-        {items.length > 0 && (
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#D4AF3715", color: "#D4AF37" }}>
-            {doneCount}/{items.length}
-          </span>
-        )}
-        <div className="flex-1" />
-        <span className="text-[9px]" style={{ color: "var(--muted)" }}>تُحذف عند المغادرة</span>
-      </button>
-
-      {open && (
-        <div className="px-3 pb-3 pt-1 space-y-2">
-          {/* Input */}
-          <div className="flex gap-2">
-            <input
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") addItem(); }}
-              placeholder="أضف ملاحظة أو مهمة سريعة..."
-              className="flex-1 px-3 py-2 rounded-lg border text-xs focus:outline-none"
-              style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }}
-            />
-            <button onClick={addItem} disabled={!input.trim()}
-              className="px-3 py-2 rounded-lg text-xs font-bold text-white disabled:opacity-30 transition"
-              style={{ background: "#D4AF37" }}>
-              +
-            </button>
-          </div>
-
-          {/* Items list */}
-          {items.length > 0 && (
-            <div className="space-y-1">
-              {items.map(item => (
-                <div key={item.id}
-                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg group transition"
-                  style={{ background: item.done ? "#3D8C5A08" : "var(--bg)" }}>
-                  <button onClick={() => toggleItem(item.id)}
-                    className="w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition text-[10px]"
-                    style={{
-                      borderColor: item.done ? "#3D8C5A" : "var(--card-border)",
-                      background: item.done ? "#3D8C5A" : "transparent",
-                      color: item.done ? "#fff" : "transparent",
-                    }}>
-                    {item.done ? "✓" : ""}
-                  </button>
-                  <span className={`flex-1 text-xs ${item.done ? "line-through" : ""}`}
-                    style={{ color: item.done ? "var(--muted)" : "var(--text)" }}>
-                    {item.text}
-                  </span>
-                  <button onClick={() => removeItem(item.id)}
-                    className="text-[10px] opacity-0 group-hover:opacity-100 transition px-1"
-                    style={{ color: "#DC2626" }}>
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {items.length === 0 && (
-            <p className="text-center py-3 text-[10px]" style={{ color: "var(--muted)" }}>
-              اكتب أي ملاحظات أو مهام سريعة لهذه الجلسة
-            </p>
-          )}
-        </div>
-      )}
     </div>
   );
 }
