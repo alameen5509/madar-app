@@ -6,7 +6,7 @@ public class SmartTask
 {
     public Guid Id { get; set; }
     public Guid OwnerId { get; set; }
-    public Guid LifeCircleId { get; set; }
+    public Guid? LifeCircleId { get; set; }
     public Guid? GoalId { get; set; }
     public Guid? ParentTaskId { get; set; }
     public string Title { get; set; } = default!;
@@ -46,7 +46,7 @@ public class SmartTask
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public ApplicationUser Owner { get; set; } = default!;
     public ApplicationUser? AssignedTo { get; set; }
-    public LifeCircle LifeCircle { get; set; } = default!;
+    public LifeCircle? LifeCircle { get; set; }
     public Goal? Goal { get; set; }
     public Project? Project { get; set; }
     public Contact? Contact { get; set; }

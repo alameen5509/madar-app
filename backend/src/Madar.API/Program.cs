@@ -358,14 +358,37 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// ═══ Auto-migrate Goals table ═══
+// ═══ Auto-migrate schema ═══
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<Madar.Infrastructure.Persistence.MadarDbContext>();
+    // Goals.LifeCircleId nullable
     try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals ADD COLUMN FocusType VARCHAR(20) NULL;"); } catch { }
     try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals MODIFY COLUMN LifeCircleId CHAR(36) NULL;"); } catch { }
     try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals DROP FOREIGN KEY FK_Goals_LifeCircles_LifeCircleId;"); } catch { }
     try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals ADD CONSTRAINT FK_Goals_LifeCircles_LifeCircleId FOREIGN KEY (LifeCircleId) REFERENCES LifeCircles(Id) ON DELETE SET NULL;"); } catch { }
+    // SmartTasks.LifeCircleId nullable
+    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE SmartTasks MODIFY COLUMN LifeCircleId CHAR(36) NULL;"); } catch { }
+    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE SmartTasks DROP FOREIGN KEY FK_SmartTasks_LifeCircles_LifeCircleId;"); } catch { }
+    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE SmartTasks ADD CONSTRAINT FK_SmartTasks_LifeCircles_LifeCircleId FOREIGN KEY (LifeCircleId) REFERENCES LifeCircles(Id) ON DELETE SET NULL;"); } catch { }
+    // Migrate LifeCircles → CircleGroups (one-time: only if CircleGroups is empty)
+    try {
+        await db.Database.ExecuteSqlRawAsync(@"
+            INSERT INTO CircleGroups (Id, UserId, Name, Color, Icon, Priority, CreatedAt)
+            SELECT Id, OwnerId, Name, COALESCE(ColorHex,'#5E5495'), COALESCE(IconKey,'◉'), Tier, NOW()
+            FROM LifeCircles
+            WHERE ParentCircleId IS NULL
+            AND NOT EXISTS (SELECT 1 FROM CircleGroups LIMIT 1);");
+    } catch { }
+    try {
+        await db.Database.ExecuteSqlRawAsync(@"
+            INSERT INTO UserCircles (Id, UserId, GroupId, Name, Color, Icon, Slug, Priority, CreatedAt)
+            SELECT Id, OwnerId, ParentCircleId, Name, COALESCE(ColorHex,'#5E5495'), COALESCE(IconKey,'◉'),
+                   LOWER(REPLACE(Name,' ','-')), Tier, NOW()
+            FROM LifeCircles
+            WHERE ParentCircleId IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM UserCircles LIMIT 1);");
+    } catch { }
 }
 
 app.Run();

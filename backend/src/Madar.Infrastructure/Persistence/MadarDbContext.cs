@@ -118,7 +118,7 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
             t.Property(x => x.Title).HasMaxLength(500).IsRequired();
             t.Property(x => x.AiPriorityScore).HasPrecision(5, 2);
             t.HasOne(x => x.Owner).WithMany(x => x.Tasks).HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
-            t.HasOne(x => x.LifeCircle).WithMany(x => x.Tasks).HasForeignKey(x => x.LifeCircleId).OnDelete(DeleteBehavior.Restrict);
+            t.HasOne(x => x.LifeCircle).WithMany(x => x.Tasks).HasForeignKey(x => x.LifeCircleId).OnDelete(DeleteBehavior.SetNull);
             t.HasOne(x => x.Goal).WithMany(x => x.LinkedTasks).HasForeignKey(x => x.GoalId).OnDelete(DeleteBehavior.SetNull);
             t.HasOne(x => x.ParentTask).WithMany(x => x.SubTasks).HasForeignKey(x => x.ParentTaskId).OnDelete(DeleteBehavior.Restrict);
             t.HasMany(x => x.Tags).WithMany(x => x.Tasks).UsingEntity(j => j.ToTable("SmartTaskTags"));

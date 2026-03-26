@@ -74,52 +74,15 @@ public class TasksController : BaseController
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        // resolve life circle
-        var circleId = req.LifeCircleId;
-        if (circleId == null || circleId == Guid.Empty)
-        {
-            circleId = await _db.LifeCircles
-                .Where(c => c.OwnerId == userId && c.IsActive)
-                .OrderBy(c => c.DisplayOrder)
-                .Select(c => c.Id)
-                .FirstOrDefaultAsync(ct);
-        }
-
-        if (circleId == null || circleId == Guid.Empty)
-        {
-            // Auto-create ecosystem + "عامة" circle for the user
-            var ecosystem = await _db.Ecosystems.FirstOrDefaultAsync(e => e.OwnerId == userId, ct);
-            if (ecosystem is null)
-            {
-                ecosystem = new Ecosystem { Id = Guid.NewGuid(), Name = "شخصي", OwnerId = userId };
-                _db.Ecosystems.Add(ecosystem);
-                await _db.SaveChangesAsync(ct);
-            }
-
-            var defaultCircle = new LifeCircle
-            {
-                Id               = Guid.NewGuid(),
-                OwnerId          = userId,
-                EcosystemId      = ecosystem.Id,
-                Name             = "عامة",
-                Description      = "دائرة عامة للمهام بدون تصنيف",
-                IconKey          = "📋",
-                ColorHex         = "#5E5495",
-                Tier             = CircleTier.First,
-                DisplayOrder     = 0,
-                IsShariaPriority = false,
-                IsActive         = true,
-            };
-            _db.LifeCircles.Add(defaultCircle);
-            await _db.SaveChangesAsync(ct);
-            circleId = defaultCircle.Id;
-        }
+        // LifeCircleId only if user explicitly sent one
+        Guid? circleId = (req.LifeCircleId.HasValue && req.LifeCircleId.Value != Guid.Empty)
+            ? req.LifeCircleId.Value : null;
 
         var task = new SmartTask
         {
             Id                    = Guid.NewGuid(),
             OwnerId               = userId,
-            LifeCircleId           = circleId.Value,
+            LifeCircleId           = circleId,
             Title                  = req.Title,
             Description            = req.Description,
             UserPriority           = req.UserPriority ?? 3,
