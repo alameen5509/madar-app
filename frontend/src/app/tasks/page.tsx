@@ -1885,6 +1885,9 @@ export default function TasksPage() {
 
   /* ── Celebration ── */
   const [showCelebration, setShowCelebration] = useState(false);
+
+  // Reminders
+  const [dueReminders, setDueReminders] = useState<{id:string;title:string;assignedPersonName?:string;assignedPersonRelation?:string;reminderFrequency?:string;nextReminderAt?:string}[]>([]);
   const [showDeferMenu, setShowDeferMenu] = useState(false);
 
   /* ── Quick Ideas (💡) ── */
@@ -2056,6 +2059,8 @@ export default function TasksPage() {
         return a.circleOrder - b.circleOrder;
       });
       setTasks(rows);
+      // Fetch due reminders
+      api.get("/api/reminders/due").then(r => setDueReminders(r.data ?? [])).catch(() => {});
     }
     catch { setError("تعذّر تحميل المهام."); }
     finally { setLoading(false); }
@@ -3046,6 +3051,35 @@ export default function TasksPage() {
         )}
 
         {/* Task List */}
+        {/* ═══ Due Reminders Banner ═══ */}
+        {dueReminders.length > 0 && (
+          <div style={{ order: sectionOrder.indexOf("tasks") - 0.5 }} className="mb-3">
+            <div className="rounded-xl border-2 p-3" style={{ borderColor: "#F59E0B40", background: "#F59E0B06" }}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-sm">🔔</span>
+                <span className="text-xs font-bold" style={{ color: "#F59E0B" }}>تذكيرات مستحقة ({dueReminders.length})</span>
+              </div>
+              <div className="space-y-1.5">
+                {dueReminders.map(r => (
+                  <div key={r.id} className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+                    <span className="text-sm">🔔</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate" style={{ color: "var(--text)" }}>{r.title}</p>
+                      {r.assignedPersonName && <p className="text-[9px]" style={{ color: "#D4AF37" }}>👤 {r.assignedPersonName} {r.assignedPersonRelation ? `(${r.assignedPersonRelation})` : ""}</p>}
+                    </div>
+                    <button onClick={async () => {
+                      try { await api.post(`/api/reminders/${r.id}/done`, {}); setDueReminders(prev => prev.filter(x => x.id !== r.id)); } catch {}
+                    }} className="text-[9px] px-2 py-1 rounded-lg font-bold" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>تم ✓</button>
+                    <button onClick={async () => {
+                      try { await api.post(`/api/reminders/${r.id}/snooze`, { hours: 1 }); setDueReminders(prev => prev.filter(x => x.id !== r.id)); } catch {}
+                    }} className="text-[9px] px-2 py-1 rounded-lg font-bold" style={{ background: "#F59E0B15", color: "#F59E0B" }}>⏰ لاحقاً</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div style={{ order: sectionOrder.indexOf("tasks"), display: hiddenSections.includes("tasks") ? "none" : undefined }}>
         <section>
           <GeometricDivider label="قائمة المهام" />
