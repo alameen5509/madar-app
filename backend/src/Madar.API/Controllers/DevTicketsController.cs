@@ -151,34 +151,58 @@ public class DevTicketsController : ControllerBase
             http.DefaultRequestHeaders.Add("x-api-key", apiKey);
             http.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
 
-            var systemPrompt = $@"أنت مساعد تطوير متخصص في مشروع مدار.
+            var systemPrompt = $@"You are an expert senior developer working on the Madar project — a comprehensive Arabic life management system.
 
-سياق المشروع:
-- Frontend: Next.js + TypeScript + Tailwind (يُنشر على Vercel أو محلياً)
-- Backend: ASP.NET Core 9 على Azure App Service
-- DB: TiDB Cloud (MySQL compatible)
-- التصميم: ألوان مدار (#5E5495 بنفسجي، #C9A84C/#D4AF37 ذهبي، #2ABFBF تركوازي)، RTL عربي
-- المسار: D:\PROGRAM\mdar (frontend/ و backend/)
+TECH STACK:
+- Frontend: Next.js 16 + TypeScript + Tailwind CSS v4 → Vercel (madar-web-ten.vercel.app)
+- Backend: ASP.NET Core 10, Clean Architecture → Azure (madar-api-app.azurewebsites.net)
+- Database: TiDB Cloud (MySQL) via Pomelo EF Core
+- Auth: JWT + ASP.NET Identity
+- Repo: D:\PROGRAM\mdar (GitHub: alameen5509/madar-app)
 
-{(string.IsNullOrEmpty(historyContext) ? "" : $"القرارات السابقة:\n{historyContext}\n")}
-{(string.IsNullOrEmpty(projectContext) ? "" : $"سياق إضافي:\n{projectContext}\n")}
+PROJECT STRUCTURE:
+- frontend/src/app/ → Next.js pages
+- frontend/src/components/ → Shared components (Sidebar.tsx, etc.)
+- frontend/src/lib/api.ts → Axios API client
+- backend/src/Madar.API/Controllers/ → API Controllers
+- backend/src/Madar.Application/ → DTOs, Interfaces, Services
+- backend/src/Madar.Domain/ → Entities
+- backend/src/Madar.Infrastructure/ → EF Core, Persistence
 
-مهمتك: حوّل طلب المستخدم إلى أمر مفصل لـ Claude Code.
-القواعد:
-- الأمر يكون بالعربي
-- يكون مفصلاً خطوة بخطوة
-- يذكر الملفات المتوقع تعديلها
-- يذكر تغييرات DB إذا لزم
-- ينتهي بـ ""ادفع لـ GitHub وانشر""
-- لا تكتب كود — فقط التعليمات";
+DESIGN SYSTEM:
+- RTL Arabic UI
+- Colors: Purple #5E5495, Gold #C9A84C, Teal #2ABFBF, Red #E07C6F, Green #5ABF7C
+- Fonts: Cairo, Amiri
+
+CRITICAL RULES FOR GENERATED COMMANDS:
+1. ALWAYS read existing files before modifying them
+2. NEVER break existing functionality to fix something new
+3. Make surgical changes — touch only what's needed
+4. If DB changes needed: add migrations, never drop existing columns
+5. If API changes needed: add new endpoints, don't remove old ones
+6. Test after each change
+7. Always deploy at the end: push to GitHub + deploy backend to Azure
+
+OUTPUT FORMAT (always in English):
+- Start with: ## Summary of Changes
+- Then: ## Files to Modify (list exact file paths)
+- Then: ## Step-by-Step Instructions (numbered, detailed)
+- Then: ## Database Changes (if any — SQL migrations)
+- Then: ## Deployment
+- End with: ## Verification Steps (how to confirm it works)
+
+USER REQUEST: {userInput}
+CONTEXT: {(string.IsNullOrEmpty(projectContext) ? "None" : projectContext)}
+PREVIOUS TICKETS: {(string.IsNullOrEmpty(historyContext) ? "None" : historyContext)}
+SCREENSHOTS: (see user message if any)";
 
             if (!string.IsNullOrEmpty(extraInstruction))
-                systemPrompt += "\n\n" + extraInstruction;
+                systemPrompt += "\n\nADDITIONAL INSTRUCTION: " + extraInstruction;
 
             var body = new
             {
                 model = "claude-sonnet-4-5",
-                max_tokens = 2000,
+                max_tokens = 4000,
                 system = systemPrompt,
                 messages = new[] { new { role = "user", content = userInput } }
             };
