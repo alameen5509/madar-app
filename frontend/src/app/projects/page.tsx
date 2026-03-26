@@ -675,6 +675,7 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [showEdit, setShowEdit] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [nt, setNt] = useState({ title: "", desc: "", priority: 3, dueDate: "", context: "Anywhere", isUrgent: false, isWork: false });
   const [editTitle, setEditTitle] = useState(goal.title);
   // Strip rating tag from description for editing
@@ -916,16 +917,64 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
             </div>
             {loadingTasks && <p className="text-center py-4 animate-pulse text-xs" style={{ color: "var(--muted)" }}>جارٍ التحميل...</p>}
             <div className="space-y-1.5">
-              {pendingTasks.map(t => (
-                <div key={t.id} className="flex items-center gap-2 px-3 py-2.5 rounded-lg border" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-                  <button onClick={() => toggleTaskStatus(t.id, t.status)}
-                    className="w-5 h-5 rounded-full border-2 flex-shrink-0" style={{ borderColor: TASK_STATUS[t.status]?.color ?? "#6B7280" }} />
-                  <span className="text-xs flex-1" style={{ color: "var(--text)" }}>{t.title}</span>
-                  <span className="text-[10px] font-semibold" style={{ color: TASK_STATUS[t.status]?.color }}>{TASK_STATUS[t.status]?.label}</span>
-                </div>
-              ))}
+              {[...pendingTasks, ...completedTasks].map(t => {
+                const st = TASK_STATUS[t.status] ?? TASK_STATUS.Inbox;
+                const isDone = t.status === "Completed";
+                const pri = t.userPriority <= 2 ? { l: "عالية", c: "#DC2626" } : t.userPriority <= 3 ? { l: "متوسطة", c: "#D4AF37" } : { l: "منخفضة", c: "#6B7280" };
+                return (
+                  <div key={t.id} className={`rounded-lg border px-3 py-2.5 ${isDone ? "opacity-50" : ""}`} style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+                    <div className="flex items-center gap-2">
+                      {/* Complete button */}
+                      <button onClick={() => {
+                        const next = isDone ? "Todo" : "Completed";
+                        api.patch(`/api/tasks/${t.id}/status`, { status: next }).then(() => {
+                          setTasks(prev => prev.map(x => x.id === t.id ? { ...x, status: next as SmartTask["status"] } : x));
+                        }).catch(() => {});
+                      }}
+                        className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition text-[9px]"
+                        style={{ borderColor: isDone ? "#3D8C5A" : st.color, background: isDone ? "#3D8C5A" : "transparent", color: isDone ? "#fff" : "transparent" }}>
+                        {isDone ? "✓" : ""}
+                      </button>
+
+                      {/* Title + date */}
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs font-medium truncate ${isDone ? "line-through" : ""}`} style={{ color: isDone ? "var(--muted)" : "var(--text)" }}>{t.title}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: `${st.color}15`, color: st.color }}>{st.label}</span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: `${pri.c}15`, color: pri.c }}>{pri.l}</span>
+                          {t.dueDate && <span className="text-[9px]" style={{ color: "var(--muted)" }}>{new Date(t.dueDate).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button onClick={() => setEditingTaskId(editingTaskId === t.id ? null : t.id)}
+                          className="text-[10px] px-1.5 py-1 rounded hover:bg-black/5 transition" title="تعديل">✏️</button>
+                        <button onClick={async () => {
+                          if (!confirm(`حذف "${t.title}"؟`)) return;
+                          try { await api.delete(`/api/tasks/${t.id}`); setTasks(prev => prev.filter(x => x.id !== t.id)); onRefresh(); } catch {}
+                        }}
+                          className="text-[10px] px-1.5 py-1 rounded hover:bg-black/5 transition" title="حذف">🗑️</button>
+                      </div>
+                    </div>
+
+                    {/* Inline edit form */}
+                    {editingTaskId === t.id && (
+                      <TaskInlineEdit task={t} onSave={async (updates) => {
+                        try {
+                          await api.patch(`/api/tasks/${t.id}`, updates);
+                          setTasks(prev => prev.map(x => x.id === t.id ? { ...x, ...updates, status: (updates.status as SmartTask["status"]) ?? x.status } : x));
+                          setEditingTaskId(null);
+                        } catch {}
+                      }} onCancel={() => setEditingTaskId(null)} />
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            {completedTasks.length > 0 && <p className="text-[10px] text-center mt-2" style={{ color: "var(--muted)" }}>+ {completedTasks.length} مكتملة</p>}
+            {tasks.length === 0 && !loadingTasks && (
+              <p className="text-center py-4 text-xs" style={{ color: "var(--muted)" }}>لا توجد مهام</p>
+            )}
           </div>
         </div>
 
@@ -1137,3 +1186,66 @@ function Input({ label, value, onChange, type = "text", placeholder, autoFocus }
 }
 
 const inputStyle = { borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" };
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TASK INLINE EDIT
+   ═══════════════════════════════════════════════════════════════════════ */
+
+function TaskInlineEdit({ task, onSave, onCancel }: {
+  task: SmartTask;
+  onSave: (updates: Record<string, unknown>) => void;
+  onCancel: () => void;
+}) {
+  const [title, setTitle] = useState(task.title);
+  const [desc, setDesc] = useState(task.description ?? "");
+  const [dueDate, setDueDate] = useState(task.dueDate?.split("T")[0] ?? "");
+  const [priority, setPriority] = useState(task.userPriority);
+  const [status, setStatus] = useState(task.status);
+
+  const statuses = [
+    { key: "Todo", label: "مخطط" },
+    { key: "InProgress", label: "جاري" },
+    { key: "Completed", label: "مكتمل" },
+    { key: "Deferred", label: "مؤجل" },
+  ];
+
+  return (
+    <div className="mt-2 pt-2 border-t space-y-2" style={{ borderColor: "var(--card-border)" }}>
+      <input value={title} onChange={e => setTitle(e.target.value)}
+        className="w-full px-3 py-2 rounded-lg border text-xs focus:outline-none"
+        style={inputStyle} placeholder="العنوان" />
+      <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={2}
+        className="w-full px-3 py-2 rounded-lg border text-xs resize-none focus:outline-none"
+        style={inputStyle} placeholder="الوصف (اختياري)" />
+      <div className="flex gap-2 flex-wrap">
+        <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
+          className="px-3 py-1.5 rounded-lg border text-[10px] focus:outline-none flex-1"
+          style={inputStyle} />
+        <select value={priority} onChange={e => setPriority(Number(e.target.value))}
+          className="px-2 py-1.5 rounded-lg border text-[10px] focus:outline-none"
+          style={inputStyle}>
+          <option value={1}>عالية</option>
+          <option value={3}>متوسطة</option>
+          <option value={5}>منخفضة</option>
+        </select>
+        <select value={status} onChange={e => setStatus(e.target.value as SmartTask["status"])}
+          className="px-2 py-1.5 rounded-lg border text-[10px] focus:outline-none"
+          style={inputStyle}>
+          {statuses.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+        </select>
+      </div>
+      <div className="flex gap-2 justify-end">
+        <button onClick={onCancel}
+          className="px-3 py-1.5 rounded-lg text-[10px] font-semibold"
+          style={{ background: "var(--bg)", color: "var(--muted)" }}>إلغاء</button>
+        <button onClick={() => onSave({
+          title: title.trim(), description: desc.trim() || undefined,
+          dueDate: dueDate || undefined, userPriority: priority, status,
+        })}
+          disabled={!title.trim()}
+          className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-40"
+          style={{ background: "#D4AF37" }}>حفظ</button>
+      </div>
+    </div>
+  );
+}
