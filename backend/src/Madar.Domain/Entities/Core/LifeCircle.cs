@@ -37,6 +37,6 @@ public class Goal
     public string? FocusType { get; set; }   // "Tech" | "NonTech" | null
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public ApplicationUser Owner { get; set; } = default!;
-    public LifeCircle? LifeCircle { get; set; };
+    public LifeCircle? LifeCircle { get; set; }
     public ICollection<SmartTask> LinkedTasks { get; set; } = [];
 }
