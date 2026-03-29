@@ -27,6 +27,7 @@ function loadBadgeCounts(): BadgeCounts {
 
 const NAV_ITEMS = [
   { icon: "↻", label: "العادات",            href: "/habits",      badgeKey: "habits" as const, fixed: false },
+  { icon: "🤲", label: "التوبة",             href: "/tawbah",      badgeKey: null, fixed: false },
   { icon: "◻", label: "أعمال اليوم",        href: "/tasks",       badgeKey: "tasks" as const, fixed: true },
   { icon: "◎", label: "أدوار الحياة",       href: "/circles",     badgeKey: null, fixed: false },
   { icon: "◈", label: "الأعمال",            href: "/works",       badgeKey: null, fixed: false },
