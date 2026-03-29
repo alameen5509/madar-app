@@ -114,8 +114,24 @@ export default function HistoryPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Filter records
-  const filtered = records.filter(r => {
+  // تحويل أحداث WW1 إلى سجلات خط زمني ودمجها
+  const ww1AsRecords: HistoryRecord[] = events.map(e => {
+    // استخراج السنة من التاريخ النصي
+    const ym = e.gregorianDate?.match(/(\d{4})/);
+    const year = ym ? parseInt(ym[1]) : 1914;
+    const hm = e.hijriDate?.match(/(\d{4})/);
+    const hijriYear = hm ? parseInt(hm[1]) : 1332;
+    return {
+      id: e.id, year, hijriYear, inputType: "gregorian",
+      title: e.title, description: e.description, location: e.location,
+      category: e.category, strategicImportance: e.strategicSignificance,
+      importance: "high",
+    };
+  });
+  const allRecords = [...records, ...ww1AsRecords.filter(w => !records.some(r => r.id === w.id))];
+
+  // Filter records — يشمل أحداث WW1 المحوّلة
+  const filtered = allRecords.filter(r => {
     if (filterCat && r.category !== filterCat) return false;
     if (filterImportance && r.importance !== filterImportance) return false;
     if (filterCountry && r.country !== filterCountry) return false;
@@ -129,10 +145,10 @@ export default function HistoryPage() {
   });
 
   // Unique values from data for filters
-  const allCategories = [...new Set(records.map(r => r.category).filter(Boolean))] as string[];
-  const allImportances = [...new Set(records.map(r => r.importance).filter(Boolean))] as string[];
-  const countries = [...new Set(records.map(r => r.country).filter(Boolean))] as string[];
-  const allFigures = [...new Set(records.map(r => r.figure).filter(Boolean))] as string[];
+  const allCategories = [...new Set(allRecords.map(r => r.category).filter(Boolean))] as string[];
+  const allImportances = [...new Set(allRecords.map(r => r.importance).filter(Boolean))] as string[];
+  const countries = [...new Set(allRecords.map(r => r.country).filter(Boolean))] as string[];
+  const allFigures = [...new Set(allRecords.map(r => r.figure).filter(Boolean))] as string[];
 
   return (
     <main className="flex-1 overflow-y-auto" dir="rtl" style={{ background: "var(--bg)" }}>
@@ -140,7 +156,7 @@ export default function HistoryPage() {
         <div className="flex items-center justify-between gap-2">
           <div>
             <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>📜 التاريخ والتوثيق</h2>
-            <p className="text-xs" style={{ color: "var(--muted)" }}>{records.length} حدث · {figures.length} شخصية</p>
+            <p className="text-xs" style={{ color: "var(--muted)" }}>{allRecords.length} حدث · {figures.length} شخصية</p>
           </div>
           <button onClick={() => setShowAdd(true)}
             className="px-4 py-2 rounded-xl text-xs font-bold text-white"
@@ -153,7 +169,7 @@ export default function HistoryPage() {
           {([["events","⚔️ الأحداث الكبرى"],["timeline","📜 الخط الزمني"]] as [PageTab,string][]).map(([k,l]) => (
             <button key={k} onClick={() => setPageTab(k)} className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition whitespace-nowrap"
               style={{ background: pageTab === k ? "#2C2C54" : "var(--bg)", color: pageTab === k ? "#D4AF37" : "var(--muted)", border: `1px solid ${pageTab === k ? "#2C2C54" : "var(--card-border)"}` }}>
-              {l} {k === "events" ? `(${events.length})` : `(${records.length})`}
+              {l} {k === "events" ? `(${events.length})` : `(${allRecords.length})`}
             </button>
           ))}
         </div>
