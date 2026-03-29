@@ -3204,7 +3204,7 @@ export default function TasksPage() {
                         )}
                         {t.reminder && t.reminder.frequency !== "none" && (
                           <p className="text-[9px] truncate" style={{ color: "#F59E0B" }}>
-                            🔔 {t.reminder.personName ? `👤 ${t.reminder.personName}` : ""} {t.reminder.personRelation ? `(${t.reminder.personRelation})` : ""} · {t.reminder.frequency === "daily" ? "يومي" : t.reminder.frequency === "weekly" ? "أسبوعي" : t.reminder.frequency === "monthly" ? "شهري" : "مخصص"}
+                            🔔 {t.reminder.personName ? `👤 ${t.reminder.personName}` : ""} {t.reminder.personRelation ? `(${t.reminder.personRelation})` : ""} · {({hourly:"كل ساعة",every3hours:"كل 3س",every5hours:"كل 5س",every10hours:"كل 10س",daily:"يومي",weekly:"أسبوعي",monthly:"شهري"} as Record<string,string>)[t.reminder.frequency] ?? "مخصص"}
                             {t.reminder.nextAt && ` · القادم: ${new Date(t.reminder.nextAt).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}`}
                           </p>
                         )}
@@ -3235,10 +3235,10 @@ export default function TasksPage() {
                     {setupReminderId === t.id && (
                       <div className="pr-10 pb-2 pt-1 space-y-2 border-t" style={{ borderColor: "#F59E0B20" }}>
                         <p className="text-[10px] font-bold" style={{ color: "#F59E0B" }}>🔔 إعداد تذكير</p>
-                        <div className="flex gap-1.5 flex-wrap">
-                          {[["daily","يومي"],["weekly","أسبوعي"],["monthly","شهري"],["custom","مخصص"]].map(([k,l]) => (
+                        <div className="flex gap-1 flex-wrap">
+                          {[["hourly","كل ساعة"],["every3hours","كل 3 ساعات"],["every5hours","كل 5 ساعات"],["every10hours","كل 10 ساعات"],["daily","يومي"],["weekly","أسبوعي"],["monthly","شهري"],["custom","مخصص"]].map(([k,l]) => (
                             <button key={k} onClick={() => setRmForm({...rmForm, freq: k, days: k==="daily"?"1":k==="weekly"?"7":k==="monthly"?"30":rmForm.days})}
-                              className="text-[9px] px-2 py-1 rounded-lg font-semibold transition"
+                              className="text-[8px] px-1.5 py-1 rounded-lg font-semibold transition"
                               style={{ background: rmForm.freq === k ? "#F59E0B" : "var(--bg)", color: rmForm.freq === k ? "#fff" : "var(--muted)", border: "1px solid var(--card-border)" }}>
                               {l}
                             </button>

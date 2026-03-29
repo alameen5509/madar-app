@@ -133,13 +133,17 @@ public class RemindersController : ControllerBase
 
     private static DateTime? CalculateNextReminder(string freq, int? intervalDays, DateTime? startDate)
     {
-        var baseDate = startDate ?? DateTime.UtcNow;
+        var now = DateTime.UtcNow;
         return freq switch
         {
-            "daily" => baseDate.Date.AddDays(1),
-            "weekly" => baseDate.Date.AddDays(7),
-            "monthly" => baseDate.Date.AddMonths(1),
-            "custom" => intervalDays.HasValue ? baseDate.Date.AddDays(intervalDays.Value) : baseDate.Date.AddDays(1),
+            "hourly" => now.AddHours(1),
+            "every3hours" => now.AddHours(3),
+            "every5hours" => now.AddHours(5),
+            "every10hours" => now.AddHours(10),
+            "daily" => now.AddDays(1),
+            "weekly" => now.AddDays(7),
+            "monthly" => now.AddMonths(1),
+            "custom" => intervalDays.HasValue ? now.AddDays(intervalDays.Value) : now.AddDays(1),
             _ => null
         };
     }
