@@ -77,12 +77,19 @@ export default function WarRoomPage() {
 
   useEffect(() => { if ((tab === "reviews" || tab === "devreqs") && roles.length > 0) loadAllReviews(); }, [tab, roles.length]);
 
+  const [formError, setFormError] = useState("");
   async function createRole() {
     if (!nr.title.trim()) return;
+    setFormError("");
     try {
       await api.post("/api/war-room/roles", { title: nr.title, organization: nr.org || undefined, sector: nr.sector || undefined, description: nr.desc || undefined, reviewFrequency: nr.freq, color: nr.color, icon: nr.icon, workId: nr.workId || undefined });
       setNr({ title: "", org: "", sector: "", desc: "", freq: "weekly", color: "#5E5495", icon: "🎯", workId: "", circleId: "" }); setShowNew(false); fetchData();
-    } catch {}
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string }; status?: number } })?.response?.data?.error
+        ?? `خطأ ${(e as { response?: { status?: number } })?.response?.status ?? "غير معروف"}`;
+      setFormError(msg);
+      console.error("Create role error:", e);
+    }
   }
 
   async function loadRoleDetails(id: string) {
@@ -182,6 +189,7 @@ export default function WarRoomPage() {
                 <input value={nr.icon} onChange={e => setNr({...nr, icon: e.target.value})} className="w-12 px-2 py-1.5 rounded-lg border text-center text-sm" style={is} />
                 <input type="color" value={nr.color} onChange={e => setNr({...nr, color: e.target.value})} className="w-10 h-9 rounded-lg border cursor-pointer" />
               </div>
+              {formError && <p className="text-xs px-3 py-2 rounded-lg" style={{ background: "#DC262610", color: "#DC2626" }}>{formError}</p>}
               <div className="flex gap-2 justify-end">
                 <button onClick={() => setShowNew(false)} className="px-3 py-1.5 rounded-lg text-[10px]" style={{ color: "var(--muted)" }}>إلغاء</button>
                 <button onClick={createRole} disabled={!nr.title.trim()} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>إضافة</button>
