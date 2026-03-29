@@ -123,6 +123,18 @@ public class WarRoomController : ControllerBase
         return rows > 0 ? Ok(new { id, status = req.Status }) : NotFound();
     }
 
+    [HttpDelete("notes/{id}")]
+    public async Task<IActionResult> DeleteNote(string id, CancellationToken ct)
+    {
+        return (await E("DELETE FROM LeadershipNotes WHERE Id=@id AND UserId=@uid", [P("@id",id),P("@uid",Uid)], ct)) > 0 ? NoContent() : NotFound();
+    }
+
+    [HttpDelete("dev-requests/{id}")]
+    public async Task<IActionResult> DeleteDevRequest(string id, CancellationToken ct)
+    {
+        return (await E("DELETE FROM LeadershipDevRequests WHERE Id=@id AND UserId=@uid", [P("@id",id),P("@uid",Uid)], ct)) > 0 ? NoContent() : NotFound();
+    }
+
     // ═══ BRIEFING ════════════════════════════════════════════════════════
 
     [HttpGet("briefing")]

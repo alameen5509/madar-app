@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 
 type Tab = "roles" | "reviews" | "devreqs";
-interface Role { id:string; title:string; organization?:string; sector?:string; description?:string; pulseStatus:string; pulseNote?:string; nextReviewDate?:string; lastReviewDate?:string; reviewFrequency:string; color:string; icon:string; priority:number; notesCount?:number; pendingDevCount?:number; }
+interface Role { id:string; title:string; organization?:string; sector?:string; description?:string; pulseStatus:string; pulseNote?:string; nextReviewDate?:string; lastReviewDate?:string; reviewFrequency:string; color:string; icon:string; priority:number; notesCount?:number; pendingDevCount?:number; workId?:string; }
 interface Note { id:string; roleId?:string; content:string; convertedTaskId?:string; createdAt:string; }
 interface DevReq { id:string; roleId?:string; title:string; description?:string; status:string; createdAt:string; }
 
@@ -23,7 +23,7 @@ export default function WarRoomPage() {
 
   // New role form
   const [showNew, setShowNew] = useState(false);
-  const [nr, setNr] = useState({ title: "", org: "", sector: "", desc: "", freq: "weekly", color: "#5E5495", icon: "🎯" });
+  const [nr, setNr] = useState({ title: "", org: "", sector: "", desc: "", freq: "weekly", color: "#5E5495", icon: "🎯", workId: "", circleId: "" });
 
   // Role detail
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
@@ -38,9 +38,20 @@ export default function WarRoomPage() {
   const [reviewRole, setReviewRole] = useState<string | null>(null);
   const [reviewForm, setReviewForm] = useState({ status: "green", note: "", accomplishments: "" });
 
+  // Works & Circles for linking
+  const [works, setWorks] = useState<{id:string;name:string;type:string}[]>([]);
+  const [circles, setCircles] = useState<{id:string;name:string}[]>([]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
-    try { const { data } = await api.get("/api/war-room/roles"); setRoles(data ?? []); } catch {}
+    try {
+      const [r, w, c] = await Promise.all([
+        api.get("/api/war-room/roles").then(r => r.data ?? []),
+        api.get("/api/works").then(r => (r.data ?? []).map((x: {id:string;name:string;type:string}) => ({ id: x.id, name: x.name, type: x.type }))).catch(() => []),
+        api.get("/api/circle-groups").then(r => (r.data ?? []).map((x: {id:string;name:string}) => ({ id: x.id, name: x.name }))).catch(() => []),
+      ]);
+      setRoles(r); setWorks(w); setCircles(c);
+    } catch {}
     setLoading(false);
   }, []);
 
@@ -69,8 +80,8 @@ export default function WarRoomPage() {
   async function createRole() {
     if (!nr.title.trim()) return;
     try {
-      await api.post("/api/war-room/roles", { title: nr.title, organization: nr.org || undefined, sector: nr.sector || undefined, description: nr.desc || undefined, reviewFrequency: nr.freq, color: nr.color, icon: nr.icon });
-      setNr({ title: "", org: "", sector: "", desc: "", freq: "weekly", color: "#5E5495", icon: "🎯" }); setShowNew(false); fetchData();
+      await api.post("/api/war-room/roles", { title: nr.title, organization: nr.org || undefined, sector: nr.sector || undefined, description: nr.desc || undefined, reviewFrequency: nr.freq, color: nr.color, icon: nr.icon, workId: nr.workId || undefined });
+      setNr({ title: "", org: "", sector: "", desc: "", freq: "weekly", color: "#5E5495", icon: "🎯", workId: "", circleId: "" }); setShowNew(false); fetchData();
     } catch {}
   }
 
@@ -149,6 +160,23 @@ export default function WarRoomPage() {
                 <input value={nr.sector} onChange={e => setNr({...nr, sector: e.target.value})} placeholder="القطاع" className="flex-1 px-3 py-2 rounded-lg border text-xs focus:outline-none" style={is} />
               </div>
               <textarea value={nr.desc} onChange={e => setNr({...nr, desc: e.target.value})} placeholder="وصف المنصب" rows={2} className="w-full px-3 py-2 rounded-lg border text-xs resize-none focus:outline-none" style={is} />
+              {/* ربط بعمل أو دور */}
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-[9px] font-bold mb-0.5 block" style={{ color: "var(--muted)" }}>💼 ربط بعمل</label>
+                  <select value={nr.workId} onChange={e => setNr({...nr, workId: e.target.value})} className="w-full px-2 py-1.5 rounded-lg border text-xs" style={is}>
+                    <option value="">بدون ربط</option>
+                    {works.map(w => <option key={w.id} value={w.id}>{w.type === "job" ? "💼" : "🏢"} {w.name}</option>)}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="text-[9px] font-bold mb-0.5 block" style={{ color: "var(--muted)" }}>◎ ربط بدور</label>
+                  <select value={nr.circleId} onChange={e => setNr({...nr, circleId: e.target.value})} className="w-full px-2 py-1.5 rounded-lg border text-xs" style={is}>
+                    <option value="">بدون ربط</option>
+                    {circles.map(c => <option key={c.id} value={c.id}>◎ {c.name}</option>)}
+                  </select>
+                </div>
+              </div>
               <div className="flex gap-2">
                 <select value={nr.freq} onChange={e => setNr({...nr, freq: e.target.value})} className="flex-1 px-2 py-1.5 rounded-lg border text-xs" style={is}><option value="daily">يومية</option><option value="weekly">أسبوعية</option><option value="monthly">شهرية</option></select>
                 <input value={nr.icon} onChange={e => setNr({...nr, icon: e.target.value})} className="w-12 px-2 py-1.5 rounded-lg border text-center text-sm" style={is} />
@@ -180,9 +208,10 @@ export default function WarRoomPage() {
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         {role.organization && <span className="text-[9px]" style={{ color: "var(--muted)" }}>{role.organization}</span>}
+                        {(() => { const w = works.find(x => x.id === role.workId); return w ? <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "#2D6B9E15", color: "#2D6B9E" }}>{w.type === "job" ? "💼" : "🏢"} {w.name}</span> : null; })()}
                         {(role.notesCount ?? 0) > 0 && <span className="text-[9px]" style={{ color: "#5E5495" }}>📝 {role.notesCount}</span>}
                         {(role.pendingDevCount ?? 0) > 0 && <span className="text-[9px]" style={{ color: "#D4AF37" }}>🔧 {role.pendingDevCount}</span>}
-                        {role.lastReviewDate && <span className="text-[9px]" style={{ color: "var(--muted)" }}>آخر مراجعة: {new Date(role.lastReviewDate).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>}
+                        {role.lastReviewDate && <span className="text-[9px]" style={{ color: "var(--muted)" }}>مراجعة: {new Date(role.lastReviewDate).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>}
                       </div>
                     </div>
                     <div className="flex gap-1" onClick={e => e.stopPropagation()}>
@@ -238,10 +267,12 @@ export default function WarRoomPage() {
                           <button onClick={() => addNote(role.id, true)} disabled={!newNote.trim()} className="px-2 py-2 rounded-lg text-[10px] font-bold disabled:opacity-40" style={{ background: "#D4AF3715", color: "#D4AF37" }} title="كمهمة">📋</button>
                         </div>
                         {notes.map(n => (
-                          <div key={n.id} className="flex items-start gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: "var(--bg)" }}>
+                          <div key={n.id} className="flex items-start gap-2 px-3 py-2 rounded-lg text-xs group" style={{ background: "var(--bg)" }}>
                             <span className="flex-1" style={{ color: "var(--text)" }}>{n.content}</span>
                             <span className="text-[8px] flex-shrink-0" style={{ color: "var(--muted)" }}>{new Date(n.createdAt).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>
                             {n.convertedTaskId && <span className="text-[8px] px-1 rounded" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>📋</span>}
+                            <button onClick={async () => { try { await api.delete(`/api/war-room/notes/${n.id}`); loadRoleDetails(role.id); } catch {} }}
+                              className="text-[8px] opacity-0 group-hover:opacity-100 transition" style={{ color: "#DC2626" }}>✕</button>
                           </div>
                         ))}
                         {notes.length === 0 && <p className="text-center text-[10px] py-2" style={{ color: "var(--muted)" }}>لا توجد ملاحظات</p>}
@@ -274,6 +305,8 @@ export default function WarRoomPage() {
                                   <button onClick={async () => { try { await api.patch(`/api/war-room/dev-requests/${d.id}/status`, { status: "done" }); loadRoleDetails(role.id); } catch {} }}
                                     className="text-[8px] px-1.5 py-0.5 rounded-lg" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>✓</button>
                                 )}
+                                <button onClick={async () => { if (confirm("حذف؟")) { try { await api.delete(`/api/war-room/dev-requests/${d.id}`); loadRoleDetails(role.id); } catch {} } }}
+                                  className="text-[8px] px-1 rounded" style={{ color: "#DC2626" }}>🗑️</button>
                               </div>
                               {d.description && <p className="text-[9px] mt-1" style={{ color: "var(--muted)" }}>{d.description}</p>}
                             </div>
