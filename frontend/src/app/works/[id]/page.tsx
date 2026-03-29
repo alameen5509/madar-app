@@ -179,6 +179,120 @@ export default function WorkDetailPage({ params }: { params: Promise<{ id: strin
           </Link>
         ))}
       </div>
+      {/* ═══ طلبات العمل ═══ */}
+      <WorkRequests workId={id} />
     </main>
+  );
+}
+
+/* ═══ WORK REQUESTS COMPONENT ═══ */
+function WorkRequests({ workId }: { workId: string }) {
+  const [reqs, setReqs] = useState<{id:string;title:string;description?:string;status:string;priority:string;notes?:string;createdAt:string;convertedProjectId?:string}[]>([]);
+  const [showNew, setShowNew] = useState(false);
+  const [nr, setNr] = useState({ title: "", desc: "", priority: "Medium", notes: "" });
+  const [showConvert, setShowConvert] = useState<string | null>(null);
+  const [conv, setConv] = useState({ projTitle: "", projDesc: "", tasks: "" });
+  const is = { background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" } as const;
+
+  const load = useCallback(async () => {
+    try { const { data } = await api.get(`/api/works/${workId}/requests`); setReqs(data ?? []); } catch {}
+  }, [workId]);
+  useEffect(() => { load(); }, [load]);
+
+  const priColor: Record<string,string> = { Urgent: "#DC2626", High: "#F59E0B", Medium: "#3B82F6", Low: "#6B7280" };
+  const priLabel: Record<string,string> = { Urgent: "عاجل", High: "مرتفع", Medium: "متوسط", Low: "منخفض" };
+  const stLabel: Record<string,string> = { Pending: "قيد الانتظار", InProgress: "جاري", Completed: "مكتمل", Cancelled: "ملغي" };
+  const stColor: Record<string,string> = { Pending: "#F59E0B", InProgress: "#3B82F6", Completed: "#3D8C5A", Cancelled: "#6B7280" };
+
+  async function create() {
+    if (!nr.title.trim()) return;
+    try { await api.post(`/api/works/${workId}/requests`, { title: nr.title, description: nr.desc || undefined, priority: nr.priority, notes: nr.notes || undefined }); setNr({ title: "", desc: "", priority: "Medium", notes: "" }); setShowNew(false); load(); } catch {}
+  }
+
+  async function convert(reqId: string) {
+    try {
+      await api.post(`/api/works/${workId}/requests/${reqId}/convert`, { projectTitle: conv.projTitle || undefined, taskTitles: conv.tasks ? conv.tasks.split("\n").filter(Boolean) : undefined });
+      setShowConvert(null); setConv({ projTitle: "", projDesc: "", tasks: "" }); load();
+    } catch {}
+  }
+
+  const pending = reqs.filter(r => r.status === "Pending" || r.status === "InProgress");
+  const done = reqs.filter(r => r.status === "Completed" || r.status === "Cancelled");
+
+  return (
+    <div className="mt-4">
+      <GeometricDivider label="طلبات العمل" />
+      <div className="flex items-center justify-between mt-3 mb-2">
+        <span className="text-xs font-bold" style={{ color: "var(--text)" }}>الطلبات ({reqs.length})</span>
+        <button onClick={() => setShowNew(true)} className="text-[10px] font-bold px-3 py-1.5 rounded-lg text-white" style={{ background: "#D4AF37" }}>+ طلب جديد</button>
+      </div>
+
+      {showNew && (
+        <div className="rounded-xl border p-4 mb-3 space-y-2" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+          <input value={nr.title} onChange={e => setNr({...nr, title: e.target.value})} placeholder="عنوان الطلب *" className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={is} />
+          <textarea value={nr.desc} onChange={e => setNr({...nr, desc: e.target.value})} placeholder="وصف..." rows={2} className="w-full px-3 py-2 rounded-lg border text-xs resize-none focus:outline-none" style={is} />
+          <div className="flex gap-2">
+            <select value={nr.priority} onChange={e => setNr({...nr, priority: e.target.value})} className="px-2 py-1.5 rounded-lg border text-xs" style={is}>
+              <option value="Low">منخفض</option><option value="Medium">متوسط</option><option value="High">مرتفع</option><option value="Urgent">عاجل</option>
+            </select>
+            <div className="flex-1" />
+            <button onClick={() => setShowNew(false)} className="px-3 py-1.5 rounded-lg text-[10px]" style={{ color: "var(--muted)" }}>إلغاء</button>
+            <button onClick={create} disabled={!nr.title.trim()} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#D4AF37" }}>إضافة</button>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {pending.map(r => (
+          <div key={r.id} className="rounded-xl border p-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate" style={{ color: "var(--text)" }}>{r.title}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: `${stColor[r.status]}15`, color: stColor[r.status] }}>{stLabel[r.status]}</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: `${priColor[r.priority]}15`, color: priColor[r.priority] }}>{priLabel[r.priority]}</span>
+                  <span className="text-[9px]" style={{ color: "var(--muted)" }}>{new Date(r.createdAt).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>
+                </div>
+              </div>
+              <div className="flex gap-1 flex-shrink-0">
+                <button onClick={() => { setShowConvert(showConvert === r.id ? null : r.id); setConv({ projTitle: r.title, projDesc: r.description ?? "", tasks: "" }); }}
+                  className="text-[9px] px-2 py-1 rounded-lg font-bold" style={{ background: "#5E549515", color: "#5E5495" }}>تحويل لمشروع</button>
+                <button onClick={async () => { try { await api.patch(`/api/works/${workId}/requests/${r.id}`, { status: "Completed" }); load(); } catch {} }}
+                  className="text-[9px] px-2 py-1 rounded-lg font-bold" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>✓</button>
+                <button onClick={async () => { if (confirm("حذف؟")) { try { await api.delete(`/api/works/${workId}/requests/${r.id}`); load(); } catch {} } }}
+                  className="text-[9px] px-1 rounded" style={{ color: "#DC2626" }}>🗑️</button>
+              </div>
+            </div>
+            {r.description && <p className="text-[10px] mt-1" style={{ color: "var(--muted)" }}>{r.description}</p>}
+
+            {showConvert === r.id && (
+              <div className="mt-2 p-2 rounded-lg space-y-2" style={{ background: "#5E549508", border: "1px solid #5E549520" }}>
+                <p className="text-[10px] font-bold" style={{ color: "#5E5495" }}>تحويل لمشروع:</p>
+                <input value={conv.projTitle} onChange={e => setConv({...conv, projTitle: e.target.value})} placeholder="اسم المشروع" className="w-full px-2 py-1.5 rounded-lg border text-[10px]" style={is} />
+                <textarea value={conv.tasks} onChange={e => setConv({...conv, tasks: e.target.value})} placeholder="المهام (سطر لكل مهمة)" rows={3} className="w-full px-2 py-1.5 rounded-lg border text-[10px] resize-none" style={is} />
+                <div className="flex gap-2">
+                  <button onClick={() => convert(r.id)} className="px-3 py-1.5 rounded-lg text-[10px] font-bold text-white" style={{ background: "#5E5495" }}>تحويل</button>
+                  <button onClick={() => setShowConvert(null)} className="text-[10px]" style={{ color: "var(--muted)" }}>إلغاء</button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {done.length > 0 && (
+        <details className="mt-3">
+          <summary className="text-[10px] cursor-pointer" style={{ color: "var(--muted)" }}>مكتملة ({done.length})</summary>
+          <div className="space-y-1 mt-1">{done.map(r => (
+            <div key={r.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg opacity-50" style={{ background: "var(--card)" }}>
+              <span className="text-xs line-through flex-1" style={{ color: "var(--text)" }}>{r.title}</span>
+              {r.convertedProjectId && <span className="text-[8px] px-1 rounded" style={{ background: "#5E549515", color: "#5E5495" }}>→ مشروع</span>}
+            </div>
+          ))}</div>
+        </details>
+      )}
+
+      {reqs.length === 0 && !showNew && <p className="text-center py-4 text-xs" style={{ color: "var(--muted)" }}>لا توجد طلبات</p>}
+    </div>
   );
 }
