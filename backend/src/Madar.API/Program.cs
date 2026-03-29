@@ -358,19 +358,15 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// ═══ Auto-migrate schema ═══
+// ═══ Auto-migrate schema (idempotent) ═══
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<Madar.Infrastructure.Persistence.MadarDbContext>();
-    // Goals.LifeCircleId nullable
     try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals ADD COLUMN FocusType VARCHAR(20) NULL;"); } catch { }
+    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals ADD COLUMN SuspendedUntil DATETIME(6) NULL;"); } catch { }
+    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals ADD COLUMN SuspendReason VARCHAR(500) NULL;"); } catch { }
     try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals MODIFY COLUMN LifeCircleId CHAR(36) NULL;"); } catch { }
-    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals DROP FOREIGN KEY FK_Goals_LifeCircles_LifeCircleId;"); } catch { }
-    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals ADD CONSTRAINT FK_Goals_LifeCircles_LifeCircleId FOREIGN KEY (LifeCircleId) REFERENCES LifeCircles(Id) ON DELETE SET NULL;"); } catch { }
-    // SmartTasks.LifeCircleId nullable
     try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE SmartTasks MODIFY COLUMN LifeCircleId CHAR(36) NULL;"); } catch { }
-    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE SmartTasks DROP FOREIGN KEY FK_SmartTasks_LifeCircles_LifeCircleId;"); } catch { }
-    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE SmartTasks ADD CONSTRAINT FK_SmartTasks_LifeCircles_LifeCircleId FOREIGN KEY (LifeCircleId) REFERENCES LifeCircles(Id) ON DELETE SET NULL;"); } catch { }
 }
 
 app.Run();
