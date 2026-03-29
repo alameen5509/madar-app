@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 
-type Tab = "plan" | "meals" | "dishes" | "juices" | "stock" | "shopping";
+type Tab = "plan" | "meals" | "dishes" | "juices" | "family" | "stock" | "shopping";
 interface Dish { id:string; name:string; description?:string; imageUrl?:string; imageData?:string; category:string; servings?:number; ingredients?:{id:string;ingredientName:string;quantity:number;unit:string}[]; }
 interface Meal { id:string; name:string; mealTime:string; frequency:string; preferredDays?:string; isDailyFavorite:boolean; isForGuests:boolean; dishes?:{dishId:string;dishName:string;dishImage?:string;category:string}[]; }
 interface Ingredient { id:string; name:string; category:string; unit:string; currentStock:number; minStock:number; brands?:{id:string;brandName:string;quality:string;isPreferred:boolean;lastPrice?:number;avgPrice?:number}[]; }
@@ -96,7 +96,7 @@ export default function NutritionPage() {
           {lowStock.length>0&&<span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{background:"#DC262615",color:"#DC2626"}}>⚠️ {lowStock.length} ناقصة</span>}
         </div>
         <div className="flex gap-1 mt-2 overflow-x-auto pb-0.5">
-          {([["plan","خطة الأسبوع","📅"],["meals","الوجبات","🍱"],["dishes","الصحون","🍽️"],["juices","العصيرات","🥤"],["stock","المخزون","🧺"],["shopping","التسوق","🛒"]] as [Tab,string,string][]).map(([k,l,ic])=>(
+          {([["plan","خطة الأسبوع","📅"],["meals","الوجبات","🍱"],["dishes","الصحون","🍽️"],["juices","العصيرات","🥤"],["family","وجبات الأفراد","👨‍👩‍👧‍👦"],["stock","المخزون","🧺"],["shopping","التسوق","🛒"]] as [Tab,string,string][]).map(([k,l,ic])=>(
             <button key={k} onClick={()=>setTab(k)} className="px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition whitespace-nowrap flex-shrink-0"
               style={{background:tab===k?"#5E5495":"var(--bg)",color:tab===k?"#fff":"var(--muted)",border:`1px solid ${tab===k?"#5E5495":"var(--card-border)"}`}}>
               {ic} {l}
@@ -314,6 +314,9 @@ export default function NutritionPage() {
           })()}
         </>)}
 
+        {/* ═══ FAMILY MEALS ═══ */}
+        {!loading&&tab==="family"&&<FamilyMealsTab meals={meals}/>}
+
         {/* ═══ STOCK ═══ */}
         {!loading&&tab==="stock"&&(<>
           <span className="text-xs font-bold" style={{color:"var(--text)"}}>المخزون والماركات</span>
@@ -361,4 +364,134 @@ export default function NutritionPage() {
       </div>
     </main>
   );
+}
+
+/* ═══ FAMILY MEALS TAB ═══ */
+function FamilyMealsTab({ meals }: { meals: Meal[] }) {
+  const [members, setMembers] = useState<{id:string;name:string;relationship?:string;gender?:string}[]>([]);
+  const [plans, setPlans] = useState<{id:string;memberId:string;memberName:string;planDate:string;mealTime:string;mealId?:string;mealName?:string;customDesc?:string}[]>([]);
+  const [showNewMember, setShowNewMember] = useState(false);
+  const [nm, setNm] = useState({ name: "", rel: "", gender: "" });
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
+  const [assignMember, setAssignMember] = useState<string | null>(null);
+  const [assignTime, setAssignTime] = useState("lunch");
+  const [assignMealId, setAssignMealId] = useState("");
+  const [assignCustom, setAssignCustom] = useState("");
+  const is2 = { background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" } as const;
+
+  useEffect(() => { loadMembers(); }, []);
+  useEffect(() => { if (members.length > 0) loadPlans(); }, [selectedDate, members.length]);
+
+  async function loadMembers() { try { const { data } = await api.get("/api/family-meals/members"); setMembers(data ?? []); } catch {} }
+  async function loadPlans() { try { const { data } = await api.get(`/api/family-meals/plans?date=${selectedDate}`); setPlans(data ?? []); } catch {} }
+
+  async function createMember() {
+    if (!nm.name.trim()) return;
+    try { await api.post("/api/family-meals/members", { name: nm.name, relationship: nm.rel || undefined, gender: nm.gender || undefined }); setNm({ name: "", rel: "", gender: "" }); setShowNewMember(false); loadMembers(); } catch {}
+  }
+
+  async function assignMeal() {
+    if (!assignMember) return;
+    try { await api.post("/api/family-meals/plans", { memberId: assignMember, date: selectedDate, mealTime: assignTime, mealId: assignMealId || undefined, customDesc: assignCustom || undefined }); setAssignMember(null); setAssignMealId(""); setAssignCustom(""); loadPlans(); } catch {}
+  }
+
+  const MT2 = [{ key: "breakfast", label: "فطور", icon: "🌅" }, { key: "lunch", label: "غداء", icon: "🍲" }, { key: "dinner", label: "عشاء", icon: "🌙" }, { key: "snack", label: "خفيفة", icon: "🍎" }];
+
+  return (<>
+    <div className="flex items-center justify-between">
+      <span className="text-xs font-bold" style={{ color: "var(--text)" }}>👨‍👩‍👧‍👦 وجبات الأفراد</span>
+      <div className="flex gap-2">
+        <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="px-2 py-1 rounded-lg border text-[10px]" style={is2} />
+        <button onClick={() => setShowNewMember(true)} className="text-[10px] font-bold px-3 py-1.5 rounded-lg text-white" style={{ background: "#5E5495" }}>+ فرد</button>
+      </div>
+    </div>
+
+    {showNewMember && (
+      <div className="rounded-xl border p-3 space-y-2" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+        <input value={nm.name} onChange={e => setNm({ ...nm, name: e.target.value })} placeholder="الاسم *" className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={is2} />
+        <div className="flex gap-2">
+          <select value={nm.rel} onChange={e => setNm({ ...nm, rel: e.target.value })} className="flex-1 px-2 py-1.5 rounded-lg border text-xs" style={is2}>
+            <option value="">العلاقة</option>{["زوج","زوجة","ابن","ابنة","أب","أم","أخ","أخت","جد","جدة"].map(r => <option key={r}>{r}</option>)}</select>
+          <select value={nm.gender} onChange={e => setNm({ ...nm, gender: e.target.value })} className="px-2 py-1.5 rounded-lg border text-xs" style={is2}>
+            <option value="">الجنس</option><option>ذكر</option><option>أنثى</option></select>
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button onClick={() => setShowNewMember(false)} className="text-[10px]" style={{ color: "var(--muted)" }}>إلغاء</button>
+          <button onClick={createMember} disabled={!nm.name.trim()} className="px-3 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>إضافة</button>
+        </div>
+      </div>
+    )}
+
+    {/* Members list */}
+    {members.length > 0 && (
+      <div className="flex gap-2 flex-wrap">
+        {members.map(m => (
+          <div key={m.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+            <span style={{ color: "var(--text)" }}>{m.name}</span>
+            {m.relationship && <span className="text-[9px]" style={{ color: "var(--muted)" }}>({m.relationship})</span>}
+            <button onClick={async () => { if (confirm(`حذف ${m.name}؟`)) { try { await api.delete(`/api/family-meals/members/${m.id}`); loadMembers(); } catch {} } }}
+              className="text-[9px]" style={{ color: "#DC2626" }}>✕</button>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {/* Daily grid */}
+    {members.length > 0 && (
+      <div className="rounded-xl border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[10px]">
+            <thead>
+              <tr style={{ background: "var(--bg)" }}>
+                <th className="px-3 py-2 text-right font-bold" style={{ color: "var(--text)" }}>الفرد</th>
+                {MT2.map(mt => <th key={mt.key} className="px-3 py-2 text-center font-bold" style={{ color: "var(--text)" }}>{mt.icon} {mt.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {members.map(m => (
+                <tr key={m.id} style={{ borderTop: "1px solid var(--card-border)" }}>
+                  <td className="px-3 py-2 font-bold" style={{ color: "var(--text)" }}>{m.name}</td>
+                  {MT2.map(mt => {
+                    const plan = plans.find(p => p.memberId === m.id && p.mealTime === mt.key);
+                    return (
+                      <td key={mt.key} className="px-2 py-2 text-center">
+                        {plan ? (
+                          <div className="flex items-center gap-1 justify-center">
+                            <span style={{ color: "var(--text)" }}>{plan.mealName ?? plan.customDesc ?? "—"}</span>
+                            <button onClick={async () => { try { await api.delete(`/api/family-meals/plans/${plan.id}`); loadPlans(); } catch {} }}
+                              className="text-[8px]" style={{ color: "#DC2626" }}>✕</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => { setAssignMember(m.id); setAssignTime(mt.key); }}
+                            className="px-2 py-1 rounded text-[9px] transition hover:opacity-80" style={{ background: "#D4AF3715", color: "#D4AF37" }}>+</button>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )}
+
+    {/* Assign meal modal */}
+    {assignMember && (
+      <div className="rounded-xl border p-3 space-y-2" style={{ background: "#D4AF3706", borderColor: "#D4AF3730" }}>
+        <p className="text-[10px] font-bold" style={{ color: "#D4AF37" }}>تعيين وجبة — {members.find(m => m.id === assignMember)?.name} — {MT2.find(m => m.key === assignTime)?.label}</p>
+        <select value={assignMealId} onChange={e => setAssignMealId(e.target.value)} className="w-full px-2 py-1.5 rounded-lg border text-xs" style={is2}>
+          <option value="">اختر من الوجبات...</option>
+          {meals.filter(m => m.mealTime === assignTime || true).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+        <input value={assignCustom} onChange={e => setAssignCustom(e.target.value)} placeholder="أو اكتب وصف مخصص..." className="w-full px-2 py-1.5 rounded-lg border text-xs focus:outline-none" style={is2} />
+        <div className="flex gap-2">
+          <button onClick={assignMeal} disabled={!assignMealId && !assignCustom.trim()} className="px-3 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#D4AF37" }}>تعيين</button>
+          <button onClick={() => setAssignMember(null)} className="text-[10px]" style={{ color: "var(--muted)" }}>إلغاء</button>
+        </div>
+      </div>
+    )}
+
+    {members.length === 0 && !showNewMember && <div className="text-center py-8"><p className="text-3xl mb-2">👨‍👩‍👧‍👦</p><p className="text-sm" style={{ color: "var(--muted)" }}>أضف أفراد الأسرة لتخطيط وجباتهم</p></div>}
+  </>);
 }
