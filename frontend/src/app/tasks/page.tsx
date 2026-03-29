@@ -150,11 +150,15 @@ function toRow(t: SmartTask, circleOrderMap?: Map<string, number>): TaskRow {
   };
 }
 
-/** المهمة متأخرة إذا مضى 24 ساعة على إنشائها ولم تكتمل */
+/** المهمة متأخرة إذا تاريخها قبل اليوم (أمس وما قبله) */
 function isOverdue(t: TaskRow): boolean {
   if (t.done || t.isInbox) return false;
-  // إذا فيه تاريخ استحقاق وتجاوزناه
-  if (t.dueDate && new Date(t.dueDate) < new Date()) return true;
+  // إذا فيه تاريخ استحقاق وتاريخه قبل اليوم (ليس اليوم نفسه)
+  if (t.dueDate) {
+    const due = new Date(t.dueDate); due.setHours(0,0,0,0);
+    const today = new Date(); today.setHours(0,0,0,0);
+    if (due < today) return true;
+  }
   // أو مضى 24 ساعة على الإنشاء
   if (t.createdAt) {
     const created = new Date(t.createdAt).getTime();
