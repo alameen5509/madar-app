@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 
 type Tab = "plan" | "meals" | "dishes" | "juices" | "stock" | "shopping";
-interface Dish { id:string; name:string; description?:string; imageUrl?:string; category:string; prepTime?:number; servings?:number; ingredients?:{id:string;ingredientName:string;quantity:number;unit:string}[]; }
+interface Dish { id:string; name:string; description?:string; imageUrl?:string; category:string; servings?:number; ingredients?:{id:string;ingredientName:string;quantity:number;unit:string}[]; }
 interface Meal { id:string; name:string; mealTime:string; frequency:string; preferredDays?:string; isDailyFavorite:boolean; isForGuests:boolean; dishes?:{dishId:string;dishName:string;dishImage?:string;category:string}[]; }
 interface Ingredient { id:string; name:string; category:string; unit:string; currentStock:number; minStock:number; brands?:{id:string;brandName:string;quality:string;isPreferred:boolean;lastPrice?:number;avgPrice?:number}[]; }
 interface Plan { planDate:string; breakfastMealId?:string; lunchMealId?:string; dinnerMealId?:string; snackMealId?:string; breakfastName?:string; lunchName?:string; dinnerName?:string; snackName?:string; }
@@ -23,7 +23,7 @@ export default function NutritionPage() {
 
   // Dish form
   const [showNewDish,setShowNewDish]=useState(false);
-  const [nd,setNd]=useState({name:"",desc:"",img:"",cat:"أساسي",prep:"",srv:"4"});
+  const [nd,setNd]=useState({name:"",desc:"",img:"",cat:"أساسي",srv:"4"});
   const [ndIngs,setNdIngs]=useState<{name:string;qty:string;unit:string;existingId?:string}[]>([]);
   const [ingSearch,setIngSearch]=useState("");
   const [expDish,setExpDish]=useState<string|null>(null);
@@ -59,10 +59,10 @@ export default function NutritionPage() {
     try{
       await api.post("/api/nutrition/dishes",{
         name:nd.name,description:nd.desc||undefined,imageUrl:nd.img||undefined,category:nd.cat,
-        prepTime:parseInt(nd.prep)||undefined,servings:parseInt(nd.srv)||4,
+        servings:parseInt(nd.srv)||4,
         ingredients:ndIngs.filter(i=>i.name.trim()).map(i=>({ingredientId:i.existingId||undefined,name:i.name,quantity:parseFloat(i.qty)||1,unit:i.unit})),
       });
-      setNd({name:"",desc:"",img:"",cat:"أساسي",prep:"",srv:"4"});setNdIngs([]);setShowNewDish(false);fetchData();
+      setNd({name:"",desc:"",img:"",cat:"أساسي",srv:"4"});setNdIngs([]);setShowNewDish(false);fetchData();
     }catch{}
   }
 
@@ -201,7 +201,6 @@ export default function NutritionPage() {
               <input value={nd.img} onChange={e=>setNd({...nd,img:e.target.value})} placeholder="رابط الصورة (اختياري)" className="w-full px-3 py-2 rounded-lg border text-xs focus:outline-none" style={is}/>
               <div className="flex gap-2">
                 <select value={nd.cat} onChange={e=>setNd({...nd,cat:e.target.value})} className="flex-1 px-2 py-1.5 rounded-lg border text-xs" style={is}>{["أساسي","جانبي","حلوى","عصير","مشروب","سلطة","شوربة"].map(c=><option key={c}>{c}</option>)}</select>
-                <input value={nd.prep} onChange={e=>setNd({...nd,prep:e.target.value})} placeholder="وقت (دقيقة)" type="number" className="w-24 px-2 py-1.5 rounded-lg border text-xs" style={is}/>
                 <input value={nd.srv} onChange={e=>setNd({...nd,srv:e.target.value})} placeholder="أشخاص" type="number" className="w-16 px-2 py-1.5 rounded-lg border text-xs" style={is}/>
               </div>
               {/* Ingredients */}
@@ -244,8 +243,7 @@ export default function NutritionPage() {
                   <div className="flex items-start justify-between">
                     <div className="cursor-pointer" onClick={()=>loadDishIngs(d.id)}>
                       <p className="font-bold text-sm" style={{color:"var(--text)"}}>{d.name}</p>
-                      <div className="flex gap-1.5 mt-0.5"><span className="text-[8px] px-1.5 py-0.5 rounded-full" style={{background:"#5E549515",color:"#5E5495"}}>{d.category}</span>
-                        {d.prepTime&&<span className="text-[8px]" style={{color:"var(--muted)"}}>{d.prepTime}د</span>}</div>
+                      <div className="flex gap-1.5 mt-0.5"><span className="text-[8px] px-1.5 py-0.5 rounded-full" style={{background:"#5E549515",color:"#5E5495"}}>{d.category}</span></div>
                     </div>
                     <button onClick={async()=>{if(confirm("حذف؟")){try{await api.delete(`/api/nutrition/dishes/${d.id}`);fetchData();}catch{}}}} className="text-[10px]" style={{color:"#DC2626"}}>🗑️</button>
                   </div>
@@ -283,8 +281,7 @@ export default function NutritionPage() {
                           <p className="font-bold text-sm" style={{color:"var(--text)"}}>{d.name}</p>
                           <div className="flex gap-1.5 mt-0.5">
                             <span className="text-[8px] px-1.5 py-0.5 rounded-full" style={{background:"#2ABFBF15",color:"#2ABFBF"}}>{d.category==="عصير"?"🥤 عصير":"☕ مشروب"}</span>
-                            {d.prepTime&&<span className="text-[8px]" style={{color:"var(--muted)"}}>{d.prepTime}د</span>}
-                            {d.servings&&<span className="text-[8px]" style={{color:"var(--muted)"}}>{d.servings} أشخاص</span>}
+                                                        {d.servings&&<span className="text-[8px]" style={{color:"var(--muted)"}}>{d.servings} أشخاص</span>}
                           </div>
                         </div>
                         <button onClick={async()=>{if(confirm("حذف؟")){try{await api.delete(`/api/nutrition/dishes/${d.id}`);fetchData();}catch{}}}} className="text-[10px]" style={{color:"#DC2626"}}>🗑️</button>
