@@ -68,7 +68,7 @@ public class PrayerTrackingController : BaseController
         else if (req.Field == "inMosque")
             log.PrayedInMosque = req.Value;
 
-        // If toggled ON, remove matching unfulfilled penalty for today
+        // If toggled ON, mark matching penalty as fulfilled (don't delete)
         if (req.Value)
         {
             var reason = req.Field == "onTime" ? "not_on_time" : "not_in_mosque";
@@ -76,7 +76,10 @@ public class PrayerTrackingController : BaseController
                 .FirstOrDefaultAsync(p => p.OwnerId == UserId && p.Date == today
                     && p.Prayer == req.Prayer && p.Reason == reason && !p.Fulfilled, ct);
             if (penalty != null)
-                _db.PrayerPenalties.Remove(penalty);
+            {
+                penalty.Fulfilled = true;
+                penalty.FulfilledAt = DateTime.UtcNow;
+            }
         }
 
         await _db.SaveChangesAsync(ct);
@@ -160,16 +163,22 @@ public class PrayerTrackingController : BaseController
         return Ok(new { success = true });
     }
 
-    // ─── GET pending penalties ───
+    // ─── GET penalties (pending + optional completed) ───
     [HttpGet("penalties")]
-    public async Task<IActionResult> GetPenalties(CancellationToken ct)
+    public async Task<IActionResult> GetPenalties([FromQuery] bool includeCompleted = false, CancellationToken ct = default)
     {
-        var penalties = await _db.PrayerPenalties
-            .Where(p => p.OwnerId == UserId && !p.Fulfilled)
+        var query = _db.PrayerPenalties.Where(p => p.OwnerId == UserId);
+        if (!includeCompleted) query = query.Where(p => !p.Fulfilled);
+
+        var penalties = await query
             .OrderByDescending(p => p.Date)
-            .Select(p => new { p.Id, p.Date, p.Prayer, p.Reason, p.PenaltyType, p.PenaltyDetail })
+            .Select(p => new { p.Id, p.Date, p.Prayer, p.Reason, p.PenaltyType, p.PenaltyDetail, p.Fulfilled, p.FulfilledAt })
             .ToListAsync(ct);
-        return Ok(penalties);
+
+        var pendingCount = await _db.PrayerPenalties.CountAsync(p => p.OwnerId == UserId && !p.Fulfilled, ct);
+        var fulfilledCount = await _db.PrayerPenalties.CountAsync(p => p.OwnerId == UserId && p.Fulfilled, ct);
+
+        return Ok(new { penalties, pendingCount, fulfilledCount });
     }
 
     // ─── POST fulfill penalty ───
