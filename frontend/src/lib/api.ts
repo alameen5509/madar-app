@@ -451,3 +451,182 @@ export async function transferTask(taskId: string, targetEmail: string): Promise
   const { data } = await api.post(`/api/tasks/${taskId}/transfer`, { targetEmail });
   return data;
 }
+
+// ─── Meetings ────────────────────────────────────────────────────────────────
+
+export interface MeetingAttendee {
+  id: string;
+  name: string;
+  role: string;
+  status: string;
+  notes?: string;
+  contactId?: string;
+}
+
+export interface MeetingAgendaItem {
+  id: string;
+  title: string;
+  description?: string;
+  duration: number;
+  displayOrder: number;
+  isCompleted: boolean;
+}
+
+export interface MeetingMinute {
+  id: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface MeetingActionItem {
+  id: string;
+  title: string;
+  assignedTo?: string;
+  dueDate?: string;
+  isCompleted: boolean;
+  taskId?: string;
+}
+
+export interface Meeting {
+  id: string;
+  title: string;
+  description?: string;
+  meetingType: string;
+  platform?: string;
+  location?: string;
+  meetingLink?: string;
+  startTime: string;
+  endTime?: string;
+  status: string;
+  recurrence?: string;
+  notes?: string;
+  isPrivate?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  projectId?: string;
+  workId?: string;
+  circleId?: string;
+  project?: { id: string; title: string };
+  work?: { id: string; name: string };
+  circle?: { id: string; name: string };
+  attendees?: MeetingAttendee[];
+  agenda?: MeetingAgendaItem[];
+  minutes?: MeetingMinute[];
+  actionItems?: MeetingActionItem[];
+  attendeeCount?: number;
+}
+
+export interface CreateMeetingPayload {
+  title: string;
+  description?: string;
+  meetingType?: string;
+  platform?: string;
+  location?: string;
+  meetingLink?: string;
+  startTime: string;
+  endTime?: string;
+  recurrence?: string;
+  notes?: string;
+  isPrivate?: boolean;
+  projectId?: string;
+  workId?: string;
+  circleId?: string;
+  attendees?: { name: string; role?: string; notes?: string }[];
+  agenda?: { title: string; description?: string; duration?: number }[];
+}
+
+export async function getMeetings(params?: { status?: string; date?: string }): Promise<Meeting[]> {
+  const q = new URLSearchParams();
+  if (params?.status) q.set('status', params.status);
+  if (params?.date) q.set('date', params.date);
+  const { data } = await api.get<Meeting[]>(`/api/meetings${q.toString() ? '?' + q : ''}`);
+  return data;
+}
+
+export async function getMeetingsToday(): Promise<Meeting[]> {
+  const { data } = await api.get<Meeting[]>('/api/meetings/today');
+  return data;
+}
+
+export async function getMeetingsUpcoming(): Promise<Meeting[]> {
+  const { data } = await api.get<Meeting[]>('/api/meetings/upcoming');
+  return data;
+}
+
+export async function getMeeting(id: string): Promise<Meeting> {
+  const { data } = await api.get<Meeting>(`/api/meetings/${id}`);
+  return data;
+}
+
+export async function createMeeting(payload: CreateMeetingPayload): Promise<{ id: string; title: string }> {
+  const { data } = await api.post('/api/meetings', payload);
+  return data;
+}
+
+export async function updateMeeting(id: string, payload: Partial<CreateMeetingPayload> & { status?: string }): Promise<void> {
+  await api.patch(`/api/meetings/${id}`, payload);
+}
+
+export async function deleteMeeting(id: string): Promise<void> {
+  await api.delete(`/api/meetings/${id}`);
+}
+
+export async function completeMeeting(id: string): Promise<void> {
+  await api.post(`/api/meetings/${id}/complete`);
+}
+
+export async function cancelMeeting(id: string): Promise<void> {
+  await api.post(`/api/meetings/${id}/cancel`);
+}
+
+// Attendees
+export async function addMeetingAttendee(meetingId: string, payload: { name: string; role?: string; notes?: string }): Promise<MeetingAttendee> {
+  const { data } = await api.post(`/api/meetings/${meetingId}/attendees`, payload);
+  return data;
+}
+
+export async function updateMeetingAttendee(id: string, payload: { name?: string; role?: string; status?: string; notes?: string }): Promise<void> {
+  await api.patch(`/api/meetings/attendees/${id}`, payload);
+}
+
+export async function removeMeetingAttendee(id: string): Promise<void> {
+  await api.delete(`/api/meetings/attendees/${id}`);
+}
+
+// Agenda
+export async function addMeetingAgendaItem(meetingId: string, payload: { title: string; description?: string; duration?: number }): Promise<MeetingAgendaItem> {
+  const { data } = await api.post(`/api/meetings/${meetingId}/agenda`, payload);
+  return data;
+}
+
+export async function updateMeetingAgendaItem(id: string, payload: { title?: string; description?: string; duration?: number; isCompleted?: boolean }): Promise<void> {
+  await api.patch(`/api/meetings/agenda/${id}`, payload);
+}
+
+export async function removeMeetingAgendaItem(id: string): Promise<void> {
+  await api.delete(`/api/meetings/agenda/${id}`);
+}
+
+// Minutes
+export async function addMeetingMinute(meetingId: string, content: string): Promise<MeetingMinute> {
+  const { data } = await api.post(`/api/meetings/${meetingId}/minutes`, { content });
+  return data;
+}
+
+export async function removeMeetingMinute(id: string): Promise<void> {
+  await api.delete(`/api/meetings/minutes/${id}`);
+}
+
+// Action Items
+export async function addMeetingActionItem(meetingId: string, payload: { title: string; assignedTo?: string; dueDate?: string }): Promise<MeetingActionItem> {
+  const { data } = await api.post(`/api/meetings/${meetingId}/actions`, payload);
+  return data;
+}
+
+export async function updateMeetingActionItem(id: string, payload: { title?: string; assignedTo?: string; dueDate?: string; isCompleted?: boolean }): Promise<void> {
+  await api.patch(`/api/meetings/actions/${id}`, payload);
+}
+
+export async function removeMeetingActionItem(id: string): Promise<void> {
+  await api.delete(`/api/meetings/actions/${id}`);
+}

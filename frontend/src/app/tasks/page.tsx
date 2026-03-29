@@ -3113,15 +3113,18 @@ export default function TasksPage() {
               const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
               const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
 
-              // تصنيف المهام حسب اليوم
+              // تصنيف المهام حسب اليوم — فصل السابقة عن اليوم عن المستقبلية
               function getTaskDay(t: TaskRow): string {
                 if (t.context === "habit") return todayStr; // العادات دائماً اليوم
                 if (t.dueDate) {
                   const d = t.dueDate.slice(0, 10);
-                  if (d <= todayStr) return todayStr; // المستحقة اليوم أو قبل
-                  return d;
+                  if (d === todayStr) return todayStr;
+                  return d; // أبقِ التاريخ الأصلي للسابقة والمستقبلية
                 }
-                if (t.createdAt) return t.createdAt.slice(0, 10);
+                if (t.createdAt) {
+                  const c = t.createdAt.slice(0, 10);
+                  return c <= todayStr ? todayStr : c;
+                }
                 return todayStr;
               }
 
@@ -3149,39 +3152,66 @@ export default function TasksPage() {
               const todayGroup = groups.get(todayStr);
               if (todayGroup) groups.set(todayStr, todayGroup.sort(sortByPlan));
 
-              // ترتيب: اليوم أولاً ثم الأقرب
+              // ترتيب: المتأخرة أولاً ← اليوم ← المستقبلية
               const sortedDays = Array.from(groups.entries()).sort((a, b) => {
-                if (a[0] === todayStr && b[0] !== todayStr) return -1;
-                if (b[0] === todayStr && a[0] !== todayStr) return 1;
+                const aIsPast = a[0] < todayStr;
+                const bIsPast = b[0] < todayStr;
+                const aIsToday = a[0] === todayStr;
+                const bIsToday = b[0] === todayStr;
+                // المتأخرة أولاً (الأقدم أولاً)
+                if (aIsPast && !bIsPast) return -1;
+                if (!aIsPast && bIsPast) return 1;
+                // ثم اليوم
+                if (aIsToday && !bIsToday) return -1;
+                if (!aIsToday && bIsToday) return 1;
                 return a[0].localeCompare(b[0]);
               });
 
               function dayLabel(d: string): string {
-                if (d === todayStr) return "اليوم";
+                if (d === todayStr) return "📌 اليوم";
                 if (d === yesterdayStr) return "أمس";
                 if (d === tomorrowStr) return "غداً";
-                if (d < todayStr) return "سابقة";
+                if (d < todayStr) {
+                  const diff = Math.round((new Date(todayStr).getTime() - new Date(d).getTime()) / 86400000);
+                  if (diff <= 7) return `⚠ متأخرة (${diff} ${diff === 1 ? "يوم" : "أيام"})`;
+                  return `⚠ متأخرة — ${new Date(d).toLocaleDateString("ar-SA", { day: "numeric", month: "short" })}`;
+                }
                 return new Date(d).toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "short" });
               }
 
+              function dayStyle(d: string): { bg: string; color: string; border: string; icon?: string } {
+                if (d < todayStr) return { bg: "#DC262608", color: "#DC2626", border: "#DC262620" };
+                if (d === todayStr) return { bg: "#D4AF3708", color: "var(--gold, #D4AF37)", border: "#D4AF3730" };
+                if (d === tomorrowStr) return { bg: "#5E549508", color: "#5E5495", border: "#5E549520" };
+                return { bg: "transparent", color: "#5E5495", border: "var(--card-border)" };
+              }
+
               return (
-              <div className="px-5 py-3 space-y-1">
-                {sortedDays.map(([day, dayTasks]) => (
-                  <details key={day} open={day === todayStr || day === tomorrowStr || sortedDays.length <= 2}>
-                    <summary className="flex items-center justify-between py-2 px-2 rounded-lg cursor-pointer hover:bg-[#C9A84C]/5 transition sticky top-0 z-10"
-                      style={{ background: "var(--card)" }}>
+              <div className="px-5 py-3 space-y-2">
+                {sortedDays.map(([day, dayTasks]) => {
+                  const ds = dayStyle(day);
+                  const isPast = day < todayStr;
+                  const isToday = day === todayStr;
+                  return (
+                  <details key={day} open={isToday || day === tomorrowStr || sortedDays.length <= 2}>
+                    <summary className="flex items-center justify-between py-2 px-3 rounded-xl cursor-pointer transition sticky top-0 z-10"
+                      style={{ background: ds.bg, borderRight: `3px solid ${ds.color}` }}>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold" style={{ color: day === todayStr ? "var(--gold, #D4AF37)" : day < todayStr ? "var(--muted)" : "#5E5495" }}>{dayLabel(day)}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100" style={{ color: "var(--muted)" }}>{dayTasks.filter(x => !x.done).length}/{dayTasks.length}</span>
+                        <span className="text-sm font-bold" style={{ color: ds.color }}>{dayLabel(day)}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
+                          style={{ background: isPast ? "#DC262612" : isToday ? "#D4AF3712" : "#5E549512", color: ds.color }}>
+                          {dayTasks.filter(x => !x.done).length}/{dayTasks.length}
+                        </span>
                       </div>
-                      <span className="text-[10px]" style={{ color: "var(--muted)" }}>{day !== todayStr ? day : ""}</span>
+                      <span className="text-[10px]" style={{ color: "var(--muted)" }}>{!isToday ? new Date(day).toLocaleDateString("ar-SA", { month: "short", day: "numeric" }) : ""}</span>
                     </summary>
                 {dayTasks.map((t) => (
                   <div key={t.id}>
                     <div
                       className={`flex items-center gap-3 py-3 border-b border-[#e2d5b0]/60 last:border-0
                                   rounded-lg px-2 transition-all
-                                  ${t.done ? "opacity-50" : ""} ${selectedTasks.has(t.id) ? "bg-[#5E5495]/10 border-[#5E5495]/30" : ""}`}>
+                                  ${t.done ? "opacity-50" : isPast && !t.done ? "opacity-75" : ""} ${selectedTasks.has(t.id) ? "bg-[#5E5495]/10 border-[#5E5495]/30" : ""}`}
+                      style={isPast && !t.done ? { borderInlineStart: "2px solid #DC262640" } : undefined}>
                       {/* الدائرة — للإنجاز فقط */}
                       {bulkMode ? (
                         <div onClick={() => toggleSelect(t.id)} className={`w-7 h-7 rounded flex-shrink-0 border-2 flex items-center justify-center transition-all cursor-pointer ${selectedTasks.has(t.id) ? "bg-[#5E5495] border-[#5E5495]" : "border-[#C9A84C] bg-transparent"}`}>
@@ -3295,7 +3325,8 @@ export default function TasksPage() {
                   </div>
                 ))}
                   </details>
-                ))}
+                  );
+                })}
               </div>
               );
             })()}

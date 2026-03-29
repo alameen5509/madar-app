@@ -3,9 +3,10 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 
 type Tab = "roles" | "reviews" | "devreqs";
-interface Role { id:string; title:string; organization?:string; sector?:string; description?:string; pulseStatus:string; pulseNote?:string; nextReviewDate?:string; lastReviewDate?:string; reviewFrequency:string; color:string; icon:string; priority:number; notesCount?:number; pendingDevCount?:number; workId?:string; }
+interface Role { id:string; title:string; organization?:string; sector?:string; description?:string; pulseStatus:string; pulseNote?:string; nextReviewDate?:string; lastReviewDate?:string; reviewFrequency:string; color:string; icon:string; priority:number; notesCount?:number; pendingDevCount?:number; workId?:string; isAuto?:boolean; autoSource?:string; }
 interface Note { id:string; roleId?:string; content:string; convertedTaskId?:string; createdAt:string; }
 interface DevReq { id:string; roleId?:string; title:string; description?:string; status:string; createdAt:string; }
+interface WorkItem { id:string; name:string; type:string; title?:string; employer?:string; sector?:string; role?:string; status?:string; jobs?:{id:string;title:string;status:string;description?:string}[] }
 
 const PULSE: Record<string,{label:string;color:string;bg:string}> = {
   green: { label: "مستقر", color: "#3D8C5A", bg: "#3D8C5A15" },
@@ -39,29 +40,120 @@ export default function WarRoomPage() {
   const [reviewForm, setReviewForm] = useState({ status: "green", note: "", accomplishments: "" });
 
   // Works & Circles for linking
-  const [works, setWorks] = useState<{id:string;name:string;type:string}[]>([]);
+  const [works, setWorks] = useState<WorkItem[]>([]);
   const [circles, setCircles] = useState<{id:string;name:string}[]>([]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [r, w, c] = await Promise.all([
-        api.get("/api/war-room/roles").then(r => r.data ?? []),
-        api.get("/api/works").then(r => (r.data ?? []).map((x: {id:string;name:string;type:string}) => ({ id: x.id, name: x.name, type: x.type }))).catch(() => []),
+        api.get("/api/war-room/roles").then(r => r.data ?? []).catch(() => []),
+        api.get("/api/works").then(r => r.data ?? []).catch(() => []),
         api.get("/api/circle-groups").then(r => (r.data ?? []).map((x: {id:string;name:string}) => ({ id: x.id, name: x.name }))).catch(() => []),
       ]);
-      setRoles(r); setWorks(w); setCircles(c);
+
+      const existingRoles = Array.isArray(r) ? r as Role[] : [];
+      const allWorks = Array.isArray(w) ? w as WorkItem[] : [];
+      const allCircles = Array.isArray(c) ? c as {id:string;name:string}[] : [];
+
+      // تحويل كل الأعمال والوظائف إلى مناصب تلقائية
+      const autoRoles: Role[] = [];
+
+      // 1) الأعمال
+      for (const work of allWorks) {
+        autoRoles.push({
+          id: `auto-work-${work.id}`,
+          title: work.name || "عمل بدون اسم",
+          organization: work.type === "job" ? (work.employer || "") : (work.sector || ""),
+          sector: work.sector,
+          description: work.type === "job" ? (work.title || "") : (work.role || ""),
+          pulseStatus: (work.status === "active" || !work.status) ? "green" : "yellow",
+          reviewFrequency: "weekly",
+          color: work.type === "job" ? "#2D6B9E" : "#5E5495",
+          icon: work.type === "job" ? "💼" : "🏢",
+          priority: 0,
+          workId: work.id,
+          isAuto: true,
+          autoSource: "work",
+        });
+        if (Array.isArray(work.jobs)) {
+          for (const job of work.jobs) {
+            autoRoles.push({
+              id: `auto-job-${job.id}`,
+              title: `${job.title || "وظيفة"} — ${work.name}`,
+              organization: work.sector || work.name,
+              sector: work.sector,
+              description: job.description,
+              pulseStatus: (job.status === "active" || !job.status) ? "green" : "yellow",
+              reviewFrequency: "weekly",
+              color: "#D4AF37",
+              icon: "👔",
+              priority: 1,
+              workId: work.id,
+              isAuto: true,
+              autoSource: "job",
+            });
+          }
+        }
+      }
+
+      // 2) أدوار الحياة
+      for (const circle of allCircles) {
+        autoRoles.push({
+          id: `auto-circle-${circle.id}`,
+          title: circle.name,
+          pulseStatus: "green",
+          reviewFrequency: "weekly",
+          color: "#8B5CF6",
+          icon: "◎",
+          priority: 2,
+          isAuto: true,
+          autoSource: "circle",
+        });
+      }
+
+      // حذف التلقائية المكررة مع المناصب اليدوية
+      const manualIds = new Set(existingRoles.map(role => role.workId).filter(Boolean));
+      const uniqueAuto = autoRoles.filter(a => {
+        if (a.autoSource === "work" && manualIds.has(a.workId)) return false;
+        return true;
+      });
+
+      setRoles([...existingRoles, ...uniqueAuto]);
+      setWorks(allWorks);
+      setCircles(allCircles);
     } catch {}
     setLoading(false);
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const isAutoRole = (id: string) => id.startsWith("auto-") || roles.find(r => r.id === id)?.isAuto === true;
+
+  // تحويل منصب تلقائي إلى حقيقي في قاعدة البيانات
+  async function promoteAutoRole(role: Role): Promise<string | null> {
+    try {
+      const { data } = await api.post("/api/war-room/roles", {
+        title: role.title,
+        organization: role.organization || undefined,
+        sector: role.sector || undefined,
+        description: role.description || undefined,
+        reviewFrequency: role.reviewFrequency,
+        color: role.color,
+        icon: role.icon,
+        workId: role.workId || undefined,
+      });
+      await fetchData();
+      return data.id;
+    } catch { return null; }
+  }
+
   // Load all notes/devreqs across all roles for the tabs
   async function loadAllReviews() {
     const allN: (Note & {roleTitle?:string;roleIcon?:string})[] = [];
     const allD: (DevReq & {roleTitle?:string;roleIcon?:string})[] = [];
     for (const role of roles) {
+      if (isAutoRole(role.id)) continue; // تجاوز المناصب التلقائية
       try {
         const [n, d] = await Promise.all([
           api.get(`/api/war-room/roles/${role.id}/notes`).then(r => r.data ?? []),
@@ -94,11 +186,22 @@ export default function WarRoomPage() {
 
   async function loadRoleDetails(id: string) {
     if (expandedRole === id) { setExpandedRole(null); return; }
-    setExpandedRole(id); setDetailTab("notes");
+
+    // إذا كان منصباً تلقائياً، أنشئه في قاعدة البيانات أولاً
+    let realId = id;
+    if (isAutoRole(id)) {
+      const role = roles.find(r => r.id === id);
+      if (!role) return;
+      const newId = await promoteAutoRole(role);
+      if (!newId) return;
+      realId = newId;
+    }
+
+    setExpandedRole(realId); setDetailTab("notes");
     try {
       const [n, d] = await Promise.all([
-        api.get(`/api/war-room/roles/${id}/notes`).then(r => r.data ?? []),
-        api.get(`/api/war-room/roles/${id}/dev-requests`).then(r => r.data ?? []),
+        api.get(`/api/war-room/roles/${realId}/notes`).then(r => r.data ?? []),
+        api.get(`/api/war-room/roles/${realId}/dev-requests`).then(r => r.data ?? []),
       ]);
       setNotes(n); setDevReqs(d);
     } catch {}
@@ -212,6 +315,7 @@ export default function WarRoomPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-bold text-sm truncate" style={{ color: "var(--text)" }}>{role.title}</p>
                         <span className="text-[9px] px-2 py-0.5 rounded-full font-bold" style={{ background: pulse.bg, color: pulse.color }}>{pulse.label}</span>
+                        {(role.isAuto || isAutoRole(role.id)) && <span className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ background: `${role.color}12`, color: role.color }}>{role.autoSource === "job" ? "👔 وظيفة" : role.autoSource === "circle" ? "◎ دور حياة" : "💼 من الأعمال"}</span>}
                         {dueReview && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold animate-pulse" style={{ background: "#F59E0B15", color: "#F59E0B" }}>مراجعة مستحقة</span>}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
@@ -223,12 +327,17 @@ export default function WarRoomPage() {
                       </div>
                     </div>
                     <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                      <button onClick={() => { setReviewRole(isReviewing ? null : role.id); setReviewForm({ status: role.pulseStatus, note: "", accomplishments: "" }); }}
+                      <button onClick={async () => {
+                        if (isReviewing) { setReviewRole(null); return; }
+                        let rid = role.id;
+                        if (isAutoRole(rid)) { const newId = await promoteAutoRole(role); if (!newId) return; rid = newId; }
+                        setReviewRole(rid); setReviewForm({ status: role.pulseStatus, note: "", accomplishments: "" });
+                      }}
                         className="text-[9px] px-2.5 py-1.5 rounded-lg font-bold transition" style={{ background: dueReview ? "#F59E0B" : "#5E549515", color: dueReview ? "#fff" : "#5E5495" }}>
                         📋 مراجعة
                       </button>
-                      <button onClick={async () => { if (confirm("حذف؟")) { try { await api.delete(`/api/war-room/roles/${role.id}`); fetchData(); } catch {} } }}
-                        className="text-[9px] px-1.5 py-1 rounded-lg" style={{ color: "#DC2626" }}>🗑️</button>
+                      {!isAutoRole(role.id) && <button onClick={async () => { if (confirm("حذف؟")) { try { await api.delete(`/api/war-room/roles/${role.id}`); fetchData(); } catch {} } }}
+                        className="text-[9px] px-1.5 py-1 rounded-lg" style={{ color: "#DC2626" }}>🗑️</button>}
                     </div>
                   </div>
 
@@ -328,7 +437,7 @@ export default function WarRoomPage() {
               </div>
             );
           })}
-          {roles.length === 0 && <div className="text-center py-12"><p className="text-3xl mb-2">🎖️</p><p className="text-sm" style={{ color: "var(--muted)" }}>أضف مناصبك القيادية</p></div>}
+          {roles.length === 0 && <div className="text-center py-12"><p className="text-3xl mb-2">🎖️</p><p className="text-sm" style={{ color: "var(--muted)" }}>أضف مناصبك القيادية أو أضف أعمالاً من صفحة الأعمال</p><p className="text-[10px] mt-1" style={{ color: "var(--muted)" }}>أعمال محمّلة: {works.length}</p></div>}
         </>)}
 
         {/* ═══ REVIEWS TAB — كل المراجعات ═══ */}

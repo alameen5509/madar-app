@@ -234,6 +234,12 @@ button, a, select, input[type="checkbox"], input[type="radio"] {
 }
 .fade-up { animation: fadeUp 0.5s ease forwards; }
 
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.animate-slideIn { animation: slideInRight 0.25s ease-out forwards; }
+
 /* ── Arch shape ── */
 .arch {
   border-radius: 9999px 9999px 0 0;

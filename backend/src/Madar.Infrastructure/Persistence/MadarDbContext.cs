@@ -58,6 +58,13 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
     public DbSet<PrayerPenalty> PrayerPenalties => Set<PrayerPenalty>();
     public DbSet<PrayerSettings> PrayerSettings => Set<PrayerSettings>();
 
+    // Meetings
+    public DbSet<Meeting> Meetings => Set<Meeting>();
+    public DbSet<MeetingAttendee> MeetingAttendees => Set<MeetingAttendee>();
+    public DbSet<MeetingAgendaItem> MeetingAgenda => Set<MeetingAgendaItem>();
+    public DbSet<MeetingMinute> MeetingMinutes => Set<MeetingMinute>();
+    public DbSet<MeetingActionItem> MeetingActionItems => Set<MeetingActionItem>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -390,6 +397,53 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
             wlr.Property(x => x.DeviceId).HasMaxLength(200).IsRequired();
             wlr.Property(x => x.DeviceName).HasMaxLength(200);
             wlr.Property(x => x.Status).HasMaxLength(20);
+        });
+
+        // ═══ Meetings ═══
+        builder.Entity<Meeting>(m => {
+            m.HasKey(x => x.Id);
+            m.Property(x => x.Title).HasMaxLength(400).IsRequired();
+            m.Property(x => x.Description).HasMaxLength(2000);
+            m.Property(x => x.Platform).HasMaxLength(50);
+            m.Property(x => x.Location).HasMaxLength(500);
+            m.Property(x => x.MeetingLink).HasMaxLength(500);
+            m.Property(x => x.Notes).HasMaxLength(5000);
+            m.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+            m.HasOne(x => x.Project).WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.SetNull);
+            m.HasOne(x => x.Work).WithMany().HasForeignKey(x => x.WorkId).OnDelete(DeleteBehavior.SetNull);
+            m.HasOne(x => x.Circle).WithMany().HasForeignKey(x => x.CircleId).OnDelete(DeleteBehavior.SetNull);
+            m.HasIndex(x => x.OwnerId);
+            m.HasIndex(x => x.StartTime);
+        });
+
+        builder.Entity<MeetingAttendee>(a => {
+            a.HasKey(x => x.Id);
+            a.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            a.Property(x => x.Notes).HasMaxLength(500);
+            a.HasOne(x => x.Meeting).WithMany(x => x.Attendees).HasForeignKey(x => x.MeetingId).OnDelete(DeleteBehavior.Cascade);
+            a.HasOne(x => x.Contact).WithMany().HasForeignKey(x => x.ContactId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<MeetingAgendaItem>(ai => {
+            ai.HasKey(x => x.Id);
+            ai.ToTable("MeetingAgenda");
+            ai.Property(x => x.Title).HasMaxLength(400).IsRequired();
+            ai.Property(x => x.Description).HasMaxLength(1000);
+            ai.HasOne(x => x.Meeting).WithMany(x => x.Agenda).HasForeignKey(x => x.MeetingId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<MeetingMinute>(mn => {
+            mn.HasKey(x => x.Id);
+            mn.Property(x => x.Content).HasMaxLength(5000).IsRequired();
+            mn.HasOne(x => x.Meeting).WithMany(x => x.Minutes).HasForeignKey(x => x.MeetingId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<MeetingActionItem>(act => {
+            act.HasKey(x => x.Id);
+            act.Property(x => x.Title).HasMaxLength(400).IsRequired();
+            act.Property(x => x.AssignedTo).HasMaxLength(200);
+            act.HasOne(x => x.Meeting).WithMany(x => x.ActionItems).HasForeignKey(x => x.MeetingId).OnDelete(DeleteBehavior.Cascade);
+            act.HasOne(x => x.Task).WithMany().HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

@@ -19,3 +19,10 @@ public enum PermissionKey
     Members_Invite, Members_Remove, Roles_Manage,
     Reports_View, Reports_Export
 }
+
+// ═══ Meetings ═══
+public enum MeetingType { Remote, InPerson, Hybrid }
+public enum MeetingStatus { Scheduled, InProgress, Completed, Cancelled, Postponed }
+public enum MeetingRecurrence { None, Daily, Weekly, Monthly }
+public enum AttendeeRole { Host, Attendee, Optional }
+public enum AttendeeStatus { Invited, Confirmed, Declined, Attended, Absent }

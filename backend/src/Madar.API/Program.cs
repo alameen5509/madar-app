@@ -201,6 +201,23 @@ using (var scope = app.Services.CreateScope())
             CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
             INDEX IX_HF_UserId (UserId)
         );",
+        // Historical Events (أحداث تاريخية موثقة)
+        @"CREATE TABLE IF NOT EXISTS HistoricalEvents (
+            Id CHAR(36) NOT NULL PRIMARY KEY,
+            UserId CHAR(36) NOT NULL,
+            Title VARCHAR(500) NOT NULL,
+            GregorianDate VARCHAR(200) NULL,
+            HijriDate VARCHAR(200) NULL,
+            Location VARCHAR(500) NULL,
+            Description TEXT NULL,
+            StrategicSignificance TEXT NULL,
+            OrderIndex INT NOT NULL DEFAULT 0,
+            Category VARCHAR(100) NOT NULL DEFAULT '',
+            CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            INDEX IX_HE_UserId (UserId),
+            INDEX IX_HE_Category (Category),
+            INDEX IX_HE_Order (OrderIndex)
+        );",
         // CircleGroups + UserCircles (new circles system)
         @"CREATE TABLE IF NOT EXISTS CircleGroups (
             Id CHAR(36) NOT NULL PRIMARY KEY,

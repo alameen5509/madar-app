@@ -19,11 +19,79 @@ public class WarRoomController : ControllerBase
     [HttpGet("roles")]
     public async Task<IActionResult> GetRoles(CancellationToken ct)
     {
+        // المناصب اليدوية
         var roles = await Q(@"SELECT r.*,
             (SELECT COUNT(*) FROM LeadershipNotes n WHERE n.RoleId=r.Id) as NotesCount,
             (SELECT COUNT(*) FROM LeadershipDevRequests d WHERE d.RoleId=r.Id AND d.Status IN ('new','inReview')) as PendingDevCount
             FROM LeadershipRoles r WHERE r.UserId=@uid AND r.IsActive=1 ORDER BY r.Priority, r.CreatedAt",
             Ps("@uid", Uid), ct);
+
+        // الأعمال والوظائف — تظهر تلقائياً كمناصب
+        var linkedWorkIds = new HashSet<string>(
+            roles.Where(r => r.ContainsKey("workId") && r["workId"] != null && r["workId"]!.ToString() != "")
+                 .Select(r => r["workId"]!.ToString()!),
+            StringComparer.OrdinalIgnoreCase);
+
+        var uid = Guid.Parse(Uid);
+        var works = await _db.Works
+            .Where(w => w.OwnerId == uid)
+            .Include(w => w.Jobs)
+            .ToListAsync(ct);
+
+        foreach (var w in works)
+        {
+            if (!linkedWorkIds.Contains(w.Id.ToString()))
+            {
+                roles.Add(new Dictionary<string, object?>
+                {
+                    ["id"] = $"auto-work-{w.Id}",
+                    ["title"] = w.Name,
+                    ["organization"] = w.Type == "job" ? w.Employer : w.Sector,
+                    ["sector"] = w.Sector,
+                    ["description"] = w.Type == "job" ? w.Title : w.Role,
+                    ["pulseStatus"] = w.Status == "active" ? "green" : "yellow",
+                    ["pulseNote"] = null,
+                    ["nextReviewDate"] = null,
+                    ["lastReviewDate"] = null,
+                    ["reviewFrequency"] = "weekly",
+                    ["color"] = w.Type == "job" ? "#2D6B9E" : "#5E5495",
+                    ["icon"] = w.Type == "job" ? "💼" : "🏢",
+                    ["priority"] = 0,
+                    ["workId"] = w.Id.ToString(),
+                    ["notesCount"] = 0,
+                    ["pendingDevCount"] = 0,
+                    ["isAuto"] = true,
+                    ["autoSource"] = "work",
+                });
+            }
+
+            // الوظائف التابعة (لمشاريع ريادية)
+            foreach (var j in w.Jobs)
+            {
+                roles.Add(new Dictionary<string, object?>
+                {
+                    ["id"] = $"auto-job-{j.Id}",
+                    ["title"] = $"{j.Title} — {w.Name}",
+                    ["organization"] = w.Sector ?? w.Name,
+                    ["sector"] = w.Sector,
+                    ["description"] = j.Description,
+                    ["pulseStatus"] = j.Status == "active" ? "green" : "yellow",
+                    ["pulseNote"] = null,
+                    ["nextReviewDate"] = null,
+                    ["lastReviewDate"] = null,
+                    ["reviewFrequency"] = "weekly",
+                    ["color"] = "#D4AF37",
+                    ["icon"] = "👔",
+                    ["priority"] = 1,
+                    ["workId"] = w.Id.ToString(),
+                    ["notesCount"] = 0,
+                    ["pendingDevCount"] = 0,
+                    ["isAuto"] = true,
+                    ["autoSource"] = "job",
+                });
+            }
+        }
+
         return Ok(roles);
     }
 

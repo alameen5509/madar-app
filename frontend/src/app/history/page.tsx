@@ -69,6 +69,14 @@ const CURRENT_CENTURY_IDX = ALL_ERAS.findIndex(e => e.from <= new Date().getFull
 
 /* ─── Page ───────────────────────────────────────────────────────────── */
 
+interface HistoricalEvent {
+  id: string; title: string; gregorianDate?: string; hijriDate?: string;
+  location?: string; description?: string; strategicSignificance?: string;
+  orderIndex: number; category: string;
+}
+
+type PageTab = "timeline" | "events";
+
 export default function HistoryPage() {
   const [records, setRecords] = useState<HistoryRecord[]>([]);
   const [figures, setFigures] = useState<HistoryFigure[]>([]);
@@ -81,6 +89,13 @@ export default function HistoryPage() {
   const [filterCountry, setFilterCountry] = useState("");
   const [filterFigure, setFilterFigure] = useState("");
   const [searchQ, setSearchQ] = useState("");
+
+  // أحداث تاريخية كبرى
+  const [pageTab, setPageTab] = useState<PageTab>("events");
+  const [events, setEvents] = useState<HistoricalEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventCatFilter, setEventCatFilter] = useState("");
+  const [expandedEvent, setExpandedEvent] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -95,7 +110,17 @@ export default function HistoryPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  const fetchEvents = useCallback(async () => {
+    setEventsLoading(true);
+    try {
+      const params = eventCatFilter ? `?category=${encodeURIComponent(eventCatFilter)}` : "";
+      const { data } = await api.get(`/api/historical-events${params}`);
+      setEvents(Array.isArray(data) ? data : []);
+    } catch {}
+    setEventsLoading(false);
+  }, [eventCatFilter]);
+
+  useEffect(() => { fetchData(); fetchEvents(); }, [fetchData, fetchEvents]);
 
   // Filter records
   const filtered = records.filter(r => {
@@ -131,13 +156,120 @@ export default function HistoryPage() {
             + حدث جديد
           </button>
         </div>
+        {/* تبويبات */}
+        <div className="flex gap-1.5 mt-2">
+          {([["events","⚔️ الأحداث الكبرى"],["timeline","📜 الخط الزمني"]] as [PageTab,string][]).map(([k,l]) => (
+            <button key={k} onClick={() => setPageTab(k)} className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition whitespace-nowrap"
+              style={{ background: pageTab === k ? "#2C2C54" : "var(--bg)", color: pageTab === k ? "#D4AF37" : "var(--muted)", border: `1px solid ${pageTab === k ? "#2C2C54" : "var(--card-border)"}` }}>
+              {l} {k === "events" ? `(${events.length})` : `(${records.length})`}
+            </button>
+          ))}
+        </div>
       </header>
 
       <div className="px-4 sm:px-6 py-4 space-y-4">
-        {loading && <p className="text-center py-12 animate-pulse" style={{ color: "var(--muted)" }}>جارٍ التحميل...</p>}
 
-        {/* ═══ TIMELINE ═══ */}
-        {!loading && (
+        {/* ═══ الأحداث الكبرى ═══ */}
+        {pageTab === "events" && (
+          <div className="space-y-4">
+            {eventsLoading && <p className="text-center py-12 animate-pulse" style={{ color: "var(--muted)" }}>جارٍ التحميل...</p>}
+            {!eventsLoading && (<>
+              {/* فلتر التصنيف */}
+              {(() => {
+                const cats = [...new Set(events.map(e => e.category).filter(Boolean))];
+                return cats.length > 1 ? (
+                  <div className="flex gap-1.5 flex-wrap">
+                    <button onClick={() => setEventCatFilter("")} className="px-3 py-1.5 rounded-lg text-[10px] font-semibold"
+                      style={{ background: !eventCatFilter ? "#2C2C54" : "var(--card)", color: !eventCatFilter ? "#D4AF37" : "var(--muted)", border: "1px solid var(--card-border)" }}>الكل</button>
+                    {cats.map(c => (
+                      <button key={c} onClick={() => setEventCatFilter(c)} className="px-3 py-1.5 rounded-lg text-[10px] font-semibold"
+                        style={{ background: eventCatFilter === c ? "#2C2C54" : "var(--card)", color: eventCatFilter === c ? "#D4AF37" : "var(--muted)", border: "1px solid var(--card-border)" }}>{c}</button>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
+
+              {/* زر بذر البيانات */}
+              {events.length === 0 && (
+                <button onClick={async () => {
+                  try { await api.post("/api/historical-events/seed-ww1"); fetchEvents(); } catch {}
+                }} className="px-4 py-2 rounded-xl text-xs font-bold text-white" style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
+                  ⚔️ تحميل أحداث الحرب العالمية الأولى
+                </button>
+              )}
+
+              {/* قائمة الأحداث */}
+              {events.length > 0 ? (
+                <div className="relative">
+                  {/* خط زمني عمودي */}
+                  <div className="absolute top-0 bottom-0 right-[18px] w-0.5" style={{ background: "linear-gradient(to bottom, #D4AF37, #2C2C54)" }} />
+
+                  <div className="space-y-4">
+                    {events.map((ev, idx) => {
+                      const isOpen = expandedEvent === ev.id;
+                      return (
+                        <div key={ev.id} className="relative pr-10">
+                          {/* نقطة على الخط الزمني */}
+                          <div className="absolute right-[11px] top-4 w-4 h-4 rounded-full border-2 z-10"
+                            style={{ background: isOpen ? "#D4AF37" : "var(--card)", borderColor: "#D4AF37" }}>
+                            <span className="absolute -right-6 top-0 text-[9px] font-bold" style={{ color: "#D4AF37" }}>{ev.orderIndex}</span>
+                          </div>
+
+                          <div className="rounded-2xl border overflow-hidden cursor-pointer transition hover:shadow-md"
+                            style={{ background: "var(--card)", borderColor: isOpen ? "#D4AF3740" : "var(--card-border)" }}
+                            onClick={() => setExpandedEvent(isOpen ? null : ev.id)}>
+
+                            {/* العنوان */}
+                            <div className="px-4 py-3">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm">⚔️</span>
+                                <h3 className="font-bold text-sm flex-1" style={{ color: "var(--text)" }}>{ev.title}</h3>
+                                {ev.category && <span className="text-[8px] px-2 py-0.5 rounded-full font-bold" style={{ background: "#2C2C5412", color: "#2C2C54" }}>{ev.category}</span>}
+                              </div>
+                              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                {ev.gregorianDate && <span className="text-[10px] flex items-center gap-1" style={{ color: "var(--muted)" }}>📅 {ev.gregorianDate}</span>}
+                                {ev.hijriDate && <span className="text-[10px] flex items-center gap-1" style={{ color: "#D4AF37" }}>🌙 {ev.hijriDate}</span>}
+                                {ev.location && <span className="text-[10px] flex items-center gap-1" style={{ color: "var(--muted)" }}>📍 {ev.location}</span>}
+                              </div>
+                            </div>
+
+                            {/* التفاصيل (موسّعة) */}
+                            {isOpen && (
+                              <div className="border-t px-4 py-3 space-y-3" style={{ borderColor: "var(--card-border)" }}>
+                                {ev.description && (
+                                  <div>
+                                    <p className="text-[9px] font-bold mb-1" style={{ color: "#2C2C54" }}>📖 الوصف:</p>
+                                    <p className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: "var(--text)" }}>{ev.description}</p>
+                                  </div>
+                                )}
+                                {ev.strategicSignificance && (
+                                  <div className="rounded-xl p-3" style={{ background: "#D4AF3708", border: "1px solid #D4AF3720" }}>
+                                    <p className="text-[9px] font-bold mb-1" style={{ color: "#D4AF37" }}>⚡ الأهمية الاستراتيجية:</p>
+                                    <p className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: "var(--text)" }}>{ev.strategicSignificance}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-3xl mb-2">⚔️</p>
+                  <p className="text-sm" style={{ color: "var(--muted)" }}>لا توجد أحداث تاريخية بعد</p>
+                </div>
+              )}
+            </>)}
+          </div>
+        )}
+
+        {/* ═══ TIMELINE (الخط الزمني القديم) ═══ */}
+        {pageTab === "timeline" && loading && <p className="text-center py-12 animate-pulse" style={{ color: "var(--muted)" }}>جارٍ التحميل...</p>}
+
+        {pageTab === "timeline" && !loading && (
           <>
             {/* Filters */}
             <div className="flex items-center gap-2 flex-wrap">
