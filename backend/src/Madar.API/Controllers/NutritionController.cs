@@ -25,8 +25,8 @@ public class NutritionController : ControllerBase
     public async Task<IActionResult> CreateDish([FromBody] DishReq req, CancellationToken ct)
     {
         var id = NewId();
-        await E("INSERT INTO Dishes (Id,UserId,Name,Description,ImageUrl,Category,PrepTime,Calories,Servings) VALUES(@id,@uid,@n,@d,@img,@cat,@pt,@cal,@srv)",
-            [P("@id",id),P("@uid",Uid),P("@n",req.Name??""),P("@d",req.Description),P("@img",req.ImageUrl),
+        await E("INSERT INTO Dishes (Id,UserId,Name,Description,ImageUrl,ImageData,Category,PrepTime,Calories,Servings) VALUES(@id,@uid,@n,@d,@img,@imgd,@cat,@pt,@cal,@srv)",
+            [P("@id",id),P("@uid",Uid),P("@n",req.Name??""),P("@d",req.Description),P("@img",req.ImageUrl),P("@imgd",req.ImageData),
              P("@cat",req.Category??"أساسي"),P("@pt",req.PrepTime),P("@cal",req.Calories),P("@srv",req.Servings??4)], ct);
         // Add ingredients inline
         if (req.Ingredients != null)
@@ -69,7 +69,7 @@ public class NutritionController : ControllerBase
     {
         var meals = await Q("SELECT * FROM Meals WHERE UserId=@uid AND IsActive=1 ORDER BY IsDailyFavorite DESC, Frequency, Name", Ps("@uid",Uid), ct);
         foreach (var m in meals)
-            m["dishes"] = await Q("SELECT md.*,d.Name as DishName,d.ImageUrl as DishImage,d.Category FROM MealDishes md JOIN Dishes d ON md.DishId=d.Id WHERE md.MealId=@mid ORDER BY md.DisplayOrder",
+            m["dishes"] = await Q("SELECT md.*,d.Name as DishName,d.ImageUrl as DishImage,d.ImageData as DishImageData,d.Category FROM MealDishes md JOIN Dishes d ON md.DishId=d.Id WHERE md.MealId=@mid ORDER BY md.DisplayOrder",
                 Ps("@mid",m["id"]?.ToString()??""), ct);
         return Ok(meals);
     }
@@ -321,7 +321,7 @@ public class NutritionController : ControllerBase
 }
 
 // DTOs
-public class DishReq { public string? Name{get;set;} public string? Description{get;set;} public string? ImageUrl{get;set;} public string? Category{get;set;} public int? PrepTime{get;set;} public int? Calories{get;set;} public int? Servings{get;set;} public List<DishIngLine>? Ingredients{get;set;} }
+public class DishReq { public string? Name{get;set;} public string? Description{get;set;} public string? ImageUrl{get;set;} public string? ImageData{get;set;} public string? Category{get;set;} public int? PrepTime{get;set;} public int? Calories{get;set;} public int? Servings{get;set;} public List<DishIngLine>? Ingredients{get;set;} }
 public class DishIngLine { public string? IngredientId{get;set;} public string? Name{get;set;} public decimal? Quantity{get;set;} public string? Unit{get;set;} }
 public class MealReq2 { public string? Name{get;set;} public string? MealTime{get;set;} public string? Frequency{get;set;} public List<int>? PreferredDays{get;set;} public bool? IsDailyFavorite{get;set;} public bool? IsForGuests{get;set;} public List<string>? DishIds{get;set;} }
 public class AddDishReq { public string? DishId{get;set;} }

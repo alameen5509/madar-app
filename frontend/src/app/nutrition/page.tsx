@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 
 type Tab = "plan" | "meals" | "dishes" | "juices" | "stock" | "shopping";
-interface Dish { id:string; name:string; description?:string; imageUrl?:string; category:string; servings?:number; ingredients?:{id:string;ingredientName:string;quantity:number;unit:string}[]; }
+interface Dish { id:string; name:string; description?:string; imageUrl?:string; imageData?:string; category:string; servings?:number; ingredients?:{id:string;ingredientName:string;quantity:number;unit:string}[]; }
 interface Meal { id:string; name:string; mealTime:string; frequency:string; preferredDays?:string; isDailyFavorite:boolean; isForGuests:boolean; dishes?:{dishId:string;dishName:string;dishImage?:string;category:string}[]; }
 interface Ingredient { id:string; name:string; category:string; unit:string; currentStock:number; minStock:number; brands?:{id:string;brandName:string;quality:string;isPreferred:boolean;lastPrice?:number;avgPrice?:number}[]; }
 interface Plan { planDate:string; breakfastMealId?:string; lunchMealId?:string; dinnerMealId?:string; snackMealId?:string; breakfastName?:string; lunchName?:string; dinnerName?:string; snackName?:string; }
@@ -58,7 +58,7 @@ export default function NutritionPage() {
     if(!nd.name.trim())return;
     try{
       await api.post("/api/nutrition/dishes",{
-        name:nd.name,description:nd.desc||undefined,imageUrl:nd.img||undefined,category:nd.cat,
+        name:nd.name,description:nd.desc||undefined,imageUrl:nd.img&&!nd.img.startsWith("data:")?nd.img:undefined,imageData:nd.img&&nd.img.startsWith("data:")?nd.img:undefined,category:nd.cat,
         servings:parseInt(nd.srv)||4,
         ingredients:ndIngs.filter(i=>i.name.trim()).map(i=>({ingredientId:i.existingId||undefined,name:i.name,quantity:parseFloat(i.qty)||1,unit:i.unit})),
       });
@@ -153,7 +153,7 @@ export default function NutritionPage() {
               <div><p className="text-[10px] font-bold mb-1" style={{color:"var(--text)"}}>اختر الصحون:</p>
                 <div className="space-y-1 max-h-40 overflow-y-auto">{dishes.map(d=>(<button key={d.id} onClick={()=>setNm({...nm,dishIds:nm.dishIds.includes(d.id)?nm.dishIds.filter(x=>x!==d.id):[...nm.dishIds,d.id]})}
                   className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-right transition" style={{background:nm.dishIds.includes(d.id)?"#D4AF3715":"var(--bg)",border:`1px solid ${nm.dishIds.includes(d.id)?"#D4AF37":"var(--card-border)"}`}}>
-                  {d.imageUrl&&<img src={d.imageUrl} alt="" className="w-8 h-8 rounded object-cover"/>}
+                  {(d.imageData||d.imageUrl)&&<img src={d.imageData||d.imageUrl} alt="" className="w-8 h-8 rounded object-cover"/>}
                   <span className="text-[10px] flex-1" style={{color:"var(--text)"}}>{d.name}</span>
                   <span className="text-[9px]" style={{color:"var(--muted)"}}>{d.category}</span>
                   {nm.dishIds.includes(d.id)&&<span className="text-[10px]" style={{color:"#D4AF37"}}>✓</span>}
@@ -198,7 +198,16 @@ export default function NutritionPage() {
           {showNewDish&&(
             <div className="rounded-xl border p-4 space-y-3" style={{background:"var(--card)",borderColor:"var(--card-border)"}}>
               <input value={nd.name} onChange={e=>setNd({...nd,name:e.target.value})} placeholder="اسم الصحن *" className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={is}/>
-              <input value={nd.img} onChange={e=>setNd({...nd,img:e.target.value})} placeholder="رابط الصورة (اختياري)" className="w-full px-3 py-2 rounded-lg border text-xs focus:outline-none" style={is}/>
+              {/* Image: paste or upload */}
+              <div className="rounded-lg border-2 border-dashed p-2 text-center transition cursor-pointer"
+                style={{borderColor:nd.img?"#D4AF37":"var(--card-border)",background:nd.img?"#D4AF3706":"var(--bg)"}}
+                onPaste={e=>{for(const item of Array.from(e.clipboardData?.items??[])){if(item.type.startsWith("image/")){const f=item.getAsFile();if(!f)continue;const r=new FileReader();r.onload=()=>{if(typeof r.result==="string")setNd({...nd,img:r.result});};r.readAsDataURL(f);}}}}
+                onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.onchange=()=>{const f=inp.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{if(typeof r.result==="string")setNd({...nd,img:r.result});};r.readAsDataURL(f);};inp.click();}}>
+                {nd.img?(
+                  <div className="relative"><img src={nd.img} alt="" className="h-20 mx-auto rounded-lg object-cover"/>
+                    <button onClick={e=>{e.stopPropagation();setNd({...nd,img:""});}} className="absolute top-0 right-0 w-5 h-5 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center">✕</button></div>
+                ):(<p className="text-[10px] py-2" style={{color:"var(--muted)"}}>📎 اضغط لرفع صورة أو الصقها (Ctrl+V)</p>)}
+              </div>
               <div className="flex gap-2">
                 <select value={nd.cat} onChange={e=>setNd({...nd,cat:e.target.value})} className="flex-1 px-2 py-1.5 rounded-lg border text-xs" style={is}>{["أساسي","جانبي","حلوى","عصير","مشروب","سلطة","شوربة"].map(c=><option key={c}>{c}</option>)}</select>
                 <input value={nd.srv} onChange={e=>setNd({...nd,srv:e.target.value})} placeholder="أشخاص" type="number" className="w-16 px-2 py-1.5 rounded-lg border text-xs" style={is}/>
@@ -238,7 +247,7 @@ export default function NutritionPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             {dishes.filter(d=>d.category!=="عصير"&&d.category!=="مشروب").map(d=>(
               <div key={d.id} className="rounded-xl border overflow-hidden" style={{background:"var(--card)",borderColor:"var(--card-border)"}}>
-                {d.imageUrl&&<img src={d.imageUrl} alt={d.name} className="w-full h-32 object-cover"/>}
+                {(d.imageData||d.imageUrl)&&<img src={d.imageData||d.imageUrl} alt={d.name} className="w-full h-32 object-cover"/>}
                 <div className="p-3">
                   <div className="flex items-start justify-between">
                     <div className="cursor-pointer" onClick={()=>loadDishIngs(d.id)}>
@@ -274,7 +283,7 @@ export default function NutritionPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 {juices.map(d=>(
                   <div key={d.id} className="rounded-xl border overflow-hidden" style={{background:"var(--card)",borderColor:"var(--card-border)"}}>
-                    {d.imageUrl&&<img src={d.imageUrl} alt={d.name} className="w-full h-32 object-cover"/>}
+                    {(d.imageData||d.imageUrl)&&<img src={d.imageData||d.imageUrl} alt={d.name} className="w-full h-32 object-cover"/>}
                     <div className="p-3">
                       <div className="flex items-start justify-between">
                         <div className="cursor-pointer" onClick={()=>loadDishIngs(d.id)}>
