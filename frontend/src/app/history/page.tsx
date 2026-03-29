@@ -70,6 +70,9 @@ const CURRENT_CENTURY_IDX = ALL_ERAS.findIndex(e => e.from <= new Date().getFull
 /* ─── Page ───────────────────────────────────────────────────────────── */
 
 import { WW1_EVENTS, type HistoricalEvent } from "./ww1-events";
+import { WW2_EVENTS } from "./ww2-events";
+
+const ALL_EMBEDDED_EVENTS = [...WW1_EVENTS, ...WW2_EVENTS];
 
 type PageTab = "timeline" | "events";
 
@@ -89,7 +92,7 @@ export default function HistoryPage() {
 
   // أحداث تاريخية كبرى — تبدأ بالبيانات المضمّنة فوراً
   const [pageTab, setPageTab] = useState<PageTab>("timeline");
-  const [events, setEvents] = useState<HistoricalEvent[]>(WW1_EVENTS);
+  const [events, setEvents] = useState<HistoricalEvent[]>(ALL_EMBEDDED_EVENTS);
   const [eventCatFilter, setEventCatFilter] = useState("");
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null);
 
@@ -203,7 +206,7 @@ export default function HistoryPage() {
                   <div className="absolute top-0 bottom-0 right-[18px] w-0.5" style={{ background: "linear-gradient(to bottom, #D4AF37, #2C2C54)" }} />
 
                   <div className="space-y-4">
-                    {events.map((ev, idx) => {
+                    {events.filter(e => !eventCatFilter || e.category === eventCatFilter).map((ev, idx) => {
                       const isOpen = expandedEvent === ev.id;
                       return (
                         <div key={ev.id} className="relative pr-10">
