@@ -42,6 +42,17 @@ public class SmartTask
     public Guid? ProjectId { get; set; }
     public Guid? ContactId { get; set; }
 
+    // Reminder fields (synced with DB raw columns)
+    public string? ReminderFrequency { get; set; }
+    public int? ReminderIntervalDays { get; set; }
+    public DateTime? ReminderStartDate { get; set; }
+    public DateTime? NextReminderAt { get; set; }
+    public DateTime? LastRemindedAt { get; set; }
+    public DateTime? SnoozedUntil { get; set; }
+    public string? ReminderStatus { get; set; }
+    public string? AssignedPersonName { get; set; }
+    public string? AssignedPersonRelation { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public ApplicationUser Owner { get; set; } = default!;

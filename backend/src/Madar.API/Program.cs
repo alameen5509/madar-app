@@ -358,15 +358,4 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// ═══ Auto-migrate schema (idempotent) ═══
-{
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<Madar.Infrastructure.Persistence.MadarDbContext>();
-    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals ADD COLUMN FocusType VARCHAR(20) NULL;"); } catch { }
-    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals ADD COLUMN SuspendedUntil DATETIME(6) NULL;"); } catch { }
-    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals ADD COLUMN SuspendReason VARCHAR(500) NULL;"); } catch { }
-    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE Goals MODIFY COLUMN LifeCircleId CHAR(36) NULL;"); } catch { }
-    try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE SmartTasks MODIFY COLUMN LifeCircleId CHAR(36) NULL;"); } catch { }
-}
-
 app.Run();

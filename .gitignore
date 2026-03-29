@@ -67,3 +67,14 @@ backend/src/Madar.API/deploy*
 backend/src/deploy.zip
 
 .vercel
+
+# Build artifacts
+backend/src/Madar.API/publish-sc/
+backend/src/Madar.API/publish9/
+*.bak
+backend/app-logs.zip
+backend/build-logs*.zip
+backend/deploy-*.zip
+backend/deploy-*.tar.gz
+backend/package-lock.json
+

@@ -25,26 +25,40 @@ function loadBadgeCounts(): BadgeCounts {
 
 /* ─── Nav items ───────────────────────────────────────────────── */
 
-const NAV_ITEMS = [
-  { icon: "↻", label: "العادات",            href: "/habits",      badgeKey: "habits" as const, fixed: false },
-  { icon: "🤲", label: "التوبة",             href: "/tawbah",      badgeKey: null, fixed: false },
-  { icon: "🚫", label: "ترك العادات",       href: "/quit-habits", badgeKey: null, fixed: false },
-  { icon: "◻", label: "أعمال اليوم",        href: "/tasks",       badgeKey: "tasks" as const, fixed: true },
-  { icon: "◎", label: "أدوار الحياة",       href: "/circles",     badgeKey: null, fixed: false },
-  { icon: "◈", label: "الأعمال",            href: "/works",       badgeKey: null, fixed: false },
-  { icon: "▣", label: "المشاريع",           href: "/projects",    badgeKey: null, fixed: false },
-  { icon: "✦", label: "صندوق الوارد",      href: "/inbox",       badgeKey: "inbox" as const, fixed: false },
-  { icon: "◑", label: "الإحصائيات",         href: "/energy",      badgeKey: null, fixed: false },
-  { icon: "◇", label: "الإدارة المالية",    href: "/finance",     badgeKey: "dues" as const, fixed: false },
-  { icon: "🍽️", label: "التغذية",            href: "/nutrition",   badgeKey: null, fixed: false },
-  { icon: "🔑", label: "الحسابات",           href: "/accounts",    badgeKey: null, fixed: false },
-  { icon: "👥", label: "المستخدمون",        href: "/users",       badgeKey: null, fixed: false },
-  { icon: "◆", label: "الذكاء الاصطناعي",  href: "/ai",          badgeKey: null, fixed: false },
-  { icon: "🎖️", label: "غرفة القيادة",       href: "/war-room",    badgeKey: null, fixed: false },
-  { icon: "📜", label: "التاريخ",            href: "/history",     badgeKey: null, fixed: false },
-  { icon: "🛠️", label: "طلبات التطوير",     href: "/dev-tickets", badgeKey: null, fixed: false },
-  { icon: "◉", label: "الإعدادات",          href: "/settings",    badgeKey: null, fixed: true },
+const NAV_GROUPS = [
+  { group: null, items: [
+    { icon: "◻", label: "أعمال اليوم",        href: "/tasks",       badgeKey: "tasks" as const, fixed: true },
+  ]},
+  { group: "التخطيط", items: [
+    { icon: "▣", label: "المشاريع",           href: "/projects",    badgeKey: null, fixed: false },
+    { icon: "◈", label: "الأعمال",            href: "/works",       badgeKey: null, fixed: false },
+    { icon: "✦", label: "صندوق الوارد",      href: "/inbox",       badgeKey: "inbox" as const, fixed: false },
+  ]},
+  { group: "الحياة", items: [
+    { icon: "◎", label: "أدوار الحياة",       href: "/circles",     badgeKey: null, fixed: false },
+    { icon: "↻", label: "العادات",            href: "/habits",      badgeKey: "habits" as const, fixed: false },
+    { icon: "🤲", label: "التوبة",             href: "/tawbah",      badgeKey: null, fixed: false },
+    { icon: "🚫", label: "ترك العادات",       href: "/quit-habits", badgeKey: null, fixed: false },
+  ]},
+  { group: "الإدارة", items: [
+    { icon: "◇", label: "الإدارة المالية",    href: "/finance",     badgeKey: "dues" as const, fixed: false },
+    { icon: "🍽️", label: "التغذية",            href: "/nutrition",   badgeKey: null, fixed: false },
+    { icon: "🎖️", label: "غرفة القيادة",       href: "/war-room",    badgeKey: null, fixed: false },
+  ]},
+  { group: "المعرفة", items: [
+    { icon: "📜", label: "التاريخ",            href: "/history",     badgeKey: null, fixed: false },
+    { icon: "◑", label: "الإحصائيات",         href: "/energy",      badgeKey: null, fixed: false },
+  ]},
+  { group: "النظام", items: [
+    { icon: "🛠️", label: "طلبات التطوير",     href: "/dev-tickets", badgeKey: null, fixed: false },
+    { icon: "👥", label: "المستخدمون",        href: "/users",       badgeKey: null, fixed: false },
+    { icon: "◉", label: "الإعدادات",          href: "/settings",    badgeKey: null, fixed: true },
+  ]},
 ];
+
+type BadgeKey = "tasks" | "habits" | "inbox" | "dues" | null;
+type NavItem = { icon: string; label: string; href: string; badgeKey: BadgeKey; fixed: boolean };
+const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap(g => g.items as NavItem[]);
 
 const DEFAULT_ORDER = NAV_ITEMS.map(i => i.href);
 
@@ -133,6 +147,12 @@ export default function Sidebar() {
       <nav className="relative z-10 flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
         {sortedItems.map((item, idx) => {
           if (!editMode && hidden.has(item.href)) return null;
+          // Group header
+          const itemGroup = NAV_GROUPS.find(g => g.items.some(i => i.href === item.href));
+          const isFirstInGroup = itemGroup?.items[0]?.href === item.href;
+          const groupLabel = isFirstInGroup && itemGroup?.group && !editMode ? (
+            <p key={`grp-${itemGroup.group}`} className="text-[9px] font-bold px-4 pt-3 pb-1" style={{ color: "rgba(255,255,255,0.25)" }}>{itemGroup.group}</p>
+          ) : null;
           const active = pathname === item.href;
           const count = item.badgeKey ? counts[item.badgeKey] : 0;
 
@@ -171,19 +191,22 @@ export default function Sidebar() {
           }
 
           return (
-            <Link key={item.href} href={item.href}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all ${
-                active ? "nav-active text-[#D4AF37] font-semibold" : "text-white/50 hover:text-white/80 hover:bg-white/5"
-              }`}>
-              <span className="text-base">{item.icon}</span>
-              <span className="flex-1">{item.label}</span>
-              {count > 0 && (
-                <span className="min-w-[20px] h-5 flex items-center justify-center rounded-full text-[10px] font-bold px-1.5"
-                  style={{ background: "#D4AF37", color: "#1A1A2E" }}>
-                  {count > 99 ? "99+" : count}
-                </span>
-              )}
-            </Link>
+            <div key={item.href}>
+              {groupLabel}
+              <Link href={item.href}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all ${
+                  active ? "nav-active text-[#D4AF37] font-semibold" : "text-white/50 hover:text-white/80 hover:bg-white/5"
+                }`}>
+                <span className="text-base">{item.icon}</span>
+                <span className="flex-1">{item.label}</span>
+                {count > 0 && (
+                  <span className="min-w-[20px] h-5 flex items-center justify-center rounded-full text-[10px] font-bold px-1.5"
+                    style={{ background: "#D4AF37", color: "#1A1A2E" }}>
+                    {count > 99 ? "99+" : count}
+                  </span>
+                )}
+              </Link>
+            </div>
           );
         })}
       </nav>
