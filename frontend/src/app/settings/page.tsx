@@ -302,11 +302,51 @@ export default function SettingsPage() {
         </section>
 
         {/* App info */}
+        {/* ═══ النسخ الاحتياطي ═══ */}
+        <div className="rounded-xl border p-4 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+          <h3 className="font-bold text-sm" style={{ color: "var(--text)" }}>💾 النسخ الاحتياطي</h3>
+          <p className="text-[10px]" style={{ color: "var(--muted)" }}>TiDB Cloud يأخذ نسخ احتياطية تلقائية يوميًا. يمكنك أيضًا تصدير بياناتك يدويًا.</p>
+          <button onClick={async () => {
+            try {
+              const { data } = await api.get("/api/backup/export");
+              const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a"); a.href = url; a.download = `madar-backup-${new Date().toISOString().split("T")[0]}.json`; a.click();
+              URL.revokeObjectURL(url);
+              alert("تم تصدير البيانات بنجاح");
+            } catch { alert("فشل التصدير"); }
+          }}
+            className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
+            style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>
+            📥 تصدير بياناتي الآن
+          </button>
+          <BackupLogs />
+        </div>
+
         <div className="text-center pb-8">
           <p className="text-[#9CA3AF] text-xs">مدار — نظام إدارة الحياة الذكي</p>
           <p className="text-[#D1D5DB] text-[10px] mt-1">الإصدار ٢.٠</p>
         </div>
       </div>
     </main>
+  );
+}
+
+function BackupLogs() {
+  const [logs, setLogs] = useState<{id:string;backupDate:string;backupType:string;status:string;fileSize:number;notes?:string}[]>([]);
+  useEffect(() => { api.get("/api/backup/logs").then(r => setLogs(r.data ?? [])).catch(() => {}); }, []);
+  if (logs.length === 0) return <p className="text-[9px] text-center" style={{ color: "var(--muted)" }}>لا توجد عمليات تصدير سابقة</p>;
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] font-bold" style={{ color: "var(--muted)" }}>آخر عمليات التصدير:</p>
+      {logs.slice(0, 5).map(l => (
+        <div key={l.id} className="flex items-center gap-2 text-[10px] px-2 py-1 rounded-lg" style={{ background: "var(--bg)" }}>
+          <span style={{ color: l.status === "success" ? "#3D8C5A" : "#DC2626" }}>{l.status === "success" ? "✅" : "❌"}</span>
+          <span style={{ color: "var(--text)" }}>{new Date(l.backupDate).toLocaleDateString("ar-SA", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+          {l.fileSize > 0 && <span style={{ color: "var(--muted)" }}>{(l.fileSize / 1024).toFixed(0)} KB</span>}
+          {l.notes && <span style={{ color: "var(--muted)" }}>{l.notes}</span>}
+        </div>
+      ))}
+    </div>
   );
 }
