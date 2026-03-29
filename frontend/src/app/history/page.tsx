@@ -88,7 +88,7 @@ export default function HistoryPage() {
   const [searchQ, setSearchQ] = useState("");
 
   // أحداث تاريخية كبرى — تبدأ بالبيانات المضمّنة فوراً
-  const [pageTab, setPageTab] = useState<PageTab>("events");
+  const [pageTab, setPageTab] = useState<PageTab>("timeline");
   const [events, setEvents] = useState<HistoricalEvent[]>(WW1_EVENTS);
   const [eventCatFilter, setEventCatFilter] = useState("");
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null);
@@ -313,7 +313,7 @@ export default function HistoryPage() {
               {ALL_ERAS.map((era, idx) => {
                 const eraRecords = filtered.filter(r => r.year >= era.from && r.year <= era.to);
                 if (eraRecords.length === 0 && idx !== CURRENT_CENTURY_IDX) return null;
-                return <EraSection key={idx} era={era} records={eraRecords} defaultOpen={idx === CURRENT_CENTURY_IDX} onSelect={setSelected} />;
+                return <EraSection key={idx} era={era} records={eraRecords} defaultOpen={idx === CURRENT_CENTURY_IDX || eraRecords.length > 0} onSelect={setSelected} />;
               })}
             </div>
 
