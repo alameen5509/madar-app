@@ -355,9 +355,6 @@ function FocusSlot({ label, icon, color, goal, goals, circleMap, focusType, onSe
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: `${color}15`, color }}>{label}</span>
             <span className="font-bold text-sm truncate" style={{ color: "var(--text)" }}>{goal.title}</span>
           </div>
-          {circle && (
-            <span className="text-[10px] mt-0.5 inline-block" style={{ color: circle.colorHex ?? "var(--muted)" }}>{circle.name}</span>
-          )}
         </div>
         <button onClick={(e) => { e.stopPropagation(); onClear(); }}
           className="text-[10px] px-2 py-1 rounded-lg font-semibold transition hover:opacity-80 flex-shrink-0"
@@ -470,7 +467,6 @@ function ProjectCard({ goal, circleMap, prefs, onTogglePin, onClick, daysLeft, i
           </div>
 
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            {circle && <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: `${circle.colorHex ?? "#666"}15`, color: circle.colorHex }}>{circle.name}</span>}
             {tags.map(t => <span key={t} className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: "#D4AF3715", color: "#D4AF37" }}>{t}</span>)}
             {goal.targetDate && (
               <span className="text-[10px] font-medium" style={{ color: overdue ? "#DC2626" : deadlineAlert ? "#F59E0B" : "var(--muted)" }}>
@@ -538,17 +534,14 @@ function NewProjectDialog({ circles, works, onClose, onCreated }: {
         title: title.trim(),
         description: (desc.trim() + ratingTag).trim() || undefined,
         targetDate: targetDate || undefined,
-        lifeCircleId: circleId || undefined,
       });
       // Save metadata via preferences
       const { data: prefData } = await api.get("/api/users/me/preferences").catch(() => ({ data: {} }));
       const pp = prefData?.projectPrefs ?? DEFAULT_PREFS;
-      // Find the newly created goal to get its ID
       const allGoals = await getGoals();
       const newGoal = allGoals.find(g => g.title === title.trim());
       if (newGoal) {
         if (tags.trim()) pp.tags = { ...pp.tags, [newGoal.id]: tags.split(",").map(t => t.trim()).filter(Boolean) };
-        if (workId) pp.linkedWork = { ...pp.linkedWork, [newGoal.id]: workId };
         if (status !== "Active") await updateGoal(newGoal.id, { status });
         await api.put("/api/users/me/preferences", { ...prefData, projectPrefs: pp }).catch(() => {});
       }
@@ -762,12 +755,7 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
         title: editTitle.trim(),
         description: fullDesc,
         targetDate: editDate || undefined,
-        lifeCircleId: editCircleId || undefined,
       });
-      // Save work link in preferences
-      const updatedPrefs = { ...prefs, linkedWork: { ...prefs.linkedWork, [goal.id]: editWorkId } };
-      if (!editWorkId) delete updatedPrefs.linkedWork[goal.id];
-      savePrefs(updatedPrefs);
       setShowEdit(false);
       onRefresh();
     } catch {} finally { setSaving(false); }
@@ -782,7 +770,6 @@ function ProjectDetail({ goal, circle, circles, works, prefs, savePrefs, onClose
         userPriority: nt.priority,
         dueDate: nt.dueDate || undefined,
         goalId: goal.id,
-        lifeCircleId: goal.lifeCircle?.id,
         isWorkTask: nt.isWork || undefined,
         isUrgent: nt.isUrgent || undefined,
         taskContext: nt.context !== "Anywhere" ? nt.context : undefined,

@@ -311,7 +311,6 @@ export function NewTaskDialog({
         cognitiveLoad,
         dueDate: dueDate || undefined,
         goalId: goalId || undefined,
-        lifeCircleId: circleId || undefined,
         isRecurring: isRecurring || undefined,
         recurrenceRule: rule,
         isWorkTask: isWorkTask || undefined,
@@ -409,44 +408,6 @@ export function NewTaskDialog({
             </div>
           </div>
           <div>
-            {/* Circle / Job selector */}
-            {!goalId && (
-              <div className="mb-3">
-                <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">الدائرة / الوظيفة</label>
-                <select value={circleId} onChange={(e) => setCircleId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition">
-                  <option value="">اختر الدائرة أو الوظيفة</option>
-                  {circles.map((c) => <option key={c.id} value={c.id}>{c.iconKey ?? ""} {c.name} ({c.tier === "Business" ? "وظيفة" : "دور"})</option>)}
-                </select>
-              </div>
-            )}
-            {/* ربط بـ — خطوتين */}
-            <div className="mb-3">
-              <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">ربط بـ</label>
-              <div className="flex gap-1.5 mb-2">
-                {([["none", "بدون ربط"], ["circle", "◎ دور"], ["job", "💼 وظيفة"]] as const).map(([k, l]) => (
-                  <button key={k} type="button" onClick={() => { setLinkType(k); setCircleId(""); setWorkId(""); }}
-                    className="flex-1 py-2 rounded-xl text-xs font-semibold transition"
-                    style={{ background: linkType === k ? "#5E5495" : "#FDFAF6", color: linkType === k ? "#fff" : "#7C7A8E", border: `1px solid ${linkType === k ? "#5E5495" : "#E2D5B0"}` }}>
-                    {l}
-                  </button>
-                ))}
-              </div>
-              {linkType === "circle" && (
-                <select value={circleId} onChange={(e) => setCircleId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition">
-                  <option value="">اختر الدور...</option>
-                  {circles.map((c) => <option key={c.id} value={c.id}>{c.iconKey ?? "◎"} {c.name}</option>)}
-                </select>
-              )}
-              {linkType === "job" && (
-                <select value={workId} onChange={(e) => setWorkId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition">
-                  <option value="">اختر الوظيفة...</option>
-                  {worksList.filter(w => w.type === "job").map((w) => <option key={w.id} value={w.id}>💼 {w.name}</option>)}
-                </select>
-              )}
-            </div>
             {/* Assign to user */}
             <div className="mt-3">
               <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">إسناد لشخص <span className="text-[#7C7A8E] font-normal">(اختياري)</span></label>
@@ -1089,7 +1050,6 @@ function EditTaskDialog({ task, onClose, onSaved }: {
           userPriority: priority,
           dueDate: dueDate || undefined,
           taskContext: context !== "Anywhere" ? context : undefined,
-          lifeCircleId: selectedCircle || undefined,
         });
       }
       onSaved();
@@ -1174,16 +1134,6 @@ function EditTaskDialog({ task, onClose, onSaved }: {
               <input type="checkbox" checked={isRecurring} onChange={() => setIsRecurring(!isRecurring)} className="accent-purple-500" />
               <span className="text-xs" style={{ color: "var(--text)" }}>🔄 مكررة</span>
             </label>
-          </div>
-          {/* الدائرة */}
-          <div>
-            <label className="block text-sm font-semibold mb-1.5" style={{ color: "var(--text)" }}>الدائرة / المشروع</label>
-            <select value={selectedCircle} onChange={(e) => setSelectedCircle(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
-              style={{ background: "var(--bg)", border: "1px solid var(--card-border)", color: "var(--text)" }}>
-              <option value="">بدون</option>
-              {circles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
           </div>
           {/* معلومات إضافية */}
           {fullData && (
