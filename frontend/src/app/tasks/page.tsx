@@ -3438,76 +3438,54 @@ export default function TasksPage() {
       {/* ── Mood Panel ── */}
       {/* Tasbeeh Dialog */}
       {showTasbeeh && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-[#1A1830]/60 backdrop-blur-sm" onClick={() => setShowTasbeeh(false)} />
-          <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-sm fade-up select-none">
-            <div className="px-7 pt-7 pb-4 border-b border-[#E2D5B0] flex items-center justify-between">
-              <h2 className="font-bold text-[#1A1830]">📿 المسبحة</h2>
-              <button onClick={() => setShowTasbeeh(false)} className="w-8 h-8 rounded-full flex items-center justify-center text-[#7C7A8E] hover:bg-[#F8F6F0] transition text-sm">✕</button>
-            </div>
-            <div className="px-7 py-6 space-y-5">
-              {/* اختيار الذكر */}
-              <div className="flex flex-wrap gap-2 justify-center">
-                {TASBEEH_LIST.map((d, i) => (
-                  <button key={i} onClick={() => { setTasbeehIdx(i); setTasbeehCount(0); setTasbeehTarget(d.target); }}
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all border"
-                    style={{
-                      background: tasbeehIdx === i ? "linear-gradient(135deg, #2C2C54, #D4AF37)" : "#F8F6F0",
-                      color: tasbeehIdx === i ? "white" : "#5E5495",
-                      borderColor: tasbeehIdx === i ? "#D4AF37" : "#E2D5B0",
-                    }}>
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* العداد */}
-              <div className="text-center space-y-2">
-                <p className="text-[#5E5495] text-lg font-bold">{currentDhikr.label}</p>
-                <button
-                  onClick={() => {
-                    if (tasbeehCount < tasbeehTarget) {
-                      setTasbeehCount(tasbeehCount + 1);
-                      if (navigator.vibrate) navigator.vibrate(30);
-                    }
-                  }}
-                  className="w-40 h-40 mx-auto rounded-full flex items-center justify-center transition-all active:scale-95"
-                  style={{
-                    background: tasbeehCount >= tasbeehTarget
-                      ? "linear-gradient(135deg, #10B981, #3D8C5A)"
-                      : "linear-gradient(135deg, #2C2C54, #5E5495)",
-                    boxShadow: "0 8px 32px rgba(44,44,84,0.3)",
-                  }}>
-                  <span className="text-white text-5xl font-bold">{tasbeehCount}</span>
-                </button>
-                <p className="text-[#7C7A8E] text-sm">
-                  {tasbeehCount >= tasbeehTarget ? "✓ تم بحمد الله" : `الهدف: ${tasbeehTarget}`}
-                </p>
-                {/* شريط التقدم */}
-                <div className="w-full h-2 rounded-full bg-[#F0EDE4] overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-200"
-                    style={{
-                      width: `${Math.min((tasbeehCount / tasbeehTarget) * 100, 100)}%`,
-                      background: tasbeehCount >= tasbeehTarget ? "#10B981" : "linear-gradient(90deg, #D4AF37, #5E5495)",
-                    }} />
-                </div>
-              </div>
-
-              {/* أزرار التحكم */}
-              <div className="flex gap-3 justify-center">
-                <button onClick={() => setTasbeehCount(0)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-[#7C7A8E] bg-[#F8F6F0] border border-[#E2D5B0] hover:bg-[#F0EDE4] transition">
-                  إعادة العد
-                </button>
-                {tasbeehCount >= tasbeehTarget && tasbeehIdx < TASBEEH_LIST.length - 1 && (
-                  <button onClick={() => { setTasbeehIdx(tasbeehIdx + 1); setTasbeehCount(0); setTasbeehTarget(TASBEEH_LIST[tasbeehIdx + 1].target); }}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-white transition hover:opacity-90"
-                    style={{ background: "linear-gradient(135deg, #D4AF37, #5E5495)" }}>
-                    التالي: {TASBEEH_LIST[tasbeehIdx + 1].label} ←
-                  </button>
-                )}
-              </div>
-            </div>
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center select-none"
+          style={{ background: "linear-gradient(135deg, #0a1f10 0%, #1A1A2E 100%)" }}
+          onClick={() => {
+            setTasbeehCount(c => c + 1);
+            if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(30);
+            try { const ctx = new AudioContext(); const osc = ctx.createOscillator(); const gain = ctx.createGain(); osc.connect(gain); gain.connect(ctx.destination); osc.frequency.value = 800; gain.gain.value = 0.05; osc.start(); osc.stop(ctx.currentTime + 0.05); } catch {}
+          }}>
+          <button onClick={(e) => { e.stopPropagation(); setShowTasbeeh(false); setTasbeehCount(0); }}
+            className="absolute top-6 left-6 text-white/40 hover:text-white text-sm z-10">✕ إغلاق</button>
+          {/* اختيار الذكر */}
+          <div className="absolute top-6 right-6 flex flex-wrap gap-1.5 max-w-[60%] justify-end z-10" onClick={e => e.stopPropagation()}>
+            {TASBEEH_LIST.map((d, i) => (
+              <button key={i} onClick={() => { setTasbeehIdx(i); setTasbeehCount(0); setTasbeehTarget(d.target); }}
+                className="px-2.5 py-1 rounded-full text-[10px] font-semibold transition"
+                style={{ background: tasbeehIdx === i ? "#D4AF3730" : "rgba(255,255,255,0.05)", color: tasbeehIdx === i ? "#D4AF37" : "rgba(255,255,255,0.3)" }}>
+                {d.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-white/40 text-sm mb-4">{currentDhikr.label}</p>
+          <div className="w-52 h-52 rounded-full flex items-center justify-center mb-6"
+            style={{ background: tasbeehCount >= tasbeehTarget ? "linear-gradient(135deg, #10B981, #3D8C5A)" : "linear-gradient(135deg, #D4AF37, #E8C96A)", boxShadow: "0 0 80px rgba(212,175,55,0.25)" }}>
+            <span className="text-7xl font-black text-[#0a1f10] select-none">{tasbeehCount}</span>
+          </div>
+          <p className="text-white/20 text-sm mb-4">اضغط في أي مكان للعد</p>
+          <div className="w-48 bg-white/10 rounded-full h-2 overflow-hidden mb-2">
+            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, (tasbeehCount / tasbeehTarget) * 100)}%`, background: "#D4AF37" }} />
+          </div>
+          <p className="text-white/30 text-[11px]">{tasbeehCount} / {tasbeehTarget}</p>
+          <div className="absolute bottom-8 flex gap-2" onClick={e => e.stopPropagation()}>
+            {[33, 100, 1000].map(n => (
+              <button key={n} onClick={() => { setTasbeehTarget(n); setTasbeehCount(0); }}
+                className="px-3 py-1.5 rounded-lg text-xs transition"
+                style={{ background: tasbeehTarget === n ? "#D4AF3730" : "rgba(255,255,255,0.05)", color: tasbeehTarget === n ? "#D4AF37" : "rgba(255,255,255,0.3)" }}>
+                {n}
+              </button>
+            ))}
+            <button onClick={() => setTasbeehCount(0)}
+              className="px-3 py-1.5 rounded-lg text-xs text-red-400/50 hover:text-red-400 transition" style={{ background: "rgba(255,255,255,0.05)" }}>
+              إعادة
+            </button>
+            {tasbeehCount >= tasbeehTarget && tasbeehIdx < TASBEEH_LIST.length - 1 && (
+              <button onClick={() => { setTasbeehIdx(tasbeehIdx + 1); setTasbeehCount(0); setTasbeehTarget(TASBEEH_LIST[tasbeehIdx + 1].target); }}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold transition"
+                style={{ background: "#D4AF3730", color: "#D4AF37" }}>
+                التالي ←
+              </button>
+            )}
           </div>
         </div>
       )}
