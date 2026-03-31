@@ -3265,6 +3265,18 @@ export default function TasksPage() {
                       </div>
                       {/* أزرار التأجيل + التذكير */}
                       <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                        {!t.done && t.context !== "habit" && t.dueDate && t.dueDate.slice(0, 10) < todayStr && (
+                          <button onClick={async (e) => {
+                            e.preventDefault(); e.stopPropagation();
+                            try {
+                              const res = await api.post("/api/tasks/" + t.id + "/update", { dueDate: new Date().toISOString() });
+                              if (res.status === 200) fetchTasks();
+                              else alert("خطأ: " + res.status);
+                            } catch (err: unknown) { alert("فشل: " + (err instanceof Error ? err.message : String(err))); }
+                          }}
+                            className="text-[8px] px-1.5 py-1 rounded-lg font-bold transition hover:scale-105"
+                            style={{ background: "#3D8C5A10", color: "#3D8C5A" }} title="اليوم">اليوم</button>
+                        )}
                         {!t.done && t.context !== "habit" && (!t.dueDate || t.dueDate.slice(0, 10) <= todayStr) && (<>
                           <button onClick={async (e) => {
                             e.preventDefault(); e.stopPropagation();
