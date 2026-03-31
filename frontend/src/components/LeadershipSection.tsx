@@ -34,14 +34,15 @@ export default function LeadershipSection({ workId, workName, workColor = "#5E54
     try {
       const { data } = await api.get("/api/war-room/roles");
       const roles = Array.isArray(data) ? data : [];
-      const existing = roles.find((r: { workId?: string }) => r.workId === workId);
-      if (existing) {
-        setPulse(existing.pulseStatus ?? "green");
-        setPulseNote(existing.pulseNote ?? null);
-        setLastReview(existing.lastReviewDate ?? null);
-        return existing.id;
+      // Find a real (non-auto) role linked to this work
+      const real = roles.find((r: { workId?: string; isAuto?: boolean; id: string }) => r.workId === workId && !r.isAuto && !r.id.startsWith("auto-"));
+      if (real) {
+        setPulse(real.pulseStatus ?? "green");
+        setPulseNote(real.pulseNote ?? null);
+        setLastReview(real.lastReviewDate ?? null);
+        return real.id;
       }
-      // Create role automatically
+      // No real role — create one (promotes auto role to real)
       const { data: created } = await api.post("/api/war-room/roles", {
         title: workName, workId, reviewFrequency: "weekly", color: workColor, icon: workIcon,
       });
