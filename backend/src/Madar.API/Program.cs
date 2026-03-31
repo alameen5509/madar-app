@@ -413,6 +413,20 @@ using (var scope = app.Services.CreateScope())
                 CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
                 INDEX IX_PhoneTriggers_UserId (UserId)
             );
+            CREATE TABLE IF NOT EXISTS PhoneTasks (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                UserId CHAR(36) NOT NULL,
+                Title VARCHAR(500) NOT NULL,
+                RecurringType VARCHAR(50) NOT NULL DEFAULT 'none',
+                RecurringIntervalHours INT NULL,
+                LastCompletedAt DATETIME(6) NULL,
+                NextDueAt DATETIME(6) NULL,
+                IsCompleted TINYINT(1) NOT NULL DEFAULT 0,
+                CompletedAt DATETIME(6) NULL,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_PhoneTasks_UserId (UserId),
+                INDEX IX_PhoneTasks_Due (UserId, NextDueAt)
+            );
             CREATE TABLE IF NOT EXISTS PhoneFreeZones (
                 Id CHAR(36) NOT NULL PRIMARY KEY,
                 UserId CHAR(36) NOT NULL,

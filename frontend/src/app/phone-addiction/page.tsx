@@ -3,12 +3,14 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 import { GeometricDivider } from "@/components/IslamicPattern";
 
-type Tab = "dashboard" | "log" | "triggers" | "zones" | "goal";
+type Tab = "dashboard" | "log" | "triggers" | "zones" | "goal" | "tasks" | "plan";
 
 interface Goal { id:string; currentDailyHours:number; targetDailyHours:number; weeklyReductionMinutes:number; whyMotivation?:string; startDate:string; targetDate?:string; status:string }
 interface DayLog { id:string; date:string; actualMinutes:number; targetMinutes:number; mood?:string; topApps?:string; note?:string }
 interface Trigger { id:string; triggerName:string; category:string; alternative?:string; frequency:number }
 interface FreeZone { id:string; zoneName:string; startTime:string; endTime:string; daysOfWeek:string; isActive:boolean; streakDays:number }
+interface PhoneTask { id:string; title:string; recurringType:string; recurringIntervalHours?:number; lastCompletedAt?:string; nextDueAt?:string; isCompleted:boolean; completedAt?:string; createdAt:string }
+interface PlanWeek { week:number; weekStart:string; targetMinutes:number; actualAvgMinutes?:number; achieved:boolean }
 
 const MOODS: Record<string,{label:string;icon:string}> = {
   great: { label: "ممتاز", icon: "😄" }, good: { label: "جيد", icon: "🙂" },
@@ -22,6 +24,10 @@ const TRIGGER_CATS: Record<string,{label:string;icon:string;color:string}> = {
   fomo: { label: "خوف الفوات", icon: "📱", color: "#DC2626" },
   procrastination: { label: "تسويف", icon: "⏳", color: "#D4AF37" },
 };
+const RECUR_TYPES: Record<string,string> = {
+  none: "مرة واحدة", hourly: "كل ساعة", every3hours: "كل 3 ساعات",
+  every5hours: "كل 5 ساعات", every10hours: "كل 10 ساعات", daily: "يومي",
+};
 const is = { background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" } as const;
 
 export default function PhoneAddictionPage() {
@@ -30,30 +36,35 @@ export default function PhoneAddictionPage() {
   const [logs, setLogs] = useState<DayLog[]>([]);
   const [triggers, setTriggers] = useState<Trigger[]>([]);
   const [zones, setZones] = useState<FreeZone[]>([]);
-  const [stats, setStats] = useState<{streakDays:number;triggerCount:number;activeZones:number;last7Days:{date:string;actualMinutes:number;targetMinutes:number}[];todayLog?:DayLog|null}|null>(null);
+  const [tasks, setTasks] = useState<PhoneTask[]>([]);
+  const [plan, setPlan] = useState<{weeks:PlanWeek[];currentWeek:number}|null>(null);
+  const [stats, setStats] = useState<{streakDays:number;triggerCount:number;activeZones:number;dueTaskCount:number;last7Days:{date:string;actualMinutes:number;targetMinutes:number}[];todayLog?:DayLog|null;yesterdayLog?:DayLog|null}|null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, l, t, z] = await Promise.all([
+      const [s, l, t, z, tk, p] = await Promise.all([
         api.get("/api/phone-addiction/stats").then(r => r.data).catch(() => null),
         api.get("/api/phone-addiction/logs?days=30").then(r => r.data ?? []).catch(() => []),
         api.get("/api/phone-addiction/triggers").then(r => r.data ?? []).catch(() => []),
         api.get("/api/phone-addiction/free-zones").then(r => r.data ?? []).catch(() => []),
+        api.get("/api/phone-addiction/tasks").then(r => r.data ?? []).catch(() => []),
+        api.get("/api/phone-addiction/plan").then(r => r.data).catch(() => null),
       ]);
       if (s?.goal) setGoal(s.goal);
       setStats(s);
       setLogs(l);
       setTriggers(t);
       setZones(z);
+      setTasks(tk);
+      setPlan(p);
     } catch {}
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  // ═══ Today's target based on gradual reduction ═══
   function todayTarget(): number {
     if (!goal) return 120;
     const start = new Date(goal.startDate);
@@ -66,6 +77,8 @@ export default function PhoneAddictionPage() {
 
   const todayTgt = Math.round(todayTarget());
   const todayLog = stats?.todayLog as DayLog | null | undefined;
+  const yesterdayLog = stats?.yesterdayLog as DayLog | null | undefined;
+  const dueTasks = tasks.filter(t => !t.isCompleted && (!t.nextDueAt || new Date(t.nextDueAt) <= new Date()));
 
   return (
     <main className="flex-1 overflow-y-auto" dir="rtl" style={{ background: "var(--bg)" }}>
@@ -73,10 +86,10 @@ export default function PhoneAddictionPage() {
         <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>📵 إدارة إدمان الجوال</h2>
         <p className="text-[10px] mt-0.5" style={{ color: "var(--muted)" }}>العلاج المعرفي السلوكي — وعي + تخفيض تدريجي + استبدال</p>
         <div className="flex gap-1.5 mt-2 overflow-x-auto pb-0.5">
-          {([["dashboard","لوحة التحكم","📊"],["log","التسجيل اليومي","📝"],["triggers","المحفزات","⚡"],["zones","فترات بلا جوال","🔕"],["goal","الهدف","🎯"]] as [Tab,string,string][]).map(([k,l,ic]) => (
+          {([["dashboard","لوحة التحكم","📊"],["log","التسجيل","📝"],["tasks","المهام","✅"],["plan","خطة العلاج","📈"],["triggers","المحفزات","⚡"],["zones","فترات آمنة","🔕"],["goal","الهدف","🎯"]] as [Tab,string,string][]).map(([k,l,ic]) => (
             <button key={k} onClick={() => setTab(k)} className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition whitespace-nowrap"
               style={{ background: tab === k ? "#DC2626" : "var(--bg)", color: tab === k ? "#fff" : "var(--muted)", border: `1px solid ${tab === k ? "#DC2626" : "var(--card-border)"}` }}>
-              {ic} {l}
+              {ic} {l} {k === "tasks" && dueTasks.length > 0 ? `(${dueTasks.length})` : ""}
             </button>
           ))}
         </div>
@@ -95,6 +108,29 @@ export default function PhoneAddictionPage() {
               <button onClick={() => setTab("goal")} className="px-6 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #DC2626, #D4AF37)" }}>🎯 حدد هدفك الأول</button>
             </div>
           ) : (<>
+            {/* Yesterday reminder */}
+            {!yesterdayLog && (
+              <div className="rounded-xl p-3 flex items-center gap-3" style={{ background: "#F59E0B10", border: "1px solid #F59E0B30" }}>
+                <span className="text-lg">⚠️</span>
+                <div className="flex-1">
+                  <p className="text-xs font-bold" style={{ color: "#F59E0B" }}>لم تسجّل استخدام الأمس!</p>
+                  <p className="text-[10px]" style={{ color: "var(--muted)" }}>سجّل ساعات الجوال لتتابع تقدمك</p>
+                </div>
+                <button onClick={() => setTab("log")} className="px-3 py-1.5 rounded-lg text-[10px] font-bold text-white" style={{ background: "#F59E0B" }}>سجّل الآن</button>
+              </div>
+            )}
+
+            {/* Due tasks alert */}
+            {dueTasks.length > 0 && (
+              <div className="rounded-xl p-3 flex items-center gap-3" style={{ background: "#DC262608", border: "1px solid #DC262620" }}>
+                <span className="text-lg">✅</span>
+                <div className="flex-1">
+                  <p className="text-xs font-bold" style={{ color: "#DC2626" }}>{dueTasks.length} مهمة مستحقة الآن</p>
+                </div>
+                <button onClick={() => setTab("tasks")} className="px-3 py-1.5 rounded-lg text-[10px] font-bold text-white" style={{ background: "#DC2626" }}>عرض</button>
+              </div>
+            )}
+
             {/* Today card */}
             <div className="rounded-2xl border p-5" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
               <div className="flex items-center justify-between mb-3">
@@ -118,24 +154,23 @@ export default function PhoneAddictionPage() {
                   </p>
                 </div>
               ) : (
-                <button onClick={() => setTab("log")} className="w-full py-3 rounded-xl text-sm font-bold text-white" style={{ background: "#DC2626" }}>📝 سجّل استخدامك اليوم</button>
+                <button onClick={() => setTab("log")} className="w-full py-3 rounded-xl text-sm font-bold text-white" style={{ background: "#DC2626" }}>📝 سجّل استخدامك</button>
               )}
             </div>
 
             {/* Stats row */}
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-xl border p-3 text-center" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-                <p className="text-2xl font-black" style={{ color: "#3D8C5A" }}>{stats?.streakDays ?? 0}</p>
-                <p className="text-[9px]" style={{ color: "var(--muted)" }}>أيام ملتزم 🔥</p>
-              </div>
-              <div className="rounded-xl border p-3 text-center" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-                <p className="text-2xl font-black" style={{ color: "#D4AF37" }}>{stats?.triggerCount ?? 0}</p>
-                <p className="text-[9px]" style={{ color: "var(--muted)" }}>محفز محدد ⚡</p>
-              </div>
-              <div className="rounded-xl border p-3 text-center" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-                <p className="text-2xl font-black" style={{ color: "#5E5495" }}>{stats?.activeZones ?? 0}</p>
-                <p className="text-[9px]" style={{ color: "var(--muted)" }}>فترة آمنة 🔕</p>
-              </div>
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { val: stats?.streakDays ?? 0, label: "ملتزم 🔥", color: "#3D8C5A" },
+                { val: stats?.dueTaskCount ?? 0, label: "مهمة مستحقة", color: "#DC2626" },
+                { val: stats?.triggerCount ?? 0, label: "محفز ⚡", color: "#D4AF37" },
+                { val: stats?.activeZones ?? 0, label: "فترة آمنة", color: "#5E5495" },
+              ].map((s, i) => (
+                <div key={i} className="rounded-xl border p-2.5 text-center" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+                  <p className="text-xl font-black" style={{ color: s.color }}>{s.val}</p>
+                  <p className="text-[8px]" style={{ color: "var(--muted)" }}>{s.label}</p>
+                </div>
+              ))}
             </div>
 
             {/* 7-day chart */}
@@ -158,7 +193,6 @@ export default function PhoneAddictionPage() {
               </div>
             </div>
 
-            {/* Why motivation */}
             {goal.whyMotivation && (
               <div className="rounded-xl p-4" style={{ background: "#D4AF3708", border: "1px solid #D4AF3720" }}>
                 <p className="text-[10px] font-bold mb-1" style={{ color: "#D4AF37" }}>💡 لماذا أفعل هذا؟</p>
@@ -168,8 +202,14 @@ export default function PhoneAddictionPage() {
           </>)}
         </>)}
 
-        {/* ═══ DAILY LOG ═══ */}
-        {!loading && tab === "log" && (<DailyLogTab todayTarget={todayTgt} logs={logs} onSave={load} />)}
+        {/* ═══ DAILY LOG — log yesterday ═══ */}
+        {!loading && tab === "log" && (<DailyLogTab todayTarget={todayTgt} logs={logs} onSave={load} yesterdayLogged={!!yesterdayLog} />)}
+
+        {/* ═══ PHONE TASKS ═══ */}
+        {!loading && tab === "tasks" && (<PhoneTasksTab tasks={tasks} onUpdate={load} />)}
+
+        {/* ═══ TREATMENT PLAN ═══ */}
+        {!loading && tab === "plan" && (<TreatmentPlanTab plan={plan} goal={goal} />)}
 
         {/* ═══ TRIGGERS ═══ */}
         {!loading && tab === "triggers" && (<TriggersTab triggers={triggers} onUpdate={load} />)}
@@ -185,29 +225,52 @@ export default function PhoneAddictionPage() {
 }
 
 // ═══ DAILY LOG TAB ═══════════════════════════════════════════════════════════
-function DailyLogTab({ todayTarget, logs, onSave }: { todayTarget: number; logs: DayLog[]; onSave: () => void }) {
+function DailyLogTab({ todayTarget, logs, onSave, yesterdayLogged }: { todayTarget: number; logs: DayLog[]; onSave: () => void; yesterdayLogged: boolean }) {
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
   const today = new Date().toISOString().split("T")[0];
-  const todayLog = logs.find(l => l.date?.startsWith(today));
-  const [hours, setHours] = useState(todayLog ? String(Math.floor(todayLog.actualMinutes/60)) : "");
-  const [mins, setMins] = useState(todayLog ? String(todayLog.actualMinutes%60) : "");
-  const [mood, setMood] = useState(todayLog?.mood ?? "");
-  const [apps, setApps] = useState(todayLog?.topApps ?? "");
-  const [note, setNote] = useState(todayLog?.note ?? "");
+  const [logDate, setLogDate] = useState(yesterdayLogged ? today : yesterday);
+  const existingLog = logs.find(l => l.date?.startsWith(logDate));
+  const [hours, setHours] = useState(existingLog ? String(Math.floor(existingLog.actualMinutes/60)) : "");
+  const [mins, setMins] = useState(existingLog ? String(existingLog.actualMinutes%60) : "");
+  const [mood, setMood] = useState(existingLog?.mood ?? "");
+  const [apps, setApps] = useState(existingLog?.topApps ?? "");
+  const [note, setNote] = useState(existingLog?.note ?? "");
+
+  // Reset form when date changes
+  useEffect(() => {
+    const ex = logs.find(l => l.date?.startsWith(logDate));
+    setHours(ex ? String(Math.floor(ex.actualMinutes/60)) : "");
+    setMins(ex ? String(ex.actualMinutes%60) : "");
+    setMood(ex?.mood ?? ""); setApps(ex?.topApps ?? ""); setNote(ex?.note ?? "");
+  }, [logDate, logs]);
 
   async function save() {
     const actual = (Number(hours) || 0) * 60 + (Number(mins) || 0);
     if (actual === 0) return;
     try {
-      await api.post("/api/phone-addiction/logs", { date: today, actualMinutes: actual, targetMinutes: todayTarget, mood: mood || undefined, topApps: apps || undefined, note: note || undefined });
+      await api.post("/api/phone-addiction/logs", { date: logDate, actualMinutes: actual, targetMinutes: todayTarget, mood: mood || undefined, topApps: apps || undefined, note: note || undefined });
       onSave();
     } catch { alert("فشل الحفظ"); }
   }
 
+  const isYesterday = logDate === yesterday;
+
   return (
     <div className="space-y-4">
-      <GeometricDivider label="تسجيل اليوم" />
+      <GeometricDivider label={isYesterday ? "تسجيل الأمس" : "تسجيل يوم"} />
       <div className="rounded-2xl border p-5 space-y-4" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-        <p className="text-xs font-bold" style={{ color: "#DC2626" }}>📝 كم ساعة استخدمت الجوال اليوم؟</p>
+        {/* Date selector */}
+        <div className="flex gap-2 items-center">
+          <button type="button" onClick={() => setLogDate(yesterday)}
+            className="px-3 py-1.5 rounded-lg text-[10px] font-semibold"
+            style={{ background: isYesterday ? "#DC2626" : "var(--bg)", color: isYesterday ? "#fff" : "var(--muted)", border: "1px solid " + (isYesterday ? "#DC2626" : "var(--card-border)") }}>أمس</button>
+          <button type="button" onClick={() => setLogDate(today)}
+            className="px-3 py-1.5 rounded-lg text-[10px] font-semibold"
+            style={{ background: logDate === today ? "#DC2626" : "var(--bg)", color: logDate === today ? "#fff" : "var(--muted)", border: "1px solid " + (logDate === today ? "#DC2626" : "var(--card-border)") }}>اليوم</button>
+          <input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} className="flex-1 px-2 py-1.5 rounded-lg border text-xs" style={is} />
+        </div>
+
+        <p className="text-xs font-bold" style={{ color: "#DC2626" }}>📝 كم ساعة استخدمت الجوال {isYesterday ? "أمس" : ""}؟</p>
         <div className="flex gap-3 items-center">
           <div className="flex-1">
             <label className="text-[9px] block mb-1" style={{ color: "var(--muted)" }}>ساعات</label>
@@ -221,7 +284,6 @@ function DailyLogTab({ todayTarget, logs, onSave }: { todayTarget: number; logs:
               className="w-full px-3 py-2.5 rounded-xl border text-center text-lg font-bold focus:outline-none" style={is} />
           </div>
         </div>
-
         <div>
           <p className="text-[10px] font-bold mb-2" style={{ color: "var(--text)" }}>كيف مزاجك؟</p>
           <div className="flex gap-2">
@@ -234,18 +296,11 @@ function DailyLogTab({ todayTarget, logs, onSave }: { todayTarget: number; logs:
             ))}
           </div>
         </div>
-
-        <input value={apps} onChange={e => setApps(e.target.value)} placeholder="أكثر التطبيقات استخداماً (مثال: تويتر، يوتيوب)"
-          className="w-full px-3 py-2 rounded-xl border text-xs focus:outline-none" style={is} />
-        <input value={note} onChange={e => setNote(e.target.value)} placeholder="ملاحظة (اختياري)"
-          className="w-full px-3 py-2 rounded-xl border text-xs focus:outline-none" style={is} />
-
-        <button onClick={save} className="w-full py-3 rounded-xl text-sm font-bold text-white" style={{ background: "#DC2626" }}>
-          {todayLog ? "تحديث تسجيل اليوم" : "حفظ تسجيل اليوم"}
-        </button>
+        <input value={apps} onChange={e => setApps(e.target.value)} placeholder="أكثر التطبيقات (تويتر، يوتيوب...)" className="w-full px-3 py-2 rounded-xl border text-xs focus:outline-none" style={is} />
+        <input value={note} onChange={e => setNote(e.target.value)} placeholder="ملاحظة (اختياري)" className="w-full px-3 py-2 rounded-xl border text-xs focus:outline-none" style={is} />
+        <button onClick={save} className="w-full py-3 rounded-xl text-sm font-bold text-white" style={{ background: "#DC2626" }}>{existingLog ? "تحديث" : "حفظ"}</button>
       </div>
 
-      {/* Previous logs */}
       <GeometricDivider label={`السجل (${logs.length})`} />
       <div className="space-y-2">
         {logs.slice(0, 14).map(l => {
@@ -267,6 +322,160 @@ function DailyLogTab({ todayTarget, logs, onSave }: { todayTarget: number; logs:
   );
 }
 
+// ═══ PHONE TASKS TAB ═════════════════════════════════════════════════════════
+function PhoneTasksTab({ tasks, onUpdate }: { tasks: PhoneTask[]; onUpdate: () => void }) {
+  const [showNew, setShowNew] = useState(false);
+  const [nt, setNt] = useState({ title: "", type: "none" as string });
+
+  async function add() {
+    if (!nt.title.trim()) return;
+    try { await api.post("/api/phone-addiction/tasks", { title: nt.title, recurringType: nt.type }); setNt({ title: "", type: "none" }); setShowNew(false); onUpdate(); } catch {}
+  }
+
+  const due = tasks.filter(t => !t.isCompleted && (!t.nextDueAt || new Date(t.nextDueAt) <= new Date()));
+  const upcoming = tasks.filter(t => !t.isCompleted && t.nextDueAt && new Date(t.nextDueAt) > new Date());
+  const completed = tasks.filter(t => t.isCompleted);
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl p-4" style={{ background: "#DC262608", border: "1px solid #DC262620" }}>
+        <p className="text-xs font-bold mb-1" style={{ color: "#DC2626" }}>✅ مهام التحكم بالجوال</p>
+        <p className="text-[10px]" style={{ color: "var(--text)" }}>أضف مهام تساعدك على تقليل الاستخدام. يمكن أن تكون مرة واحدة أو متكررة (كل ساعة، كل 3 ساعات، يومياً...).</p>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold" style={{ color: "var(--text)" }}>المهام ({tasks.length})</span>
+        <button onClick={() => setShowNew(true)} className="text-[10px] font-bold px-3 py-1.5 rounded-lg text-white" style={{ background: "#DC2626" }}>+ مهمة</button>
+      </div>
+
+      {showNew && (
+        <div className="rounded-xl border p-4 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+          <input value={nt.title} onChange={e => setNt({...nt, title: e.target.value})} placeholder="عنوان المهمة (مثال: ضع الجوال بعيداً عنك)" className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={is} />
+          <div>
+            <p className="text-[9px] font-bold mb-1" style={{ color: "var(--muted)" }}>التكرار:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {Object.entries(RECUR_TYPES).map(([k, v]) => (
+                <button key={k} onClick={() => setNt({...nt, type: k})} className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition"
+                  style={{ background: nt.type === k ? "#DC262620" : "var(--bg)", color: nt.type === k ? "#DC2626" : "var(--muted)", border: `1px solid ${nt.type === k ? "#DC2626" : "var(--card-border)"}` }}>
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => setShowNew(false)} className="px-3 py-1.5 rounded-lg text-[10px]" style={{ color: "var(--muted)" }}>إلغاء</button>
+            <button onClick={add} disabled={!nt.title.trim()} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#DC2626" }}>إضافة</button>
+          </div>
+        </div>
+      )}
+
+      {/* Due now */}
+      {due.length > 0 && (<>
+        <p className="text-[10px] font-bold" style={{ color: "#DC2626" }}>🔴 مستحقة الآن ({due.length})</p>
+        {due.map(t => (
+          <div key={t.id} className="rounded-xl border p-3 flex items-center gap-3" style={{ background: "#DC262605", borderColor: "#DC262620" }}>
+            <button onClick={async () => { try { await api.post("/api/phone-addiction/tasks/" + t.id + "/complete"); onUpdate(); } catch {} }}
+              className="w-8 h-8 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition hover:scale-110" style={{ borderColor: "#DC2626" }}>
+              <span className="text-[10px]" style={{ color: "#DC2626" }}>✓</span>
+            </button>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium" style={{ color: "var(--text)" }}>{t.title}</p>
+              <span className="text-[9px]" style={{ color: "#DC2626" }}>{RECUR_TYPES[t.recurringType] ?? t.recurringType}</span>
+            </div>
+            <button onClick={async () => { if (confirm("حذف؟")) { try { await api.delete("/api/phone-addiction/tasks/" + t.id); onUpdate(); } catch {} } }}
+              className="text-[9px]" style={{ color: "#DC2626" }}>🗑️</button>
+          </div>
+        ))}
+      </>)}
+
+      {/* Upcoming */}
+      {upcoming.length > 0 && (<>
+        <p className="text-[10px] font-bold mt-2" style={{ color: "#5E5495" }}>⏳ قادمة ({upcoming.length})</p>
+        {upcoming.map(t => (
+          <div key={t.id} className="rounded-xl border p-3 flex items-center gap-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+            <span className="text-lg">⏳</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium" style={{ color: "var(--text)" }}>{t.title}</p>
+              <span className="text-[9px]" style={{ color: "var(--muted)" }}>{RECUR_TYPES[t.recurringType]} · التالي: {t.nextDueAt ? new Date(t.nextDueAt).toLocaleString("ar-SA", { hour: "2-digit", minute: "2-digit" }) : ""}</span>
+            </div>
+            <button onClick={async () => { if (confirm("حذف؟")) { try { await api.delete("/api/phone-addiction/tasks/" + t.id); onUpdate(); } catch {} } }}
+              className="text-[9px]" style={{ color: "#DC2626" }}>🗑️</button>
+          </div>
+        ))}
+      </>)}
+
+      {/* Completed */}
+      {completed.length > 0 && (
+        <details className="mt-3">
+          <summary className="text-[10px] cursor-pointer" style={{ color: "var(--muted)" }}>مكتملة ({completed.length})</summary>
+          <div className="space-y-1 mt-1">{completed.map(t => (
+            <div key={t.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg opacity-50" style={{ background: "var(--card)" }}>
+              <span className="text-xs line-through flex-1" style={{ color: "var(--text)" }}>{t.title}</span>
+            </div>
+          ))}</div>
+        </details>
+      )}
+
+      {tasks.length === 0 && !showNew && <div className="text-center py-8"><p className="text-3xl mb-2">✅</p><p className="text-sm" style={{ color: "var(--muted)" }}>أضف مهام تساعدك على التحكم</p></div>}
+    </div>
+  );
+}
+
+// ═══ TREATMENT PLAN TAB ══════════════════════════════════════════════════════
+function TreatmentPlanTab({ plan, goal }: { plan: {weeks:PlanWeek[];currentWeek:number}|null; goal: Goal|null }) {
+  if (!goal) return (
+    <div className="text-center py-12">
+      <p className="text-3xl mb-3">📈</p>
+      <p className="font-bold" style={{ color: "var(--text)" }}>حدد هدفك أولاً</p>
+      <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>اذهب لتبويب "الهدف" لتبدأ خطة العلاج</p>
+    </div>
+  );
+
+  const weeks = plan?.weeks ?? [];
+  const currentWeek = plan?.currentWeek ?? 1;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl p-4" style={{ background: "#3D8C5A08", border: "1px solid #3D8C5A20" }}>
+        <p className="text-xs font-bold mb-1" style={{ color: "#3D8C5A" }}>📈 خطة التخفيض التدريجي</p>
+        <p className="text-[10px]" style={{ color: "var(--text)" }}>
+          من {goal.currentDailyHours} ساعة → {goal.targetDailyHours} ساعة · تخفيض {goal.weeklyReductionMinutes} دقيقة أسبوعياً · {weeks.length} أسبوع
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        {weeks.map(w => {
+          const isCurrent = w.week === currentWeek;
+          const isPast = w.week < currentWeek;
+          return (
+            <div key={w.week} className="rounded-xl border p-3 flex items-center gap-3"
+              style={{ background: isCurrent ? "#D4AF3708" : "var(--card)", borderColor: isCurrent ? "#D4AF3730" : "var(--card-border)", opacity: isPast && !w.achieved ? 0.6 : 1 }}>
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                style={{ background: w.achieved ? "#3D8C5A" : isCurrent ? "#D4AF37" : isPast ? "#DC2626" : "var(--bg)", color: w.achieved || isCurrent ? "#fff" : isPast ? "#fff" : "var(--muted)" }}>
+                {w.achieved ? "✓" : w.week}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold" style={{ color: "var(--text)" }}>أسبوع {w.week}</span>
+                  {isCurrent && <span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "#D4AF3715", color: "#D4AF37" }}>الحالي</span>}
+                </div>
+                <p className="text-[9px]" style={{ color: "var(--muted)" }}>
+                  الهدف: {Math.floor(w.targetMinutes/60)}س {Math.round(w.targetMinutes%60)}د
+                  {w.actualAvgMinutes != null && ` · الفعلي: ${Math.floor(w.actualAvgMinutes/60)}س ${Math.round(w.actualAvgMinutes%60)}د`}
+                </p>
+              </div>
+              {w.actualAvgMinutes != null && (
+                <span className="text-lg">{w.achieved ? "✅" : "❌"}</span>
+              )}
+            </div>
+          );
+        })}
+        {weeks.length === 0 && <p className="text-center py-8 text-sm" style={{ color: "var(--muted)" }}>سجّل بيانات لعرض خطة العلاج</p>}
+      </div>
+    </div>
+  );
+}
+
 // ═══ TRIGGERS TAB ════════════════════════════════════════════════════════════
 function TriggersTab({ triggers, onUpdate }: { triggers: Trigger[]; onUpdate: () => void }) {
   const [showNew, setShowNew] = useState(false);
@@ -280,67 +489,45 @@ function TriggersTab({ triggers, onUpdate }: { triggers: Trigger[]; onUpdate: ()
   return (
     <div className="space-y-4">
       <div className="rounded-xl p-4" style={{ background: "#F59E0B08", border: "1px solid #F59E0B20" }}>
-        <p className="text-xs font-bold mb-1" style={{ color: "#F59E0B" }}>⚡ ما هي المحفزات؟</p>
-        <p className="text-[10px]" style={{ color: "var(--text)" }}>المحفز هو الشعور أو الموقف الذي يجعلك تمسك الجوال تلقائياً. حدد محفزاتك واكتب بديلاً صحياً لكل واحد.</p>
+        <p className="text-xs font-bold mb-1" style={{ color: "#F59E0B" }}>⚡ المحفزات</p>
+        <p className="text-[10px]" style={{ color: "var(--text)" }}>الشعور أو الموقف الذي يجعلك تمسك الجوال تلقائياً. حدد محفزاتك واكتب بديلاً صحياً.</p>
       </div>
-
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold" style={{ color: "var(--text)" }}>محفزاتي ({triggers.length})</span>
         <button onClick={() => setShowNew(true)} className="text-[10px] font-bold px-3 py-1.5 rounded-lg text-white" style={{ background: "#F59E0B" }}>+ محفز</button>
       </div>
-
       {showNew && (
         <div className="rounded-xl border p-4 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
           <input value={nf.name} onChange={e => setNf({...nf, name: e.target.value})} placeholder="المحفز (مثال: أنتظر في الطابور)" className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={is} />
-          <div>
-            <p className="text-[9px] font-bold mb-1" style={{ color: "var(--muted)" }}>التصنيف:</p>
-            <div className="flex flex-wrap gap-1.5">
-              {Object.entries(TRIGGER_CATS).map(([k, v]) => (
-                <button key={k} onClick={() => setNf({...nf, cat: k})} className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition"
-                  style={{ background: nf.cat === k ? `${v.color}20` : "var(--bg)", color: v.color, border: `1px solid ${nf.cat === k ? v.color : "var(--card-border)"}` }}>
-                  {v.icon} {v.label}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(TRIGGER_CATS).map(([k, v]) => (
+              <button key={k} onClick={() => setNf({...nf, cat: k})} className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition"
+                style={{ background: nf.cat === k ? `${v.color}20` : "var(--bg)", color: v.color, border: `1px solid ${nf.cat === k ? v.color : "var(--card-border)"}` }}>
+                {v.icon} {v.label}
+              </button>
+            ))}
           </div>
-          <input value={nf.alt} onChange={e => setNf({...nf, alt: e.target.value})} placeholder="البديل الصحي (مثال: قراءة كتاب، ذكر، مشي)" className="w-full px-3 py-2 rounded-lg border text-xs focus:outline-none" style={is} />
+          <input value={nf.alt} onChange={e => setNf({...nf, alt: e.target.value})} placeholder="البديل الصحي (مثال: قراءة كتاب)" className="w-full px-3 py-2 rounded-lg border text-xs focus:outline-none" style={is} />
           <div className="flex gap-2 justify-end">
             <button onClick={() => setShowNew(false)} className="px-3 py-1.5 rounded-lg text-[10px]" style={{ color: "var(--muted)" }}>إلغاء</button>
             <button onClick={add} disabled={!nf.name.trim()} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#F59E0B" }}>إضافة</button>
           </div>
         </div>
       )}
-
-      <div className="space-y-2">
-        {triggers.map(t => {
-          const cat = TRIGGER_CATS[t.category] ?? TRIGGER_CATS.habit;
-          return (
-            <div key={t.id} className="rounded-xl border p-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-              <div className="flex items-center gap-2">
-                <span className="text-lg">{cat.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium" style={{ color: "var(--text)" }}>{t.triggerName}</p>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: `${cat.color}15`, color: cat.color }}>{cat.label}</span>
-                </div>
-                <button onClick={async () => { if (confirm("حذف؟")) { try { await api.delete(`/api/phone-addiction/triggers/${t.id}`); onUpdate(); } catch {} } }}
-                  className="text-[9px] px-1" style={{ color: "#DC2626" }}>🗑️</button>
-              </div>
-              {t.alternative && (
-                <div className="mt-2 px-3 py-1.5 rounded-lg" style={{ background: "#3D8C5A08", border: "1px solid #3D8C5A15" }}>
-                  <span className="text-[9px] font-bold" style={{ color: "#3D8C5A" }}>✅ البديل: </span>
-                  <span className="text-[10px]" style={{ color: "var(--text)" }}>{t.alternative}</span>
-                </div>
-              )}
+      {triggers.map(t => {
+        const cat = TRIGGER_CATS[t.category] ?? TRIGGER_CATS.habit;
+        return (
+          <div key={t.id} className="rounded-xl border p-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{cat.icon}</span>
+              <div className="flex-1"><p className="text-sm font-medium" style={{ color: "var(--text)" }}>{t.triggerName}</p><span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: `${cat.color}15`, color: cat.color }}>{cat.label}</span></div>
+              <button onClick={async () => { if (confirm("حذف؟")) { try { await api.delete("/api/phone-addiction/triggers/" + t.id); onUpdate(); } catch {} } }} className="text-[9px]" style={{ color: "#DC2626" }}>🗑️</button>
             </div>
-          );
-        })}
-        {triggers.length === 0 && !showNew && (
-          <div className="text-center py-8">
-            <p className="text-3xl mb-2">⚡</p>
-            <p className="text-sm" style={{ color: "var(--muted)" }}>حدد المحفزات التي تجعلك تمسك الجوال</p>
+            {t.alternative && <div className="mt-2 px-3 py-1.5 rounded-lg" style={{ background: "#3D8C5A08", border: "1px solid #3D8C5A15" }}><span className="text-[9px] font-bold" style={{ color: "#3D8C5A" }}>✅ البديل: </span><span className="text-[10px]" style={{ color: "var(--text)" }}>{t.alternative}</span></div>}
           </div>
-        )}
-      </div>
+        );
+      })}
+      {triggers.length === 0 && !showNew && <div className="text-center py-8"><p className="text-3xl mb-2">⚡</p><p className="text-sm" style={{ color: "var(--muted)" }}>حدد محفزاتك</p></div>}
     </div>
   );
 }
@@ -359,62 +546,36 @@ function FreeZonesTab({ zones, onUpdate }: { zones: FreeZone[]; onUpdate: () => 
     <div className="space-y-4">
       <div className="rounded-xl p-4" style={{ background: "#5E549508", border: "1px solid #5E549520" }}>
         <p className="text-xs font-bold mb-1" style={{ color: "#5E5495" }}>🔕 فترات بلا جوال</p>
-        <p className="text-[10px]" style={{ color: "var(--text)" }}>حدد أوقات ثابتة تلتزم فيها بعدم استخدام الجوال. تعديل البيئة من أقوى أساليب CBT.</p>
+        <p className="text-[10px]" style={{ color: "var(--text)" }}>أوقات ثابتة تلتزم فيها بعدم الاستخدام. تعديل البيئة من أقوى أساليب CBT.</p>
       </div>
-
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold" style={{ color: "var(--text)" }}>فتراتي ({zones.length})</span>
         <button onClick={() => setShowNew(true)} className="text-[10px] font-bold px-3 py-1.5 rounded-lg text-white" style={{ background: "#5E5495" }}>+ فترة</button>
       </div>
-
       {showNew && (
         <div className="rounded-xl border p-4 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-          <input value={nz.name} onChange={e => setNz({...nz, name: e.target.value})} placeholder="اسم الفترة (مثال: وقت النوم، صلاة الفجر)" className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={is} />
+          <input value={nz.name} onChange={e => setNz({...nz, name: e.target.value})} placeholder="اسم الفترة (وقت النوم...)" className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={is} />
           <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="text-[9px] block mb-1" style={{ color: "var(--muted)" }}>من</label>
-              <input type="time" value={nz.start} onChange={e => setNz({...nz, start: e.target.value})} className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={is} />
-            </div>
-            <div className="flex-1">
-              <label className="text-[9px] block mb-1" style={{ color: "var(--muted)" }}>إلى</label>
-              <input type="time" value={nz.end} onChange={e => setNz({...nz, end: e.target.value})} className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none" style={is} />
-            </div>
+            <div className="flex-1"><label className="text-[9px] block mb-1" style={{ color: "var(--muted)" }}>من</label><input type="time" value={nz.start} onChange={e => setNz({...nz, start: e.target.value})} className="w-full px-3 py-2 rounded-lg border text-sm" style={is} /></div>
+            <div className="flex-1"><label className="text-[9px] block mb-1" style={{ color: "var(--muted)" }}>إلى</label><input type="time" value={nz.end} onChange={e => setNz({...nz, end: e.target.value})} className="w-full px-3 py-2 rounded-lg border text-sm" style={is} /></div>
           </div>
-          <select value={nz.days} onChange={e => setNz({...nz, days: e.target.value})} className="w-full px-3 py-2 rounded-lg border text-xs" style={is}>
-            <option value="all">كل الأيام</option>
-            <option value="weekdays">أيام العمل</option>
-            <option value="weekends">عطلة نهاية الأسبوع</option>
-          </select>
+          <select value={nz.days} onChange={e => setNz({...nz, days: e.target.value})} className="w-full px-3 py-2 rounded-lg border text-xs" style={is}><option value="all">كل الأيام</option><option value="weekdays">أيام العمل</option><option value="weekends">العطلة</option></select>
           <div className="flex gap-2 justify-end">
             <button onClick={() => setShowNew(false)} className="px-3 py-1.5 rounded-lg text-[10px]" style={{ color: "var(--muted)" }}>إلغاء</button>
             <button onClick={add} disabled={!nz.name.trim()} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>إضافة</button>
           </div>
         </div>
       )}
-
-      <div className="space-y-2">
-        {zones.map(z => (
-          <div key={z.id} className="rounded-xl border p-3 flex items-center gap-3" style={{ background: "var(--card)", borderColor: "var(--card-border)", opacity: z.isActive ? 1 : 0.5 }}>
-            <span className="text-lg">🔕</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium" style={{ color: "var(--text)" }}>{z.zoneName}</p>
-              <p className="text-[10px]" style={{ color: "var(--muted)" }}>{z.startTime} — {z.endTime} · {z.daysOfWeek === "all" ? "كل يوم" : z.daysOfWeek === "weekdays" ? "أيام العمل" : "العطلة"}</p>
-            </div>
-            <button onClick={async () => { try { await api.patch(`/api/phone-addiction/free-zones/${z.id}`, { isActive: !z.isActive }); onUpdate(); } catch {} }}
-              className="text-[9px] px-2 py-1 rounded-lg font-bold" style={{ background: z.isActive ? "#3D8C5A15" : "#6B728015", color: z.isActive ? "#3D8C5A" : "#6B7280" }}>
-              {z.isActive ? "✓ مفعّل" : "معطّل"}
-            </button>
-            <button onClick={async () => { if (confirm("حذف؟")) { try { await api.delete(`/api/phone-addiction/free-zones/${z.id}`); onUpdate(); } catch {} } }}
-              className="text-[9px]" style={{ color: "#DC2626" }}>🗑️</button>
-          </div>
-        ))}
-        {zones.length === 0 && !showNew && (
-          <div className="text-center py-8">
-            <p className="text-3xl mb-2">🔕</p>
-            <p className="text-sm" style={{ color: "var(--muted)" }}>أضف فترات زمنية تلتزم فيها بعدم استخدام الجوال</p>
-          </div>
-        )}
-      </div>
+      {zones.map(z => (
+        <div key={z.id} className="rounded-xl border p-3 flex items-center gap-3" style={{ background: "var(--card)", borderColor: "var(--card-border)", opacity: z.isActive ? 1 : 0.5 }}>
+          <span className="text-lg">🔕</span>
+          <div className="flex-1"><p className="text-sm font-medium" style={{ color: "var(--text)" }}>{z.zoneName}</p><p className="text-[10px]" style={{ color: "var(--muted)" }}>{z.startTime} — {z.endTime} · {z.daysOfWeek === "all" ? "كل يوم" : z.daysOfWeek === "weekdays" ? "أيام العمل" : "العطلة"}</p></div>
+          <button onClick={async () => { try { await api.patch("/api/phone-addiction/free-zones/" + z.id, { isActive: !z.isActive }); onUpdate(); } catch {} }}
+            className="text-[9px] px-2 py-1 rounded-lg font-bold" style={{ background: z.isActive ? "#3D8C5A15" : "#6B728015", color: z.isActive ? "#3D8C5A" : "#6B7280" }}>{z.isActive ? "✓ مفعّل" : "معطّل"}</button>
+          <button onClick={async () => { if (confirm("حذف؟")) { try { await api.delete("/api/phone-addiction/free-zones/" + z.id); onUpdate(); } catch {} } }} className="text-[9px]" style={{ color: "#DC2626" }}>🗑️</button>
+        </div>
+      ))}
+      {zones.length === 0 && !showNew && <div className="text-center py-8"><p className="text-3xl mb-2">🔕</p><p className="text-sm" style={{ color: "var(--muted)" }}>أضف فترات آمنة</p></div>}
     </div>
   );
 }
@@ -430,11 +591,7 @@ function GoalTab({ goal, onSave }: { goal: Goal|null; onSave: () => void }) {
   async function save() {
     if (!cur) return;
     try {
-      await api.post("/api/phone-addiction/goal", {
-        currentDailyHours: Number(cur), targetDailyHours: Number(tgt) || 2,
-        weeklyReductionMinutes: Number(red) || 15, whyMotivation: why || undefined,
-        targetDate: targetDate || undefined,
-      });
+      await api.post("/api/phone-addiction/goal", { currentDailyHours: Number(cur), targetDailyHours: Number(tgt) || 2, weeklyReductionMinutes: Number(red) || 15, whyMotivation: why || undefined, targetDate: targetDate || undefined });
       onSave();
     } catch { alert("فشل الحفظ"); }
   }
@@ -442,52 +599,17 @@ function GoalTab({ goal, onSave }: { goal: Goal|null; onSave: () => void }) {
   return (
     <div className="space-y-4">
       <div className="rounded-xl p-4" style={{ background: "#DC262608", border: "1px solid #DC262620" }}>
-        <p className="text-xs font-bold mb-1" style={{ color: "#DC2626" }}>🎯 كيف يعمل التخفيض التدريجي؟</p>
-        <p className="text-[10px]" style={{ color: "var(--text)" }}>
-          حدد واقعك الحالي (مثلاً 6 ساعات) وهدفك (مثلاً ساعتين). النظام يخفّض هدفك اليومي تدريجياً كل أسبوع حتى تصل للهدف بدون صدمة.
-        </p>
+        <p className="text-xs font-bold mb-1" style={{ color: "#DC2626" }}>🎯 التخفيض التدريجي</p>
+        <p className="text-[10px]" style={{ color: "var(--text)" }}>حدد واقعك وهدفك. النظام يخفّض هدفك اليومي تدريجياً كل أسبوع.</p>
       </div>
-
       <div className="rounded-2xl border p-5 space-y-4" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-        <div>
-          <label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>📱 كم ساعة تستخدم الجوال حالياً يومياً؟</label>
-          <input type="number" value={cur} onChange={e => setCur(e.target.value)} placeholder="مثلاً: 6" step="0.5" min="0"
-            className="w-full px-4 py-3 rounded-xl border text-lg font-bold text-center focus:outline-none" style={is} />
-        </div>
-        <div>
-          <label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>🎯 هدفك النهائي (ساعات يومياً)</label>
-          <input type="number" value={tgt} onChange={e => setTgt(e.target.value)} placeholder="2" step="0.5" min="0"
-            className="w-full px-4 py-3 rounded-xl border text-lg font-bold text-center focus:outline-none" style={is} />
-        </div>
-        <div>
-          <label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>⬇️ التخفيض الأسبوعي (دقائق)</label>
-          <input type="number" value={red} onChange={e => setRed(e.target.value)} placeholder="15"
-            className="w-full px-4 py-2.5 rounded-xl border text-center focus:outline-none" style={is} />
-          <p className="text-[9px] mt-1" style={{ color: "var(--muted)" }}>كل أسبوع ينخفض هدفك اليومي بهذا المقدار</p>
-        </div>
-        <div>
-          <label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>💡 لماذا تريد التقليل؟ (دافعك العميق)</label>
-          <textarea value={why} onChange={e => setWhy(e.target.value)} rows={3} placeholder="مثال: أريد وقتاً أكثر مع أطفالي، أريد التركيز في عملي، أريد نوماً أفضل..."
-            className="w-full px-3 py-2 rounded-xl border text-xs resize-none focus:outline-none" style={is} />
-        </div>
-        <div>
-          <label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>📅 تاريخ الوصول للهدف (اختياري)</label>
-          <input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none" style={is} />
-        </div>
-
-        {cur && tgt && (
-          <div className="rounded-xl p-3" style={{ background: "#3D8C5A08", border: "1px solid #3D8C5A15" }}>
-            <p className="text-[10px] font-bold" style={{ color: "#3D8C5A" }}>📊 الخطة:</p>
-            <p className="text-[10px]" style={{ color: "var(--text)" }}>
-              من {cur} ساعة → {tgt} ساعة · تخفيض {red} دقيقة أسبوعياً · يستغرق تقريباً {Math.ceil(((Number(cur) - Number(tgt)) * 60) / (Number(red) || 15))} أسبوع
-            </p>
-          </div>
-        )}
-
-        <button onClick={save} disabled={!cur} className="w-full py-3 rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#DC2626" }}>
-          {goal ? "تحديث الهدف" : "🚀 ابدأ الرحلة"}
-        </button>
+        <div><label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>📱 كم ساعة تستخدم يومياً؟</label><input type="number" value={cur} onChange={e => setCur(e.target.value)} placeholder="6" step="0.5" className="w-full px-4 py-3 rounded-xl border text-lg font-bold text-center focus:outline-none" style={is} /></div>
+        <div><label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>🎯 الهدف (ساعات)</label><input type="number" value={tgt} onChange={e => setTgt(e.target.value)} placeholder="2" step="0.5" className="w-full px-4 py-3 rounded-xl border text-lg font-bold text-center focus:outline-none" style={is} /></div>
+        <div><label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>⬇️ التخفيض الأسبوعي (دقائق)</label><input type="number" value={red} onChange={e => setRed(e.target.value)} placeholder="15" className="w-full px-4 py-2.5 rounded-xl border text-center focus:outline-none" style={is} /></div>
+        <div><label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>💡 لماذا تريد التقليل؟</label><textarea value={why} onChange={e => setWhy(e.target.value)} rows={3} placeholder="دافعك العميق..." className="w-full px-3 py-2 rounded-xl border text-xs resize-none focus:outline-none" style={is} /></div>
+        <div><label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>📅 تاريخ الوصول (اختياري)</label><input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)} className="w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none" style={is} /></div>
+        {cur && tgt && <div className="rounded-xl p-3" style={{ background: "#3D8C5A08", border: "1px solid #3D8C5A15" }}><p className="text-[10px]" style={{ color: "#3D8C5A" }}>📊 من {cur}س → {tgt}س · تخفيض {red}د/أسبوع · ≈{Math.ceil(((Number(cur) - Number(tgt)) * 60) / (Number(red) || 15))} أسبوع</p></div>}
+        <button onClick={save} disabled={!cur} className="w-full py-3 rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#DC2626" }}>{goal ? "تحديث الهدف" : "🚀 ابدأ الرحلة"}</button>
       </div>
     </div>
   );
