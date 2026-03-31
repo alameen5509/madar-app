@@ -3345,6 +3345,18 @@ export default function TasksPage() {
                             className="text-[8px] px-1.5 py-1 rounded-lg font-bold transition hover:scale-105"
                             style={{ background: "#D4AF3710", color: "#D4AF37" }} title="الأسبوع القادم">+7</button>
                         </>)}
+                        {!t.done && t.context !== "habit" && t.dueDate && t.dueDate.slice(0, 10) > todayStr && (
+                          <button onClick={async (e) => {
+                            e.preventDefault(); e.stopPropagation();
+                            const cur = new Date(t.dueDate!); cur.setDate(cur.getDate() + 1);
+                            try {
+                              const res = await api.post("/api/tasks/" + t.id + "/update", { dueDate: cur.toISOString() });
+                              if (res.status === 200) fetchTasks();
+                            } catch {}
+                          }}
+                            className="text-[8px] px-1.5 py-1 rounded-lg font-bold transition hover:scale-105"
+                            style={{ background: "#5E549510", color: "#5E5495" }} title="اليوم التالي">+1</button>
+                        )}
                         {t.reminder && t.reminder.frequency !== "none" && t.reminder.nextAt && new Date(t.reminder.nextAt) <= new Date() ? (<>
                           <button onClick={async () => { try { await api.post(`/api/reminders/${t.id}/done`, {}); fetchTasks(); } catch {} }}
                             className="text-[8px] px-1.5 py-1 rounded-lg font-bold" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>تم ✓</button>
