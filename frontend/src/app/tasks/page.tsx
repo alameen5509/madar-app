@@ -3263,8 +3263,22 @@ export default function TasksPage() {
                           </p>
                         )}
                       </div>
-                      {/* أزرار التذكير */}
+                      {/* أزرار التأجيل + التذكير */}
                       <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                        {!t.done && t.context !== "habit" && (<>
+                          <button onClick={async () => {
+                            const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+                            try { await api.patch(`/api/tasks/${t.id}`, { dueDate: tomorrow }); fetchTasks(); } catch {}
+                          }}
+                            className="text-[8px] px-1.5 py-1 rounded-lg font-bold transition hover:scale-105"
+                            style={{ background: "#5E549510", color: "#5E5495" }} title="غداً">غداً</button>
+                          <button onClick={async () => {
+                            const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+                            try { await api.patch(`/api/tasks/${t.id}`, { dueDate: nextWeek }); fetchTasks(); } catch {}
+                          }}
+                            className="text-[8px] px-1.5 py-1 rounded-lg font-bold transition hover:scale-105"
+                            style={{ background: "#D4AF3710", color: "#D4AF37" }} title="الأسبوع القادم">+7</button>
+                        </>)}
                         {t.reminder && t.reminder.frequency !== "none" && t.reminder.nextAt && new Date(t.reminder.nextAt) <= new Date() ? (<>
                           <button onClick={async () => { try { await api.post(`/api/reminders/${t.id}/done`, {}); fetchTasks(); } catch {} }}
                             className="text-[8px] px-1.5 py-1 rounded-lg font-bold" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>تم ✓</button>
