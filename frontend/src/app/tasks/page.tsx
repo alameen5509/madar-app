@@ -3267,18 +3267,24 @@ export default function TasksPage() {
                       <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
                         {!t.done && t.context !== "habit" && (<>
                           <button onClick={async (e) => {
-                            e.stopPropagation();
+                            e.preventDefault(); e.stopPropagation();
                             const d = new Date(); d.setDate(d.getDate() + 1);
-                            const tomorrow = d.toISOString();
-                            try { await api.post("/api/tasks/" + t.id + "/update", { dueDate: tomorrow }); fetchTasks(); } catch (err) { console.error("postpone err", err); }
+                            try {
+                              const res = await api.post("/api/tasks/" + t.id + "/update", { dueDate: d.toISOString() });
+                              if (res.status === 200) fetchTasks();
+                              else alert("خطأ: " + res.status);
+                            } catch (err: unknown) { alert("فشل التأجيل: " + (err instanceof Error ? err.message : String(err))); }
                           }}
                             className="text-[8px] px-1.5 py-1 rounded-lg font-bold transition hover:scale-105"
                             style={{ background: "#5E549510", color: "#5E5495" }} title="غداً">غداً</button>
                           <button onClick={async (e) => {
-                            e.stopPropagation();
+                            e.preventDefault(); e.stopPropagation();
                             const d = new Date(); d.setDate(d.getDate() + 7);
-                            const nextWeek = d.toISOString();
-                            try { await api.post("/api/tasks/" + t.id + "/update", { dueDate: nextWeek }); fetchTasks(); } catch (err) { console.error("postpone err", err); }
+                            try {
+                              const res = await api.post("/api/tasks/" + t.id + "/update", { dueDate: d.toISOString() });
+                              if (res.status === 200) fetchTasks();
+                              else alert("خطأ: " + res.status);
+                            } catch (err: unknown) { alert("فشل التأجيل: " + (err instanceof Error ? err.message : String(err))); }
                           }}
                             className="text-[8px] px-1.5 py-1 rounded-lg font-bold transition hover:scale-105"
                             style={{ background: "#D4AF3710", color: "#D4AF37" }} title="الأسبوع القادم">+7</button>
