@@ -110,6 +110,15 @@ export default function DimensionPage({ params }: { params: Promise<{ id: string
             className="px-4 py-2 rounded-xl text-xs font-bold text-white" style={{ background: color }}>+ جانب فرعي</button>
           <button onClick={() => setShowAddType(showAddType === "goal" ? null : "goal")}
             className="px-4 py-2 rounded-xl text-xs font-bold text-white" style={{ background: "#D4AF37" }}>+ هدف</button>
+          <div className="flex-1" />
+          <button onClick={async () => {
+            if (!confirm(`حذف الجانب "${dim.name}" وكل محتوياته نهائياً؟`)) return;
+            try { await api.delete(`/api/job-dimensions/${dimId}`); window.history.back(); } catch { alert("فشل الحذف"); }
+          }}
+            className="px-3 py-2 rounded-xl text-[10px] font-medium transition hover:bg-red-50"
+            style={{ color: "#ef4444", border: "1px solid #ef444430" }}>
+            🗑️ حذف الجانب
+          </button>
         </div>
 
         {showAddType && (
@@ -149,7 +158,14 @@ export default function DimensionPage({ params }: { params: Promise<{ id: string
                     <div className="h-1.5 rounded-full overflow-hidden" style={{ background: (sd.color || color) + "15" }}>
                       <div className="h-full rounded-full" style={{ width: `${sdp}%`, background: sd.color || color }} />
                     </div>
-                    <p className="text-[10px] mt-2 font-semibold group-hover:translate-x-[-4px] transition-transform" style={{ color }}>فتح ←</p>
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-[10px] font-semibold group-hover:translate-x-[-4px] transition-transform" style={{ color }}>فتح ←</p>
+                      <button onClick={async (e) => {
+                        e.preventDefault(); e.stopPropagation();
+                        if (!confirm(`حذف "${sd.name}" وكل محتوياته؟`)) return;
+                        try { await api.delete(`/api/job-dimensions/${sd.id}`); load(); } catch { alert("فشل الحذف"); }
+                      }} className="text-[9px] px-2 py-1 rounded-lg hover:bg-red-50" style={{ color: "#ef4444" }}>🗑️</button>
+                    </div>
                   </Link>
                 );
               })}
@@ -184,7 +200,14 @@ export default function DimensionPage({ params }: { params: Promise<{ id: string
                     <div className="h-1.5 rounded-full overflow-hidden" style={{ background: gc + "15" }}>
                       <div className="h-full rounded-full" style={{ width: `${gp}%`, background: gc }} />
                     </div>
-                    <p className="text-[10px] mt-2 font-semibold group-hover:translate-x-[-4px] transition-transform" style={{ color: "#D4AF37" }}>فتح ←</p>
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-[10px] font-semibold group-hover:translate-x-[-4px] transition-transform" style={{ color: "#D4AF37" }}>فتح ←</p>
+                      <button onClick={async (e) => {
+                        e.preventDefault(); e.stopPropagation();
+                        if (!confirm(`حذف الهدف "${g.title}" وكل أهدافه الفرعية؟`)) return;
+                        try { await api.delete(`/api/job-goals/${g.id}`); load(); } catch { alert("فشل الحذف"); }
+                      }} className="text-[9px] px-2 py-1 rounded-lg hover:bg-red-50" style={{ color: "#ef4444" }}>🗑️</button>
+                    </div>
                   </Link>
                 );
               })}

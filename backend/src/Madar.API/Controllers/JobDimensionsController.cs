@@ -153,7 +153,33 @@ public class JobDimensionsController : BaseController
     {
         var dim = await _db.JobDimensions.FirstOrDefaultAsync(d => d.Id == id, ct);
         if (dim is null) return NotFound();
-        _db.JobDimensions.Remove(dim);
+
+        // Collect this dimension + all descendant dimensions
+        var allDims = await _db.JobDimensions.Where(d => d.JobId == dim.JobId).ToListAsync(ct);
+        var toDelete = new List<Guid> { id };
+        var queue = new Queue<Guid>([id]);
+        while (queue.Count > 0)
+        {
+            var parentId = queue.Dequeue();
+            foreach (var child in allDims.Where(d => d.ParentDimensionId == parentId))
+            {
+                toDelete.Add(child.Id);
+                queue.Enqueue(child.Id);
+            }
+        }
+
+        // Delete goal links first, then goals, then dimensions
+        var goals = await _db.JobGoals.Where(g => toDelete.Contains(g.DimensionId)).ToListAsync(ct);
+        var goalIds = goals.Select(g => g.Id).ToList();
+
+        var goalProjects = await _db.JobGoalProjects.Where(gp => goalIds.Contains(gp.GoalId)).ToListAsync(ct);
+        var goalTasks = await _db.JobGoalTasks.Where(gt => goalIds.Contains(gt.GoalId)).ToListAsync(ct);
+
+        _db.JobGoalProjects.RemoveRange(goalProjects);
+        _db.JobGoalTasks.RemoveRange(goalTasks);
+        _db.JobGoals.RemoveRange(goals);
+        _db.JobDimensions.RemoveRange(allDims.Where(d => toDelete.Contains(d.Id)));
+
         await _db.SaveChangesAsync(ct);
         return NoContent();
     }
@@ -302,7 +328,29 @@ public class JobGoalsController : BaseController
     {
         var goal = await _db.JobGoals.FirstOrDefaultAsync(g => g.Id == id, ct);
         if (goal is null) return NotFound();
-        _db.JobGoals.Remove(goal);
+
+        // Collect this goal + all descendant sub-goals
+        var allGoals = await _db.JobGoals.Where(g => g.DimensionId == goal.DimensionId).ToListAsync(ct);
+        var toDelete = new List<Guid> { id };
+        var queue = new Queue<Guid>([id]);
+        while (queue.Count > 0)
+        {
+            var parentId = queue.Dequeue();
+            foreach (var child in allGoals.Where(g => g.ParentGoalId == parentId))
+            {
+                toDelete.Add(child.Id);
+                queue.Enqueue(child.Id);
+            }
+        }
+
+        // Delete links first, then goals
+        var goalProjects = await _db.JobGoalProjects.Where(gp => toDelete.Contains(gp.GoalId)).ToListAsync(ct);
+        var goalTasks = await _db.JobGoalTasks.Where(gt => toDelete.Contains(gt.GoalId)).ToListAsync(ct);
+
+        _db.JobGoalProjects.RemoveRange(goalProjects);
+        _db.JobGoalTasks.RemoveRange(goalTasks);
+        _db.JobGoals.RemoveRange(allGoals.Where(g => toDelete.Contains(g.Id)));
+
         await _db.SaveChangesAsync(ct);
         return NoContent();
     }

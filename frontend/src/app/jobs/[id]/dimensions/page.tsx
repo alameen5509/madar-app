@@ -93,7 +93,18 @@ export default function DimensionsPage({ params }: { params: Promise<{ id: strin
                 </div>
               )}
 
-              <p className="text-[10px] mt-3 font-semibold group-hover:translate-x-[-4px] transition-transform" style={{ color }}>فتح الجانب ←</p>
+              <div className="flex items-center justify-between mt-3">
+                <p className="text-[10px] font-semibold group-hover:translate-x-[-4px] transition-transform" style={{ color }}>فتح الجانب ←</p>
+                <button onClick={async (e) => {
+                  e.preventDefault(); e.stopPropagation();
+                  if (!confirm(`حذف الجانب "${d.name}" وكل محتوياته (جوانب فرعية + أهداف)؟`)) return;
+                  try { await api.delete(`/api/job-dimensions/${d.id}`); refresh(); } catch { alert("فشل الحذف"); }
+                }}
+                  className="text-[10px] px-3 py-1.5 rounded-lg font-medium transition hover:bg-red-50"
+                  style={{ color: "#ef4444", border: "1px solid #ef444430" }}>
+                  🗑️ حذف
+                </button>
+              </div>
             </Link>
           );
         })}
