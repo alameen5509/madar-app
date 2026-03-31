@@ -3265,7 +3265,7 @@ export default function TasksPage() {
                       </div>
                       {/* أزرار التأجيل + التذكير */}
                       <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                        {!t.done && t.context !== "habit" && (<>
+                        {!t.done && t.context !== "habit" && (!t.dueDate || t.dueDate.slice(0, 10) <= todayStr) && (<>
                           <button onClick={async (e) => {
                             e.preventDefault(); e.stopPropagation();
                             const d = new Date(); d.setDate(d.getDate() + 1);
