@@ -30,7 +30,7 @@ export default function PhoneAddictionPage() {
   const [logs, setLogs] = useState<DayLog[]>([]);
   const [triggers, setTriggers] = useState<Trigger[]>([]);
   const [zones, setZones] = useState<FreeZone[]>([]);
-  const [stats, setStats] = useState<{streakDays:number;triggerCount:number;activeZones:number;last7Days:{date:string;actualMinutes:number;targetMinutes:number}[]}|null>(null);
+  const [stats, setStats] = useState<{streakDays:number;triggerCount:number;activeZones:number;last7Days:{date:string;actualMinutes:number;targetMinutes:number}[];todayLog?:DayLog|null}|null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
