@@ -44,7 +44,6 @@ const NAV_GROUPS = [
   { group: "الإدارة", items: [
     { icon: "◇", label: "الإدارة المالية",    href: "/finance",     badgeKey: "dues" as const, fixed: false },
     { icon: "🍽️", label: "التغذية",            href: "/nutrition",   badgeKey: null, fixed: false },
-    { icon: "🎖️", label: "غرفة القيادة",       href: "/war-room",    badgeKey: null, fixed: false },
   ]},
   { group: "المعرفة", items: [
     { icon: "📜", label: "التاريخ",            href: "/history",     badgeKey: null, fixed: false },

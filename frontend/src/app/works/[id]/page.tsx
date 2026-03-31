@@ -4,6 +4,7 @@ import { use, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { GeometricDivider } from "@/components/IslamicPattern";
+import LeadershipSection from "@/components/LeadershipSection";
 
 interface WorkData {
   id: string; type: string; name: string; title?: string; employer?: string;
@@ -102,8 +103,10 @@ export default function WorkDetailPage({ params }: { params: Promise<{ id: strin
             ))}
           </nav>
         </header>
-        <div className="px-6 py-5">
+        <div className="px-6 py-5 space-y-6">
           <p className="text-xs text-center" style={{ color: "var(--muted)" }}>اختر قسماً من الأعلى للدخول</p>
+          <GeometricDivider label="القيادة" />
+          <LeadershipSection workId={id} workName={work.name} workColor="#2D6B9E" workIcon="💼" />
         </div>
       </main>
     );
@@ -178,6 +181,13 @@ export default function WorkDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           </Link>
         ))}
+      </div>
+      {/* ═══ القيادة ═══ */}
+      <div className="px-6 py-4">
+        <GeometricDivider label="القيادة" />
+        <div className="mt-3">
+          <LeadershipSection workId={id} workName={work.name} workColor="#D4AF37" workIcon="🏢" />
+        </div>
       </div>
       {/* ═══ طلبات العمل ═══ */}
       <WorkRequests workId={id} />
