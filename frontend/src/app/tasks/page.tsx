@@ -422,7 +422,29 @@ export function NewTaskDialog({
               </select>
             </div>
             <label className="block text-sm font-semibold text-[#1A1830] mb-1.5 mt-3">تاريخ الاستحقاق <span className="text-[#7C7A8E] font-normal">(اختياري)</span></label>
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
+            <div className="flex gap-1.5 mb-2">
+              {[
+                { label: "اليوم", val: new Date().toISOString().slice(0, 10) },
+                { label: "غداً", val: new Date(Date.now() + 86400000).toISOString().slice(0, 10) },
+                { label: "الأسبوع القادم", val: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10) },
+              ].map(o => (
+                <button key={o.label} type="button" onClick={() => setDueDate(o.val)}
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition"
+                  style={{ background: dueDate === o.val ? "#5E5495" : "#F8F6F0", color: dueDate === o.val ? "#fff" : "#5E5495", border: "1px solid " + (dueDate === o.val ? "#5E5495" : "#E2D5B0") }}>
+                  {o.label}
+                </button>
+              ))}
+              <button type="button" onClick={() => { const el = document.getElementById("dueDatePicker") as HTMLInputElement; el?.showPicker?.(); }}
+                className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition"
+                style={{ background: dueDate && ![0,1,7].map(d => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10)).includes(dueDate) ? "#5E5495" : "#F8F6F0", color: dueDate && ![0,1,7].map(d => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10)).includes(dueDate) ? "#fff" : "#5E5495", border: "1px solid #E2D5B0" }}>
+                📅 تاريخ آخر
+              </button>
+              {dueDate && (
+                <button type="button" onClick={() => setDueDate("")}
+                  className="px-2 py-1.5 rounded-lg text-[10px] text-red-400 hover:bg-red-50 transition" style={{ border: "1px solid #fee2e2" }}>✕</button>
+              )}
+            </div>
+            <input id="dueDatePicker" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition" />
           </div>
           {/* Recurrence */}
@@ -1130,7 +1152,29 @@ function EditTaskDialog({ task, onClose, onSaved }: {
           {/* تاريخ الاستحقاق */}
           <div>
             <label className="block text-sm font-semibold mb-1.5" style={{ color: "var(--text)" }}>تاريخ الاستحقاق</label>
-            <input type="date" value={dueDate ? dueDate.slice(0, 10) : ""} onChange={(e) => setDueDate(e.target.value)}
+            <div className="flex gap-1.5 mb-2">
+              {[
+                { label: "اليوم", val: new Date().toISOString().slice(0, 10) },
+                { label: "غداً", val: new Date(Date.now() + 86400000).toISOString().slice(0, 10) },
+                { label: "+7", val: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10) },
+              ].map(o => (
+                <button key={o.label} type="button" onClick={() => setDueDate(o.val)}
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition"
+                  style={{ background: dueDate?.slice(0, 10) === o.val ? "#5E5495" : "var(--bg)", color: dueDate?.slice(0, 10) === o.val ? "#fff" : "#5E5495", border: "1px solid " + (dueDate?.slice(0, 10) === o.val ? "#5E5495" : "var(--card-border)") }}>
+                  {o.label}
+                </button>
+              ))}
+              <button type="button" onClick={() => { const el = document.getElementById("editDueDatePicker") as HTMLInputElement; el?.showPicker?.(); }}
+                className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition"
+                style={{ background: "var(--bg)", color: "#5E5495", border: "1px solid var(--card-border)" }}>
+                📅
+              </button>
+              {dueDate && (
+                <button type="button" onClick={() => setDueDate("")}
+                  className="px-2 py-1.5 rounded-lg text-[10px] text-red-400 hover:bg-red-50 transition" style={{ border: "1px solid #fee2e2" }}>✕</button>
+              )}
+            </div>
+            <input id="editDueDatePicker" type="date" value={dueDate ? dueDate.slice(0, 10) : ""} onChange={(e) => setDueDate(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
               style={{ background: "var(--bg)", border: "1px solid var(--card-border)", color: "var(--text)" }} />
           </div>
