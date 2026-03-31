@@ -3268,13 +3268,13 @@ export default function TasksPage() {
                         {!t.done && t.context !== "habit" && (<>
                           <button onClick={async () => {
                             const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-                            try { await api.patch(`/api/tasks/${t.id}`, { dueDate: tomorrow }); fetchTasks(); } catch {}
+                            try { await api.post(`/api/tasks/${t.id}/update`, { dueDate: tomorrow }); fetchTasks(); } catch {}
                           }}
                             className="text-[8px] px-1.5 py-1 rounded-lg font-bold transition hover:scale-105"
                             style={{ background: "#5E549510", color: "#5E5495" }} title="غداً">غداً</button>
                           <button onClick={async () => {
                             const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
-                            try { await api.patch(`/api/tasks/${t.id}`, { dueDate: nextWeek }); fetchTasks(); } catch {}
+                            try { await api.post(`/api/tasks/${t.id}/update`, { dueDate: nextWeek }); fetchTasks(); } catch {}
                           }}
                             className="text-[8px] px-1.5 py-1 rounded-lg font-bold transition hover:scale-105"
                             style={{ background: "#D4AF3710", color: "#D4AF37" }} title="الأسبوع القادم">+7</button>
