@@ -40,6 +40,7 @@ const NAV_GROUPS = [
     { icon: "↻", label: "العادات",            href: "/habits",      badgeKey: "habits" as const, fixed: false },
     { icon: "🤲", label: "التوبة",             href: "/tawbah",      badgeKey: null, fixed: false },
     { icon: "🚫", label: "ترك العادات",       href: "/quit-habits", badgeKey: null, fixed: false },
+    { icon: "📵", label: "إدمان الجوال",      href: "/phone-addiction", badgeKey: null, fixed: false },
   ]},
   { group: "الإدارة", items: [
     { icon: "◇", label: "الإدارة المالية",    href: "/finance",     badgeKey: "dues" as const, fixed: false },

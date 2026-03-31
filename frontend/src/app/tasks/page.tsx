@@ -723,6 +723,16 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
   const allPending = tasks.filter((t) => !t.done && !t.isInbox && (!t.dueDate || t.dueDate.slice(0, 10) <= _todayLocal));
   const habitTasks = allPending.filter(t => t.context === "habit");
   const pending = allPending.filter(t => t.context !== "habit").sort((a, b) => {
+    // مهام اليوم أولاً، ثم المتأخرة، ثم بلا تاريخ
+    const todayScore = (t: TaskRow) => {
+      if (!t.dueDate) return 2; // بلا تاريخ
+      const d = t.dueDate.slice(0, 10);
+      if (d === _todayLocal) return 0; // اليوم
+      if (d < _todayLocal) return 1; // متأخرة
+      return 2;
+    };
+    const ds = todayScore(a) - todayScore(b);
+    if (ds !== 0) return ds;
     if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
     const typeOrder = (t: TaskRow) => t.isRecurring ? 0 : t.isWork ? 2 : 1;
     return typeOrder(a) - typeOrder(b);
@@ -1267,6 +1277,16 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
   const allPending = tasks.filter((t) => !t.done && !t.isInbox && (!t.dueDate || t.dueDate.slice(0, 10) <= _todayLocal));
   const habitTasks = allPending.filter(t => t.context === "habit");
   const pending = allPending.filter(t => t.context !== "habit").sort((a, b) => {
+    // مهام اليوم أولاً
+    const todayScore = (t: TaskRow) => {
+      if (!t.dueDate) return 2;
+      const d = t.dueDate.slice(0, 10);
+      if (d === _todayLocal) return 0;
+      if (d < _todayLocal) return 1;
+      return 2;
+    };
+    const ds = todayScore(a) - todayScore(b);
+    if (ds !== 0) return ds;
     if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
     const typeOrder = (t: TaskRow) => t.isRecurring ? 0 : t.isWork ? 2 : 1;
     if (typeOrder(a) !== typeOrder(b)) return typeOrder(a) - typeOrder(b);

@@ -373,6 +373,63 @@ using (var scope = app.Services.CreateScope())
     {
         Log.Warning(ex, "Prayer tables auto-create skipped (may already exist)");
     }
+
+    // ═══ Phone Addiction (CBT) tables ═══
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS ScreenTimeGoals (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                UserId CHAR(36) NOT NULL,
+                CurrentDailyHours DECIMAL(4,1) NOT NULL DEFAULT 0,
+                TargetDailyHours DECIMAL(4,1) NOT NULL DEFAULT 2,
+                WeeklyReductionMinutes INT NOT NULL DEFAULT 15,
+                WhyMotivation TEXT NULL,
+                StartDate DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                TargetDate DATETIME(6) NULL,
+                `Status` VARCHAR(20) NOT NULL DEFAULT 'active',
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_ScreenTimeGoals_UserId (UserId)
+            );
+            CREATE TABLE IF NOT EXISTS ScreenTimeLogs (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                UserId CHAR(36) NOT NULL,
+                Date DATE NOT NULL,
+                ActualMinutes INT NOT NULL DEFAULT 0,
+                TargetMinutes INT NOT NULL DEFAULT 0,
+                Mood VARCHAR(20) NULL,
+                TopApps VARCHAR(500) NULL,
+                Note VARCHAR(500) NULL,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                UNIQUE INDEX IX_ScreenTimeLogs_User_Date (UserId, Date)
+            );
+            CREATE TABLE IF NOT EXISTS PhoneTriggers (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                UserId CHAR(36) NOT NULL,
+                TriggerName VARCHAR(200) NOT NULL,
+                Category VARCHAR(50) NOT NULL DEFAULT 'boredom',
+                Alternative VARCHAR(500) NULL,
+                Frequency INT NOT NULL DEFAULT 1,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_PhoneTriggers_UserId (UserId)
+            );
+            CREATE TABLE IF NOT EXISTS PhoneFreeZones (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                UserId CHAR(36) NOT NULL,
+                ZoneName VARCHAR(200) NOT NULL,
+                StartTime VARCHAR(10) NOT NULL,
+                EndTime VARCHAR(10) NOT NULL,
+                DaysOfWeek VARCHAR(50) NOT NULL DEFAULT 'all',
+                IsActive TINYINT(1) NOT NULL DEFAULT 1,
+                StreakDays INT NOT NULL DEFAULT 0,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_PhoneFreeZones_UserId (UserId)
+            );");
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Phone addiction tables auto-create skipped");
+    }
 }
 
 app.Run();
