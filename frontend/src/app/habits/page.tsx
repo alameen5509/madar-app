@@ -522,6 +522,13 @@ function PrayerSection() {
           if (step === 5) return false;
           const timeStatus = getPrayerTimeStatus(p.key);
           if (timeStatus === "future") return false;
+          if (timeStatus === "past") {
+            // الماضية: تظهر فقط إذا لم تُسجّل بعد
+            const cur = prayerState[p.key];
+            if (!cur || (!cur.onTime && !cur.inMosque && !cur.expired)) return true; // لم تُسجّل
+            if (cur.onTime && cur.inMosque) return false; // مكتملة
+            return true; // سُجّل جزئياً
+          }
           const cur = prayerState[p.key];
           if (cur && cur.onTime && cur.inMosque) return false;
           return true;
