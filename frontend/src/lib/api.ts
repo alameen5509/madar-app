@@ -180,11 +180,24 @@ export async function createCircle(payload: CreateCirclePayload): Promise<LifeCi
   return data;
 }
 
-/** lat/lng default to Riyadh; replace with user's stored coords when available */
+const CITY_COORDS: Record<string, { lat: string; lng: string }> = {
+  riyadh: { lat: "24.7136", lng: "46.6753" }, madinah: { lat: "24.4672", lng: "39.6024" },
+  makkah: { lat: "21.4225", lng: "39.8262" }, jeddah: { lat: "21.5433", lng: "39.1728" },
+  dammam: { lat: "26.4207", lng: "50.0888" }, tabuk: { lat: "28.3838", lng: "36.5550" },
+  abha: { lat: "18.2164", lng: "42.5053" },
+};
+
+/** Uses saved city from localStorage, or defaults to Riyadh */
 export async function getSalahToday(
-  lat = '24.6877',
-  lng = '46.7219',
+  lat?: string,
+  lng?: string,
 ): Promise<SalahTimesResponse> {
+  if (!lat || !lng) {
+    const savedCity = typeof window !== "undefined" ? localStorage.getItem("madar_prayer_city") : null;
+    const coords = savedCity && savedCity !== "auto" ? CITY_COORDS[savedCity] : null;
+    lat = coords?.lat ?? "24.7136";
+    lng = coords?.lng ?? "46.7219";
+  }
   const { data } = await api.get<SalahTimesResponse>(
     `/api/salah/today?lat=${lat}&lng=${lng}`,
   );

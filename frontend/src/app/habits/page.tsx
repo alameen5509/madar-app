@@ -64,14 +64,17 @@ function HygieneSection() {
   const [habits, setHabits] = useState<HygieneHabit[]>(() => {
     if (typeof window === "undefined") return DEFAULT_HYGIENE;
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null") as HygieneHabit[] | null;
       if (!saved) return DEFAULT_HYGIENE;
-      // Merge with defaults to pick up new items
-      const map = new Map(saved.map((h: HygieneHabit) => [h.id, h]));
-      return DEFAULT_HYGIENE.map(d => (map.get(d.id) as HygieneHabit) ?? d);
+      // Merge: keep saved + add any new defaults
+      const savedIds = new Set(saved.map(h => h.id));
+      const newDefaults = DEFAULT_HYGIENE.filter(d => !savedIds.has(d.id));
+      return [...saved, ...newDefaults];
     } catch { return DEFAULT_HYGIENE; }
   });
   const [showManage, setShowManage] = useState(false);
+  const [showAddCustom, setShowAddCustom] = useState(false);
+  const [customTitle, setCustomTitle] = useState("");
 
   // Reset todayDone at start of new day
   useEffect(() => {
@@ -102,6 +105,18 @@ function HygieneSection() {
 
   function toggleEnabled(id: string) {
     save(habits.map(h => h.id === id ? { ...h, enabled: !h.enabled } : h));
+  }
+
+  function addCustom() {
+    if (!customTitle.trim()) return;
+    const newH: HygieneHabit = { id: "hc_" + Date.now(), title: customTitle.trim(), icon: "✨", enabled: true, todayDone: false, streak: 0 };
+    save([...habits, newH]);
+    setCustomTitle(""); setShowAddCustom(false);
+  }
+
+  function removeCustom(id: string) {
+    if (!id.startsWith("hc_")) return; // only custom ones
+    save(habits.filter(h => h.id !== id));
   }
 
   const active = habits.filter(h => h.enabled);
@@ -139,9 +154,26 @@ function HygieneSection() {
                 {h.enabled && <span className="text-white text-[9px]">✓</span>}
               </button>
               <span className="text-sm">{h.icon}</span>
-              <span className="text-xs" style={{ color: h.enabled ? "var(--text, #16213E)" : "var(--muted, #9CA3AF)" }}>{h.title}</span>
+              <span className="flex-1 text-xs" style={{ color: h.enabled ? "var(--text, #16213E)" : "var(--muted, #9CA3AF)" }}>{h.title}</span>
+              {h.id.startsWith("hc_") && (
+                <button onClick={() => { if (confirm("حذف؟")) removeCustom(h.id); }} className="text-[9px]" style={{ color: "#DC2626" }}>🗑️</button>
+              )}
             </div>
           ))}
+          {/* Add custom */}
+          {showAddCustom ? (
+            <div className="flex gap-2 mt-2 pt-2" style={{ borderTop: "1px solid #0F346015" }}>
+              <input value={customTitle} onChange={e => setCustomTitle(e.target.value)} placeholder="عادة جديدة..."
+                onKeyDown={e => { if (e.key === "Enter") addCustom(); }}
+                className="flex-1 px-2 py-1.5 rounded-lg border text-xs focus:outline-none" style={{ background: "var(--card, #fff)", borderColor: "var(--card-border, #E5E7EB)", color: "var(--text)" }} autoFocus />
+              <button onClick={addCustom} disabled={!customTitle.trim()} className="px-3 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#0F3460" }}>+</button>
+              <button onClick={() => { setShowAddCustom(false); setCustomTitle(""); }} className="text-[10px]" style={{ color: "var(--muted)" }}>✕</button>
+            </div>
+          ) : (
+            <button onClick={() => setShowAddCustom(true)} className="w-full mt-2 pt-2 text-[10px] font-bold text-center" style={{ color: "#0F3460", borderTop: "1px solid #0F346015" }}>
+              + إضافة عادة مخصصة
+            </button>
+          )}
         </div>
       )}
 
@@ -241,6 +273,16 @@ function CelebrationOverlay({ onDone }: { onDone: () => void }) {
 
 /* ─── Prayer Section Component ────────────────────────────────────────── */
 
+const CITIES: Record<string, { label: string; lat: string; lng: string }> = {
+  riyadh: { label: "الرياض", lat: "24.7136", lng: "46.6753" },
+  madinah: { label: "المدينة المنورة", lat: "24.4672", lng: "39.6024" },
+  makkah: { label: "مكة المكرمة", lat: "21.4225", lng: "39.8262" },
+  jeddah: { label: "جدة", lat: "21.5433", lng: "39.1728" },
+  dammam: { label: "الدمام", lat: "26.4207", lng: "50.0888" },
+  tabuk: { label: "تبوك", lat: "28.3838", lng: "36.5550" },
+  abha: { label: "أبها", lat: "18.2164", lng: "42.5053" },
+};
+
 function PrayerSection() {
   const [prayerState, setPrayerState] = useState<PrayerState>({});
   const [penalties, setPenalties] = useState<Penalty[]>([]);
@@ -250,24 +292,35 @@ function PrayerSection() {
   const [penaltyConfig, setPenaltyConfig] = useState<Record<string, string>>({});
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [showStats, setShowStats] = useState(false);
+  const [city, setCity] = useState<string>(() => {
+    if (typeof window === "undefined") return "riyadh";
+    return localStorage.getItem("madar_prayer_city") ?? "auto";
+  });
 
-  // Load salah times
-  useEffect(() => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        api.get(`/api/salah/today?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`)
-          .then(({ data }) => setSalahTimes(data))
-          .catch(() => {});
-      },
-      () => {
-        // Default Riyadh
-        api.get("/api/salah/today?lat=24.7136&lng=46.6753")
-          .then(({ data }) => setSalahTimes(data))
-          .catch(() => {});
+  // Load salah times based on city
+  const loadSalahTimes = useCallback((selectedCity: string) => {
+    if (selectedCity === "auto") {
+      if (!navigator.geolocation) {
+        api.get("/api/salah/today?lat=24.7136&lng=46.6753").then(({ data }) => setSalahTimes(data)).catch(() => {});
+        return;
       }
-    );
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { api.get(`/api/salah/today?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`).then(({ data }) => setSalahTimes(data)).catch(() => {}); },
+        () => { api.get("/api/salah/today?lat=24.7136&lng=46.6753").then(({ data }) => setSalahTimes(data)).catch(() => {}); }
+      );
+    } else {
+      const c = CITIES[selectedCity];
+      if (c) api.get(`/api/salah/today?lat=${c.lat}&lng=${c.lng}`).then(({ data }) => setSalahTimes(data)).catch(() => {});
+    }
   }, []);
+
+  useEffect(() => { loadSalahTimes(city); }, [city, loadSalahTimes]);
+
+  function changeCity(newCity: string) {
+    setCity(newCity);
+    localStorage.setItem("madar_prayer_city", newCity);
+    loadSalahTimes(newCity);
+  }
 
   // Load today's prayer logs
   const loadToday = useCallback(() => {
@@ -421,10 +474,12 @@ function PrayerSection() {
       <GeometricDivider label="الصلوات" />
       {(() => {
         const visible = PRAYERS.filter(p => {
+          const timeStatus = getPrayerTimeStatus(p.key);
+          if (timeStatus === "future") return false; // لا تظهر حتى يحين وقتها
           const cur = prayerState[p.key];
           if (!cur) return true; // no data yet — show
           if (cur.onTime && cur.inMosque) return false; // both done — hide
-          return true; // expired but not both done — keep visible
+          return true;
         });
         const done = PRAYERS.length - visible.length;
 
@@ -556,15 +611,21 @@ function PrayerSection() {
         );
       })()}
 
-      {/* ═══ Stats & Settings buttons ═══ */}
-      <div className="flex gap-2 mt-4">
+      {/* ═══ City + Stats & Settings buttons ═══ */}
+      <div className="flex gap-2 mt-4 flex-wrap">
+        <select value={city} onChange={e => changeCity(e.target.value)}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 text-[#6B7280] focus:outline-none"
+          style={{ background: "var(--card, #fff)" }}>
+          <option value="auto">📍 تلقائي (GPS)</option>
+          {Object.entries(CITIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
         <button onClick={() => { setShowStats(!showStats); if (!showStats) loadStats(); }}
           className="px-3 py-1.5 rounded-lg text-xs font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
-          📊 {showStats ? "إخفاء الإحصائيات" : "إحصائيات الصلاة"}
+          📊 {showStats ? "إخفاء" : "إحصائيات"}
         </button>
         <button onClick={() => setShowSettings(!showSettings)}
           className="px-3 py-1.5 rounded-lg text-xs font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50">
-          ⚙ إعدادات الصلوات
+          ⚙ إعدادات
         </button>
       </div>
 
