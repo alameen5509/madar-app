@@ -1309,8 +1309,8 @@ function TransferTaskDialog({ taskId, taskTitle, onClose, onDone }: {
 
 /* ─── Inline Day Planner (مدمج في الصفحة) ─────────────────────────────────── */
 
-function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
-  prayers: Prayer[]; tasks: TaskRow[]; blockedPeriods: string[]; onBlockToggle: (name: string) => void;
+function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onToggleDone }: {
+  prayers: Prayer[]; tasks: TaskRow[]; blockedPeriods: string[]; onBlockToggle: (name: string) => void; onToggleDone?: (id: string, currentDone: boolean) => void;
 }) {
   const habitDuration = (() => {
     try { return JSON.parse(localStorage.getItem("madar_settings") ?? "{}").habitDuration ?? 30; } catch { return 30; }
@@ -1547,9 +1547,16 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle }: {
                     </span>
                   )}
                   <div className="flex-1 min-w-0">
-                    <span className="text-sm truncate block" style={{ color: "var(--text)" }}>{t.title}</span>
+                    <span className={`text-sm truncate block ${t.done ? "line-through opacity-50" : ""}`} style={{ color: "var(--text)" }}>{t.title}</span>
                     {t.goalTitle && <span className="text-[9px] truncate block" style={{ color: "#D4AF37" }}>📁 {t.goalTitle}</span>}
                   </div>
+                  {onToggleDone && (
+                    <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleDone(t.id, t.done); }}
+                      className="w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition hover:scale-110"
+                      style={{ borderColor: t.done ? "#3D8C5A" : "#C9A84C", background: t.done ? "#3D8C5A" : "transparent" }}>
+                      {t.done && <span className="text-white text-[9px]">✓</span>}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -3449,7 +3456,7 @@ export default function TasksPage() {
         {/* ── تخطيط اليوم — مدمج في أسفل الصفحة ── */}
         <div style={{ order: sectionOrder.indexOf("planner"), display: hiddenSections.includes("planner") ? "none" : undefined }}>
         <GeometricDivider label="📋 تخطيط اليوم" />
-        <InlineDayPlanner prayers={prayers} tasks={visibleTasks} blockedPeriods={blockedPeriods} onBlockToggle={(name) => setBlockedPeriods((p) => p.includes(name) ? p.filter((x) => x !== name) : [...p, name])} />
+        <InlineDayPlanner prayers={prayers} tasks={visibleTasks} blockedPeriods={blockedPeriods} onBlockToggle={(name) => setBlockedPeriods((p) => p.includes(name) ? p.filter((x) => x !== name) : [...p, name])} onToggleDone={toggle} />
         </div>
 
         {/* ── المهام المستقبلية ── */}
