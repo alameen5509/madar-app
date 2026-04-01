@@ -27,6 +27,7 @@ function loadBadgeCounts(): BadgeCounts {
 
 const NAV_GROUPS = [
   { group: null, items: [
+    { icon: "↻", label: "عبادات وعادات",      href: "/habits",      badgeKey: "habits" as const, fixed: true },
     { icon: "◻", label: "أعمال اليوم",        href: "/tasks",       badgeKey: "tasks" as const, fixed: true },
   ]},
   { group: "التخطيط", items: [
@@ -37,7 +38,6 @@ const NAV_GROUPS = [
   ]},
   { group: "الحياة", items: [
     { icon: "◎", label: "أدوار الحياة",       href: "/circles",     badgeKey: null, fixed: false },
-    { icon: "↻", label: "العادات",            href: "/habits",      badgeKey: "habits" as const, fixed: false },
     { icon: "🤲", label: "التوبة",             href: "/tawbah",      badgeKey: null, fixed: false },
     { icon: "🚫", label: "ترك العادات",       href: "/quit-habits", badgeKey: null, fixed: false },
     { icon: "📵", label: "إدمان الجوال",      href: "/phone-addiction", badgeKey: null, fixed: false },

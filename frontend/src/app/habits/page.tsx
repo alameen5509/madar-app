@@ -882,7 +882,7 @@ export default function HabitsPage() {
       <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-gray-200 px-8 py-4 pr-16 md:pr-8">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-[#16213E] font-bold text-lg">العادات اليومية</h2>
+            <h2 className="text-[#16213E] font-bold text-lg">عبادات وعادات</h2>
             <p className="text-[#6B7280] text-xs">{doneCount} من {activeHabits.length} مكتملة اليوم</p>
           </div>
           <div className="flex items-center gap-2">
