@@ -1483,24 +1483,26 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onTog
       }
     } catch {}
 
-    // 2. توزيع تلقائي حسب البيئة — المهام في فترات منتهية تنتقل للتالية
+    // 2. توزيع تلقائي حسب البيئة والفترة المناسبة
+    const periodKeyMap2: Record<string, string> = { "الفجر": "fajr", "الضحى": "duha", "الظهر": "dhuhr", "العصر": "asr", "المغرب": "maghrib", "العشاء": "isha" };
     const assigned = new Set<string>();
     const result = allPeriods.map(p => {
       const isHabit = p.name === habitPeriodName && habitTasks.length > 0;
       if (p.blocked) return { ...p, tasks: [] as TaskRow[], habitSlot: false };
       const isPast = p.endMin <= now && p.name !== "بعد منتصف الليل";
       const pCtx = periodContexts[p.name];
+      const pKey = periodKeyMap2[p.name] ?? "";
       const slots = Math.floor(p.duration / 30);
       const pt: TaskRow[] = [];
       if (isHabit && !isPast) pt.push(...habitTasks);
-      // الفترات المنتهية: لا نوزع عليها (مهامها ستنتقل للتالية)
       if (!isPast) {
         for (let s = 0; s < slots; s++) {
           let pick: TaskRow | undefined;
           if (pCtx) {
-            pick = pending.find(t => !assigned.has(t.id) && t.context === pCtx);
+            pick = pending.find(t => !assigned.has(t.id) && (t.suitablePeriod === "all" || t.suitablePeriod === pKey) && t.context === pCtx);
+            if (!pick) pick = pending.find(t => !assigned.has(t.id) && (t.suitablePeriod === "all" || t.suitablePeriod === pKey) && (t.context === "Anywhere" || t.context === "habit"));
           } else {
-            pick = pending.find(t => !assigned.has(t.id));
+            pick = pending.find(t => !assigned.has(t.id) && (t.suitablePeriod === "all" || t.suitablePeriod === pKey));
           }
           if (!pick) break;
           assigned.add(pick.id);
