@@ -301,6 +301,7 @@ export interface CreateTaskPayload {
   isUrgent?: boolean;
   waitingFor?: string;
   taskContext?: string;
+  suitablePeriod?: string;
   cost?: number;
   costCurrency?: string;
   assignedToEmail?: string;

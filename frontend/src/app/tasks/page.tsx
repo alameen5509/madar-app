@@ -91,6 +91,16 @@ const P_COLORS: Record<string, string> = {
   "منخفضة": "bg-green-100 text-green-700",
 };
 
+const SUITABLE_PERIODS = [
+  { key: "all", label: "الكل", icon: "🔄" },
+  { key: "fajr", label: "الفجر", icon: "🌙" },
+  { key: "duha", label: "الضحى", icon: "☀️" },
+  { key: "dhuhr", label: "الظهر", icon: "🌤️" },
+  { key: "asr", label: "العصر", icon: "🌇" },
+  { key: "maghrib", label: "المغرب", icon: "🌆" },
+  { key: "isha", label: "العشاء", icon: "🌙" },
+] as const;
+
 const TASK_CONTEXTS = [
   { key: "Anywhere", label: "أي مكان", icon: "🌐" },
   { key: "Office",   label: "مكتب",   icon: "🏢" },
@@ -118,6 +128,7 @@ interface TaskRow {
   dueDate?: string;
   hasSubtasks: boolean;
   context: string;
+  suitablePeriod: string; // all, fajr, duha, dhuhr, asr, maghrib, isha
   createdAt?: string;
   goalId?: string;
   goalTitle?: string;
@@ -144,6 +155,7 @@ function toRow(t: SmartTask, circleOrderMap?: Map<string, number>): TaskRow {
     dueDate:  t.dueDate,
     hasSubtasks: false,
     context: (t.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere",
+    suitablePeriod: (t.contextNote ?? "").match(/period:(\w+)/)?.[1] ?? "all",
     createdAt: t.createdAt,
     goalId: t.goal?.id,
     goalTitle: t.goal?.title,
@@ -257,6 +269,7 @@ export function NewTaskDialog({
   const [userPriority, setPriority] = useState<number>(3);
   const [cognitiveLoad, setLoad]    = useState<CreateTaskPayload["cognitiveLoad"]>("Medium");
   const [taskContext, setTaskContext] = useState("Anywhere");
+  const [suitablePeriod, setSuitablePeriod] = useState("all");
   const [dueDate, setDueDate]       = useState(() => new Date().toISOString().slice(0, 10));
   const [goalId, setGoalId]         = useState(defaultGoalId ?? "");
   const [linkType, setLinkType]     = useState<"none" | "circle" | "job">("none");
@@ -321,6 +334,7 @@ export function NewTaskDialog({
         isUrgent: isUrgent || undefined,
         waitingFor: waitingFor.trim() || undefined,
         taskContext: taskContext !== "Anywhere" ? taskContext : undefined,
+        suitablePeriod: suitablePeriod !== "all" ? suitablePeriod : undefined,
         assignedToEmail: assignTo || undefined,
       });
       onCreated(toRow(task));
@@ -389,6 +403,22 @@ export function NewTaskDialog({
             </div>
             <input id="dueDatePickerTop" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-[#1A1830] mb-2">الفترة المناسبة</label>
+            <div className="flex gap-1.5 flex-wrap">
+              {SUITABLE_PERIODS.map((sp) => (
+                <button key={sp.key} type="button" onClick={() => setSuitablePeriod(sp.key)}
+                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all"
+                  style={{
+                    background: suitablePeriod === sp.key ? "#2C2C54" : "#F8F6F0",
+                    color: suitablePeriod === sp.key ? "#fff" : "#7C7A8E",
+                    border: `1px solid ${suitablePeriod === sp.key ? "#2C2C54" : "#E2D5B0"}`,
+                  }}>
+                  {sp.icon} {sp.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div>
             <label className="block text-sm font-semibold text-[#1A1830] mb-2">الأولوية</label>
@@ -817,15 +847,21 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
       if (isHabitPeriod) {
         pt.push(...habitTasks);
       }
+      // Map Arabic period name to suitablePeriod key
+      const periodKeyMap: Record<string, string> = { "الفجر": "fajr", "الضحى": "duha", "الظهر": "dhuhr", "العصر": "asr", "المغرب": "maghrib", "العشاء": "isha" };
+      const periodKey = periodKeyMap[period.name] ?? "";
+
       for (let s = 0; s < slots && remaining.length > 0; s++) {
+        // Find task that fits this period
+        let idx = -1;
         if (pCtx) {
-          let idx = remaining.findIndex(t => t.context === pCtx);
-          if (idx < 0) idx = remaining.findIndex(t => t.context === "Anywhere" || t.context === "habit");
-          if (idx < 0) idx = 0;
-          pt.push(remaining.splice(idx, 1)[0]);
+          idx = remaining.findIndex(t => (t.suitablePeriod === "all" || t.suitablePeriod === periodKey) && t.context === pCtx);
+          if (idx < 0) idx = remaining.findIndex(t => (t.suitablePeriod === "all" || t.suitablePeriod === periodKey) && (t.context === "Anywhere" || t.context === "habit"));
         } else {
-          pt.push(remaining.shift()!);
+          idx = remaining.findIndex(t => t.suitablePeriod === "all" || t.suitablePeriod === periodKey);
         }
+        if (idx < 0) break; // no suitable tasks for this period
+        pt.push(remaining.splice(idx, 1)[0]);
       }
       periodTasks.set(period.name, pt);
     }
@@ -2098,6 +2134,7 @@ export default function TasksPage() {
           dueDate: undefined,
           hasSubtasks: false,
           context: "habit",
+          suitablePeriod: "all",
         });
       }
 

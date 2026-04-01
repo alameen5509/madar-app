@@ -98,6 +98,7 @@ public class TasksController : BaseController
                 req.IsUrgent == true ? "urgent" : null,
                 req.WaitingFor != null ? $"waiting:{req.WaitingFor}" : null,
                 req.TaskContext != null ? $"ctx:{req.TaskContext}" : null,
+                req.SuitablePeriod != null && req.SuitablePeriod != "all" ? $"period:{req.SuitablePeriod}" : null,
             }.Where(x => x != null)),
             Cost                   = req.Cost,
             CostCurrency           = req.CostCurrency ?? "SAR",
@@ -393,6 +394,7 @@ public class CreateTaskRequest
     public bool? IsUrgent { get; set; } = false;
     public string? WaitingFor { get; set; }
     public string? TaskContext { get; set; }
+    public string? SuitablePeriod { get; set; }
     // Phase 3 fields
     public decimal? Cost { get; set; }
     public string? CostCurrency { get; set; }
