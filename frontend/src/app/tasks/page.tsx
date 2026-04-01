@@ -337,8 +337,6 @@ export function NewTaskDialog({
         suitablePeriod: suitablePeriod !== "all" ? suitablePeriod : undefined,
         assignedToEmail: assignTo || undefined,
       });
-      // Debug: show what API returned
-      console.log("Created task contextNote:", task.contextNote, "period parsed:", (task.contextNote ?? "").match(/period:(\w+)/)?.[1] ?? "all");
       onCreated(toRow(task));
       onClose();
     } catch (err: unknown) {
@@ -1147,8 +1145,6 @@ function EditTaskDialog({ task, onClose, onSaved }: {
           suitablePeriod: editPeriod !== "all" ? editPeriod : "all",
         });
       }
-      // Debug
-      alert("تم الحفظ — الفترة: " + editPeriod);
       onSaved();
       onClose();
     } catch { setError("فشل الحفظ"); }
@@ -1383,8 +1379,8 @@ function TransferTaskDialog({ taskId, taskTitle, onClose, onDone }: {
 
 /* ─── Inline Day Planner (مدمج في الصفحة) ─────────────────────────────────── */
 
-function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onToggleDone }: {
-  prayers: Prayer[]; tasks: TaskRow[]; blockedPeriods: string[]; onBlockToggle: (name: string) => void; onToggleDone?: (id: string, currentDone: boolean) => void;
+function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onToggleDone, onEditTask, onPostpone }: {
+  prayers: Prayer[]; tasks: TaskRow[]; blockedPeriods: string[]; onBlockToggle: (name: string) => void; onToggleDone?: (id: string, currentDone: boolean) => void; onEditTask?: (t: TaskRow) => void; onPostpone?: (id: string) => void;
 }) {
   const habitDuration = (() => {
     try { return JSON.parse(localStorage.getItem("madar_settings") ?? "{}").habitDuration ?? 30; } catch { return 30; }
@@ -1580,6 +1576,25 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onTog
     });
   }
 
+  function moveToNextPeriod(periodName: string, taskId: string) {
+    setPlan(prev => {
+      const next = prev.map(x => ({ ...x, tasks: [...x.tasks] }));
+      const fromIdx = next.findIndex(x => x.name === periodName);
+      if (fromIdx < 0) return prev;
+      const taskIdx = next[fromIdx].tasks.findIndex(t => t.id === taskId);
+      if (taskIdx < 0) return prev;
+      let toIdx = -1;
+      for (let i = fromIdx + 1; i < next.length; i++) { if (!next[i].blocked) { toIdx = i; break; } }
+      if (toIdx < 0) return prev;
+      const [task] = next[fromIdx].tasks.splice(taskIdx, 1);
+      next[toIdx].tasks.push(task);
+      const overrides: Record<string, string[]> = {};
+      next.forEach(p => { overrides[p.name] = p.tasks.map(t => t.id); });
+      try { localStorage.setItem("madar_plan_overrides", JSON.stringify(overrides)); } catch {}
+      return next;
+    });
+  }
+
   function fmtTime(min: number): string {
     const h = Math.floor(min / 60);
     const m = min % 60;
@@ -1630,17 +1645,29 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onTog
                       {ctxIcon(t.context)} {TASK_CONTEXTS.find(c => c.key === t.context)?.label ?? t.context}
                     </span>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <span className={`text-sm truncate block ${t.done ? "line-through opacity-50" : ""}`} style={{ color: "var(--text)" }}>{t.title}</span>
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={(e) => { e.stopPropagation(); if (onEditTask && t.context !== "habit") onEditTask(t); }}>
+                    <span className={`text-sm truncate block hover:underline ${t.done ? "line-through opacity-50" : ""}`} style={{ color: "var(--text)" }}>{t.title}</span>
                     {t.goalTitle && <span className="text-[9px] truncate block" style={{ color: "#D4AF37" }}>📁 {t.goalTitle}</span>}
                   </div>
-                  {onToggleDone && (
-                    <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleDone(t.id, t.done); }}
-                      className="w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition hover:scale-110"
-                      style={{ borderColor: t.done ? "#3D8C5A" : "#C9A84C", background: t.done ? "#3D8C5A" : "transparent" }}>
-                      {t.done && <span className="text-white text-[9px]">✓</span>}
-                    </button>
-                  )}
+                  <div className="flex gap-0.5 flex-shrink-0">
+                    {!t.done && t.context !== "habit" && onPostpone && (
+                      <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); onPostpone(t.id); }}
+                        className="text-[8px] px-1.5 py-1 rounded-lg font-bold transition hover:scale-105"
+                        style={{ background: "#5E549510", color: "#5E5495" }} title="غداً">غداً</button>
+                    )}
+                    {!t.done && t.context !== "habit" && (
+                      <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); moveToNextPeriod(p.name, t.id); }}
+                        className="text-[8px] px-1.5 py-1 rounded-lg font-bold transition hover:scale-105"
+                        style={{ background: "#D4AF3710", color: "#D4AF37" }} title="الفترة التالية">→</button>
+                    )}
+                    {onToggleDone && (
+                      <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleDone(t.id, t.done); }}
+                        className="w-7 h-7 rounded-full border-2 flex items-center justify-center transition hover:scale-110"
+                        style={{ borderColor: t.done ? "#3D8C5A" : "#C9A84C", background: t.done ? "#3D8C5A" : "transparent" }}>
+                        {t.done && <span className="text-white text-[9px]">✓</span>}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -3562,7 +3589,14 @@ export default function TasksPage() {
         {/* ── تخطيط اليوم — مدمج في أسفل الصفحة ── */}
         <div style={{ order: sectionOrder.indexOf("planner"), display: hiddenSections.includes("planner") ? "none" : undefined }}>
         <GeometricDivider label="📋 تخطيط اليوم" />
-        <InlineDayPlanner prayers={prayers} tasks={visibleTasks} blockedPeriods={blockedPeriods} onBlockToggle={(name) => setBlockedPeriods((p) => p.includes(name) ? p.filter((x) => x !== name) : [...p, name])} onToggleDone={toggle} />
+        <InlineDayPlanner prayers={prayers} tasks={visibleTasks} blockedPeriods={blockedPeriods}
+          onBlockToggle={(name) => setBlockedPeriods((p) => p.includes(name) ? p.filter((x) => x !== name) : [...p, name])}
+          onToggleDone={toggle}
+          onEditTask={(t) => setEditingTask(t)}
+          onPostpone={async (id) => {
+            const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+            try { await api.post("/api/tasks/" + id + "/update", { dueDate: tomorrow.toISOString() }); fetchTasks(); } catch {}
+          }} />
         </div>
 
         {/* ── المهام المستقبلية ── */}
