@@ -1131,8 +1131,8 @@ export default function FinancePage() {
     }, 0);
   };
 
-  // معاملات الشهر المختار
-  const mTx = txs.filter((t) => t.date.startsWith(month));
+  // معاملات الشهر المختار (أو الكل)
+  const mTx = month === "all" ? txs : txs.filter((t) => t.date.startsWith(month));
   const income = mTx.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
   const expense = mTx.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
   const debtPaid = mTx.filter((t) => t.type === "debt_payment" || t.type === "installment").reduce((s, t) => s + t.amount, 0);
@@ -1197,8 +1197,10 @@ export default function FinancePage() {
             <h2 className="text-[#16213E] font-bold text-lg">الإدارة المالية</h2>
             <p className="text-[#6B7280] text-[10px]">حسابات (أين المال) · محافظ (لمن المال) · التزامات</p>
           </div>
-          <div className="flex gap-2">
-            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#D4AF37]" />
+          <div className="flex gap-2 items-center">
+            <button onClick={() => setMonth("all")} className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition"
+              style={{ background: month === "all" ? "#5E5495" : "#F3F4F6", color: month === "all" ? "#fff" : "#6B7280" }}>الكل</button>
+            <input type="month" value={month === "all" ? "" : month} onChange={(e) => setMonth(e.target.value || "all")} className="px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#D4AF37]" />
             <button onClick={() => setShowAdd(true)} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>+ معاملة</button>
           </div>
         </div>
