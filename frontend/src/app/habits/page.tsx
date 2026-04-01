@@ -297,7 +297,12 @@ function PrayerSection() {
     return localStorage.getItem("madar_prayer_city") ?? "auto";
   });
 
-  // Load salah times based on city
+  // Interactive question flow state
+  const [prayerSteps, setPrayerSteps] = useState<Record<string, number>>({});
+  const [waitingPrayed, setWaitingPrayed] = useState<Record<string, boolean>>({});
+  const [waitingSunnah, setWaitingSunnah] = useState<Record<string, boolean>>({});
+  const [prayerAnswers, setPrayerAnswers] = useState<Record<string, { inMosque: boolean; onTime: boolean }>>({});
+
   const loadSalahTimes = useCallback((selectedCity: string) => {
     if (selectedCity === "auto") {
       if (!navigator.geolocation) {
@@ -468,148 +473,92 @@ function PrayerSection() {
   const penaltyLabel = (type: string) => PENALTY_TYPES.find(t => t.key === type)?.label ?? type;
   const reasonLabel = (r: string) => r === "not_on_time" ? "لم تُصلَّ في الوقت" : "لم تُصلَّ في المسجد";
 
+  function setStep(pk: string, s: number) { setPrayerSteps(prev => ({ ...prev, [pk]: s })); }
+
+  async function finalizePrayer(pk: string, ans: { inMosque: boolean; onTime: boolean }) {
+    setPrayerState(prev => ({ ...prev, [pk]: { onTime: ans.onTime, inMosque: ans.inMosque, expired: false } }));
+    try { await api.post("/api/prayer-tracking/toggle", { prayer: pk, field: "onTime", value: ans.onTime }); await api.post("/api/prayer-tracking/toggle", { prayer: pk, field: "inMosque", value: ans.inMosque }); loadPenalties(); loadStats(); } catch { loadToday(); }
+    setStep(pk, 5);
+  }
+
+  function renderPrayerCard(p: typeof PRAYERS[number]) {
+    const timeStr = getPrayerTimeStr(p.key);
+    const isCurrent = getPrayerTimeStatus(p.key) === "current";
+    const isPast = getPrayerTimeStatus(p.key) === "past";
+    const step = prayerSteps[p.key] ?? 0;
+    const isW = waitingPrayed[p.key] ?? false;
+    const isWS = waitingSunnah[p.key] ?? false;
+    const ans = prayerAnswers[p.key] ?? { inMosque: false, onTime: false };
+    if (step === 5) return null;
+    return (
+      <div key={p.key} className="rounded-xl p-4 border-2 shadow-sm space-y-3" style={{ borderColor: isCurrent ? "#D4AF37" : isPast && step === 0 ? "#DC2626" : "#D4AF3780", background: isPast && step === 0 ? "#FEF2F2" : "var(--card, #fff)" }}>
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">{p.icon}</span>
+          <div className="flex-1"><p className="text-sm font-bold" style={{ color: "#16213E" }}>{p.label}</p>{timeStr && <p className="text-[10px]" style={{ color: "#6B7280" }}>{timeStr}</p>}</div>
+          {isCurrent && <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] animate-pulse" />}
+          {isPast && step === 0 && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: "#FEE2E2", color: "#DC2626" }}>انتهى الوقت</span>}
+          {step > 0 && step < 5 && <div className="flex gap-1">{[1,2,3,4].map(s => <div key={s} className="w-1.5 h-1.5 rounded-full" style={{ background: s <= step ? "#D4AF37" : "#E5E7EB" }} />)}</div>}
+        </div>
+        {step === 0 && (<div className="space-y-2"><p className="text-sm font-bold text-center" style={{ color: "#16213E" }}>هل صليت {p.label}؟</p>
+          {isW ? (<><button onClick={() => { setWaitingPrayed(prev => ({ ...prev, [p.key]: false })); setStep(p.key, 2); }} className="w-full py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)", color: "#fff" }}>صليت ✅</button><p className="text-xs text-center animate-pulse" style={{ color: "#D4AF37" }}>بانتظارك...</p></>) : (
+            <div className="flex gap-2"><button onClick={() => setStep(p.key, 2)} className="flex-1 py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)", color: "#fff" }}>نعم صليت ✅</button><button onClick={() => setWaitingPrayed(prev => ({ ...prev, [p.key]: true }))} className="flex-1 py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #5E5495, #2C2C54)", color: "#fff" }}>لا — سأصلي الآن</button></div>)}
+        </div>)}
+        {step === 2 && (<div className="space-y-2"><p className="text-sm font-bold text-center" style={{ color: "#16213E" }}>هل صليت في المسجد؟</p><div className="flex gap-2"><button onClick={() => { setPrayerAnswers(prev => ({ ...prev, [p.key]: { ...ans, inMosque: true } })); setStep(p.key, 3); }} className="flex-1 py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #2C2C54, #5E5495)", color: "#fff" }}>نعم — في المسجد 🕌</button><button onClick={() => { setPrayerAnswers(prev => ({ ...prev, [p.key]: { ...ans, inMosque: false } })); setStep(p.key, 3); }} className="flex-1 py-3 rounded-xl text-sm font-bold border-2" style={{ background: "transparent", borderColor: "#2C2C54", color: "#2C2C54" }}>لا</button></div></div>)}
+        {step === 3 && (<div className="space-y-2"><p className="text-sm font-bold text-center" style={{ color: "#16213E" }}>هل صليت في الوقت؟</p><div className="flex gap-2"><button onClick={() => { setPrayerAnswers(prev => ({ ...prev, [p.key]: { ...ans, onTime: true } })); setStep(p.key, 4); }} className="flex-1 py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #D4AF37, #B8912A)", color: "#fff" }}>نعم — في الوقت ⏰</button><button onClick={() => { setPrayerAnswers(prev => ({ ...prev, [p.key]: { ...ans, onTime: false } })); setStep(p.key, 4); }} className="flex-1 py-3 rounded-xl text-sm font-bold border-2" style={{ background: "transparent", borderColor: "#D4AF37", color: "#B8912A" }}>لا — بعد الوقت</button></div></div>)}
+        {step === 4 && (<div className="space-y-2"><p className="text-sm font-bold text-center" style={{ color: "#16213E" }}>هل صليت السنن الرواتب؟</p><p className="text-[10px] text-center" style={{ color: "#D4AF37" }}>✨ ١٢ ركعة يومياً تبني بيتاً في الجنة</p>
+          {isWS ? (<><button onClick={() => { setWaitingSunnah(prev => ({ ...prev, [p.key]: false })); finalizePrayer(p.key, ans); }} className="w-full py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)", color: "#fff" }}>أديتها ✅</button><p className="text-xs text-center animate-pulse" style={{ color: "#D4AF37" }}>بانتظارك...</p></>) : (
+            <div className="flex gap-2"><button onClick={() => finalizePrayer(p.key, ans)} className="flex-1 py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)", color: "#fff" }}>نعم — أديتها ✅</button><button onClick={() => setWaitingSunnah(prev => ({ ...prev, [p.key]: true }))} className="flex-1 py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #5E5495, #2C2C54)", color: "#fff" }}>لا — سأؤديها الآن</button></div>)}
+        </div>)}
+      </div>
+    );
+  }
+
   return (
     <>
-      {/* ═══ Prayer Cards ═══ */}
       <GeometricDivider label="الصلوات" />
       {(() => {
         const visible = PRAYERS.filter(p => {
+          const step = prayerSteps[p.key] ?? 0;
+          if (step === 5) return false;
           const timeStatus = getPrayerTimeStatus(p.key);
-          if (timeStatus === "future") return false; // لا تظهر حتى يحين وقتها
+          if (timeStatus === "future") return false;
           const cur = prayerState[p.key];
-          if (!cur) return true; // no data yet — show
-          if (cur.onTime && cur.inMosque) return false; // both done — hide
+          if (cur && cur.onTime && cur.inMosque) return false;
           return true;
         });
         const done = PRAYERS.length - visible.length;
-
-        return (
-          <>
-            {/* Done summary */}
-            {done > 0 && (
-              <div className="flex items-center gap-2 mt-3 px-1">
-                <span className="text-sm">🌟</span>
-                <p className="text-xs text-[#3D8C5A] font-semibold">
-                  {done === PRAYERS.length
-                    ? "بارك الله فيك — أتممت جميع الصلوات اليوم"
-                    : `${done} من ${PRAYERS.length} صلوات مكتملة`}
-                </p>
+        return (<>
+          {done > 0 && <div className="flex items-center gap-2 mt-3 px-1"><span className="text-sm">🌟</span><p className="text-xs text-[#3D8C5A] font-semibold">{done === PRAYERS.length ? "بارك الله فيك — أتممت جميع الصلوات اليوم" : `${done} من ${PRAYERS.length} صلوات مكتملة`}</p></div>}
+          {visible.length > 0 && (
+              <div className="space-y-3 mt-3">
+                {visible.map(p => renderPrayerCard(p))}
               </div>
             )}
-
-            {/* Active prayer cards */}
-            {visible.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
-                {visible.map(p => {
-                  const cur = prayerState[p.key] ?? { onTime: false, inMosque: false, expired: false };
-                  const timeStatus = getPrayerTimeStatus(p.key);
-                  const timeStr = getPrayerTimeStr(p.key);
-
-                  return (
-                    <div key={p.key}
-                      className="bg-white rounded-xl p-4 border shadow-sm transition-all"
-                      style={{
-                        borderColor: cur.expired && (!cur.onTime || !cur.inMosque) ? "#DC2626" : timeStatus === "current" ? "#D4AF37" : "#E5E7EB",
-                        opacity: timeStatus === "future" && !cur.onTime && !cur.inMosque ? 0.65 : 1,
-                        background: cur.expired && (!cur.onTime || !cur.inMosque) ? "#FEF2F2" : "white",
-                      }}>
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">{p.icon}</span>
-                          <div>
-                            <p className="text-sm font-bold text-[#16213E]">{p.label}</p>
-                            {timeStr && <p className="text-[10px] text-[#6B7280]">{timeStr}</p>}
-                          </div>
-                        </div>
-                        {timeStatus === "current" && (
-                          <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] animate-pulse" />
-                        )}
-                      </div>
-
-                      {/* زر صليت الأساسي */}
-                      <button onClick={() => { if (!cur.onTime) togglePrayer(p.key, "onTime"); }}
-                        className="w-full py-3 rounded-xl text-sm font-bold transition-all mb-2"
-                        style={{
-                          background: cur.onTime ? "linear-gradient(135deg, #3D8C5A, #2C8C4A)" : cur.expired ? "#DC2626" : "linear-gradient(135deg, #5E5495, #D4AF37)",
-                          color: "#fff",
-                          opacity: cur.onTime ? 0.8 : 1,
-                        }}>
-                        {cur.onTime ? "✅ صليت" : cur.expired ? "🔴 لم أصلِّ في الوقت" : "🤲 صليت"}
-                      </button>
-
-                      {/* تفاصيل إضافية */}
-                      <div className="flex gap-2">
-                        <button onClick={() => togglePrayer(p.key, "onTime")}
-                          className="flex-1 py-2 rounded-lg text-[10px] font-semibold transition-all"
-                          style={{
-                            background: cur.onTime ? "#3D8C5A15" : cur.expired ? "#FEE2E2" : "#F3F4F6",
-                            color: cur.onTime ? "#3D8C5A" : cur.expired ? "#DC2626" : "#6B7280",
-                            border: `1px solid ${cur.onTime ? "#3D8C5A40" : cur.expired ? "#DC262640" : "#E5E7EB"}`,
-                          }}>
-                          {cur.onTime ? "✅ في الوقت" : "⏰ في الوقت"}
-                        </button>
-                        <button onClick={() => togglePrayer(p.key, "inMosque")}
-                          className="flex-1 py-2 rounded-lg text-[10px] font-semibold transition-all"
-                          style={{
-                            background: cur.inMosque ? "#2C2C5415" : cur.expired ? "#FEE2E2" : "#F3F4F6",
-                            color: cur.inMosque ? "#2C2C54" : cur.expired ? "#DC2626" : "#6B7280",
-                            border: `1px solid ${cur.inMosque ? "#2C2C5440" : cur.expired ? "#DC262640" : "#E5E7EB"}`,
-                          }}>
-                          {cur.inMosque ? "🕌 في المسجد" : "🕌 في المسجد"}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        );
+          </>);
       })()}
 
-      {/* ═══ Penalties — show one at a time like prayer cards ═══ */}
-      {penalties.length > 0 && (() => {
-        const pen = penalties[0]; // show first penalty only
-        const pIcon = PRAYERS.find(pr => pr.key === pen.prayer)?.icon ?? "🕌";
-        return (
-          <div className="mt-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">⚠️</span>
-              <span className="text-sm font-bold text-red-800">
-                عقوبة عليك {penalties.length > 1 ? `(${penalties.length} متبقية)` : ""}
-              </span>
-            </div>
-            <div className="bg-white rounded-xl p-5 border-2 border-red-300 shadow-sm transition-all">
-              {/* Prayer info */}
-              <div className="flex items-center gap-3 mb-4">
-                <span className="text-3xl">{pIcon}</span>
-                <div>
-                  <p className="text-base font-bold text-[#16213E]">{prayerLabel(pen.prayer)}</p>
-                  <p className="text-xs text-red-500">{reasonLabel(pen.reason)} — {pen.date}</p>
+      {/* ═══ Penalties — all shown, sorted oldest first ═══ */}
+      {penalties.length > 0 && (
+        <div className="mt-4 space-y-3">
+          <div className="flex items-center gap-2"><span className="text-lg">⚠️</span><span className="text-sm font-bold text-red-800">لديك {penalties.length} عقوبة متراكمة</span></div>
+          {[...penalties].sort((a, b) => a.date.localeCompare(b.date)).map(pen => {
+            const pIcon = PRAYERS.find(pr => pr.key === pen.prayer)?.icon ?? "🕌";
+            return (
+              <div key={pen.id} className="rounded-xl p-5 border-2 border-red-300 shadow-sm" style={{ background: "#fff" }}>
+                <div className="flex items-center gap-3 mb-4"><span className="text-3xl">{pIcon}</span><div><p className="text-base font-bold" style={{ color: "#16213E" }}>{prayerLabel(pen.prayer)}</p><p className="text-xs text-red-500">{reasonLabel(pen.reason)} — {pen.date}</p></div></div>
+                <p className="text-xs font-semibold mb-2" style={{ color: "#6B7280" }}>اختر عقوبتك وأدِّها:</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {PENALTY_TYPES.map(t => (
+                    <button key={t.key} onClick={() => fulfillPenalty(pen.id)} className="py-3.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 border-2" style={{ background: "linear-gradient(135deg, #2C2C54, #5E5495)", color: "white", borderColor: "#2C2C54" }}>
+                      {t.key === "quran" ? "📖" : t.key === "nafila" ? "🕌" : "📿"}<br /><span className="text-[10px] font-medium opacity-90">{t.label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
-
-              {/* Choose one of 3 penalties */}
-              <p className="text-xs text-[#6B7280] font-semibold mb-2">اختر عقوبتك وأدِّها:</p>
-              <div className="grid grid-cols-3 gap-2">
-                {PENALTY_TYPES.map(t => (
-                  <button key={t.key} onClick={() => fulfillPenalty(pen.id)}
-                    className="py-3.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 border-2"
-                    style={{
-                      background: "linear-gradient(135deg, #2C2C54, #5E5495)",
-                      color: "white",
-                      borderColor: "#2C2C54",
-                    }}>
-                    {t.key === "quran" ? "📖" : t.key === "nafila" ? "🕌" : "📿"}
-                    <br />
-                    <span className="text-[10px] font-medium opacity-90">{t.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+            );
+          })}
+        </div>
+      )}
 
       {/* ═══ City + Stats & Settings buttons ═══ */}
       <div className="flex gap-2 mt-4 flex-wrap">
