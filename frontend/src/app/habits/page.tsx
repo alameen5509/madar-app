@@ -35,6 +35,138 @@ const DEFAULT_HABITS: Habit[] = [
   { id: "7", title: "صلة رحم", icon: "🤝", streak: 0, todayDone: false, category: "social", isIdea: true },
 ];
 
+/* ─── Hygiene Habits (النظافة الشخصية) ───────────────────────────── */
+
+interface HygieneHabit { id: string; title: string; icon: string; enabled: boolean; todayDone: boolean; streak: number }
+
+const DEFAULT_HYGIENE: HygieneHabit[] = [
+  { id: "h1", title: "الاستحمام", icon: "🚿", enabled: true, todayDone: false, streak: 0 },
+  { id: "h2", title: "السواك / تنظيف الأسنان", icon: "🪥", enabled: true, todayDone: false, streak: 0 },
+  { id: "h3", title: "غسل الوجه", icon: "🧴", enabled: true, todayDone: false, streak: 0 },
+  { id: "h4", title: "تقليم الأظافر", icon: "💅", enabled: false, todayDone: false, streak: 0 },
+  { id: "h5", title: "تسريح الشعر", icon: "💇", enabled: true, todayDone: false, streak: 0 },
+  { id: "h6", title: "التطيّب / العطر", icon: "🌸", enabled: true, todayDone: false, streak: 0 },
+  { id: "h7", title: "غسل اليدين", icon: "🧼", enabled: true, todayDone: false, streak: 0 },
+  { id: "h8", title: "تنظيف الأذن", icon: "👂", enabled: false, todayDone: false, streak: 0 },
+  { id: "h9", title: "ارتداء ملابس نظيفة", icon: "👕", enabled: true, todayDone: false, streak: 0 },
+  { id: "h10", title: "ترتيب الفراش", icon: "🛏️", enabled: true, todayDone: false, streak: 0 },
+  { id: "h11", title: "الاستنشاق والاستنثار", icon: "💨", enabled: false, todayDone: false, streak: 0 },
+  { id: "h12", title: "غسل القدمين", icon: "🦶", enabled: false, todayDone: false, streak: 0 },
+  { id: "h13", title: "إزالة شعر الإبط والعانة", icon: "✂️", enabled: false, todayDone: false, streak: 0 },
+  { id: "h14", title: "وضع مزيل العرق", icon: "🧴", enabled: true, todayDone: false, streak: 0 },
+  { id: "h15", title: "ترطيب البشرة", icon: "💧", enabled: false, todayDone: false, streak: 0 },
+];
+
+function HygieneSection() {
+  const STORAGE_KEY = "madar_hygiene";
+  const DATE_KEY = "madar_hygiene_date";
+
+  const [habits, setHabits] = useState<HygieneHabit[]>(() => {
+    if (typeof window === "undefined") return DEFAULT_HYGIENE;
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
+      if (!saved) return DEFAULT_HYGIENE;
+      // Merge with defaults to pick up new items
+      const map = new Map(saved.map((h: HygieneHabit) => [h.id, h]));
+      return DEFAULT_HYGIENE.map(d => (map.get(d.id) as HygieneHabit) ?? d);
+    } catch { return DEFAULT_HYGIENE; }
+  });
+  const [showManage, setShowManage] = useState(false);
+
+  // Reset todayDone at start of new day
+  useEffect(() => {
+    const today = new Date().toDateString();
+    const lastDate = localStorage.getItem(DATE_KEY);
+    if (lastDate !== today) {
+      setHabits(prev => {
+        const reset = prev.map(h => ({ ...h, todayDone: false }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(reset));
+        localStorage.setItem(DATE_KEY, today);
+        return reset;
+      });
+    }
+  }, []);
+
+  function save(updated: HygieneHabit[]) {
+    setHabits(updated);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  }
+
+  function toggle(id: string) {
+    save(habits.map(h => {
+      if (h.id !== id) return h;
+      const done = !h.todayDone;
+      return { ...h, todayDone: done, streak: done ? h.streak + 1 : Math.max(0, h.streak - 1) };
+    }));
+  }
+
+  function toggleEnabled(id: string) {
+    save(habits.map(h => h.id === id ? { ...h, enabled: !h.enabled } : h));
+  }
+
+  const active = habits.filter(h => h.enabled);
+  const doneCount = active.filter(h => h.todayDone).length;
+  const pct = active.length === 0 ? 0 : Math.round((doneCount / active.length) * 100);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🧼</span>
+          <span className="text-sm font-bold" style={{ color: "var(--text, #16213E)" }}>النظافة الشخصية</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: "#0F346015", color: "#0F3460" }}>{doneCount}/{active.length}</span>
+        </div>
+        <button onClick={() => setShowManage(!showManage)} className="text-[10px] px-2.5 py-1 rounded-lg font-semibold transition"
+          style={{ background: showManage ? "#0F3460" : "#0F346010", color: showManage ? "#fff" : "#0F3460" }}>
+          {showManage ? "تم" : "إدارة"}
+        </button>
+      </div>
+
+      {/* Progress */}
+      <div className="h-2 rounded-full overflow-hidden" style={{ background: "#0F346015" }}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: "#0F3460" }} />
+      </div>
+
+      {/* Manage mode */}
+      {showManage && (
+        <div className="rounded-xl border p-3 space-y-1" style={{ background: "var(--bg, #FDFAF6)", borderColor: "#0F346020" }}>
+          <p className="text-[10px] font-bold mb-2" style={{ color: "var(--muted, #6B7280)" }}>فعّل أو أخفِ العادات:</p>
+          {habits.map(h => (
+            <div key={h.id} className="flex items-center gap-2 py-1">
+              <button onClick={() => toggleEnabled(h.id)}
+                className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition"
+                style={{ background: h.enabled ? "#0F3460" : "#E5E7EB" }}>
+                {h.enabled && <span className="text-white text-[9px]">✓</span>}
+              </button>
+              <span className="text-sm">{h.icon}</span>
+              <span className="text-xs" style={{ color: h.enabled ? "var(--text, #16213E)" : "var(--muted, #9CA3AF)" }}>{h.title}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Active habits */}
+      {!showManage && (
+        <div className="space-y-1.5">
+          {active.map(h => (
+            <div key={h.id} onClick={() => toggle(h.id)}
+              className={`flex items-center gap-3 rounded-xl px-4 py-3 border transition-all cursor-pointer hover:shadow-sm ${h.todayDone ? "opacity-60" : ""}`}
+              style={{ background: "var(--card, #fff)", borderColor: h.todayDone ? "#0F346040" : "var(--card-border, #E5E7EB)" }}>
+              <div className="w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition"
+                style={{ borderColor: "#0F3460", background: h.todayDone ? "#0F3460" : "transparent" }}>
+                {h.todayDone && <span className="text-white text-[10px]">✓</span>}
+              </div>
+              <span className="text-lg">{h.icon}</span>
+              <span className={`flex-1 text-sm font-medium ${h.todayDone ? "line-through" : ""}`} style={{ color: h.todayDone ? "var(--muted, #9CA3AF)" : "var(--text, #16213E)" }}>{h.title}</span>
+              {h.streak > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "#0F346012", color: "#0F3460" }}>🔥 {h.streak}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Prayer Types ────────────────────────────────────────────────────── */
 
 const PRAYERS = [
@@ -754,6 +886,13 @@ export default function HabitsPage() {
       <div className="px-8 py-6 space-y-5">
         {/* ═══ Prayer Section (top) ═══ */}
         <PrayerSection />
+
+        {/* ═══ Hygiene Section ═══ */}
+        <GeometricDivider label="النظافة الشخصية" />
+        <HygieneSection />
+
+        {/* ═══ Habits ═══ */}
+        <GeometricDivider label="العادات" />
 
         {/* Tabs */}
         <div className="flex gap-2 mt-6">
