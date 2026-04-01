@@ -124,6 +124,10 @@ public class TasksController : BaseController
             aiPriorityScore = task.AiPriorityScore,
             cognitiveLoad   = task.RequiredCognitiveLoad.ToString(),
             dueDate         = task.DueDate,
+            contextNote     = task.ContextNote,
+            isRecurring     = task.IsRecurring,
+            recurrenceRule  = task.RecurrenceRule,
+            createdAt       = task.CreatedAt,
             lifeCircle      = task.LifeCircle == null ? null : new
             {
                 id    = task.LifeCircle.Id,
