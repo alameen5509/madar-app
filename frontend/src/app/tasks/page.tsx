@@ -843,25 +843,30 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
 
       const pCtx = periodContexts[period.name];
       const pt: TaskRow[] = [];
+      const now = nowMin();
+      const isPastPeriod = period.endMin <= now;
+
       // أضف العادات أولاً في هذه الفترة
       if (isHabitPeriod) {
         pt.push(...habitTasks);
       }
-      // Map Arabic period name to suitablePeriod key
-      const periodKeyMap: Record<string, string> = { "الفجر": "fajr", "الضحى": "duha", "الظهر": "dhuhr", "العصر": "asr", "المغرب": "maghrib", "العشاء": "isha" };
-      const periodKey = periodKeyMap[period.name] ?? "";
 
-      for (let s = 0; s < slots && remaining.length > 0; s++) {
-        // Find task that fits this period
-        let idx = -1;
-        if (pCtx) {
-          idx = remaining.findIndex(t => (t.suitablePeriod === "all" || t.suitablePeriod === periodKey) && t.context === pCtx);
-          if (idx < 0) idx = remaining.findIndex(t => (t.suitablePeriod === "all" || t.suitablePeriod === periodKey) && (t.context === "Anywhere" || t.context === "habit"));
-        } else {
-          idx = remaining.findIndex(t => t.suitablePeriod === "all" || t.suitablePeriod === periodKey);
+      // الفترات الماضية لا تأخذ مهام جديدة
+      if (!isPastPeriod) {
+        const periodKeyMap: Record<string, string> = { "الفجر": "fajr", "الضحى": "duha", "الظهر": "dhuhr", "العصر": "asr", "المغرب": "maghrib", "العشاء": "isha" };
+        const periodKey = periodKeyMap[period.name] ?? "";
+
+        for (let s = 0; s < slots && remaining.length > 0; s++) {
+          let idx = -1;
+          if (pCtx) {
+            idx = remaining.findIndex(t => (t.suitablePeriod === "all" || t.suitablePeriod === periodKey) && t.context === pCtx);
+            if (idx < 0) idx = remaining.findIndex(t => (t.suitablePeriod === "all" || t.suitablePeriod === periodKey) && (t.context === "Anywhere" || t.context === "habit"));
+          } else {
+            idx = remaining.findIndex(t => t.suitablePeriod === "all" || t.suitablePeriod === periodKey);
+          }
+          if (idx < 0) break;
+          pt.push(remaining.splice(idx, 1)[0]);
         }
-        if (idx < 0) break; // no suitable tasks for this period
-        pt.push(remaining.splice(idx, 1)[0]);
       }
       periodTasks.set(period.name, pt);
     }
