@@ -207,14 +207,12 @@ public class TasksController : BaseController
         }
         if (req.SuitablePeriod is not null)
         {
-            var note = task.ContextNote ?? "";
-            var periodMatch = System.Text.RegularExpressions.Regex.Match(note, @"period:\w+");
-            var periodVal = req.SuitablePeriod == "all" ? null : $"period:{req.SuitablePeriod}";
-            if (periodMatch.Success)
-                note = System.Text.RegularExpressions.Regex.Replace(note, @"\|?period:\w+", "");
-            if (periodVal != null)
-                note = string.IsNullOrEmpty(note) ? periodVal : $"{note}|{periodVal}";
-            task.ContextNote = note.Trim('|');
+            // إعادة بناء contextNote: أزل period القديم، أضف الجديد
+            var parts = (task.ContextNote ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries)
+                .Where(p => !p.StartsWith("period:")).ToList();
+            if (req.SuitablePeriod != "all")
+                parts.Add($"period:{req.SuitablePeriod}");
+            task.ContextNote = string.Join("|", parts);
         }
         task.UpdatedAt = DateTime.UtcNow;
 
