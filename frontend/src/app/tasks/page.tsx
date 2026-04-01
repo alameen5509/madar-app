@@ -866,6 +866,18 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
       periodTasks.set(period.name, pt);
     }
 
+    // Tasks with specific period that didn't get placed (period already passed) → put in current/next available period
+    if (remaining.length > 0) {
+      const now = nowMin();
+      const currentOrNext = allPeriods.find(p => !p.blocked && p.endMin > now) ?? allPeriods.find(p => !p.blocked);
+      if (currentOrNext) {
+        const pt = periodTasks.get(currentOrNext.name) ?? [];
+        pt.push(...remaining);
+        periodTasks.set(currentOrNext.name, pt);
+        remaining.length = 0;
+      }
+    }
+
     // Build result in original order
     for (const period of allPeriods) {
       result.push({
@@ -1088,6 +1100,7 @@ function EditTaskDialog({ task, onClose, onSaved }: {
   const [isWork, setIsWork] = useState(task.isWork);
   const [isUrgent, setIsUrgent] = useState(task.isUrgent);
   const [isRecurring, setIsRecurring] = useState(task.isRecurring);
+  const [editPeriod, setEditPeriod] = useState(task.suitablePeriod ?? "all");
   const [assignEmail, setAssignEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -1124,6 +1137,7 @@ function EditTaskDialog({ task, onClose, onSaved }: {
           userPriority: priority,
           dueDate: dueDate || undefined,
           taskContext: context !== "Anywhere" ? context : undefined,
+          suitablePeriod: editPeriod !== "all" ? editPeriod : "all",
         });
       }
       onSaved();
@@ -1215,6 +1229,19 @@ function EditTaskDialog({ task, onClose, onSaved }: {
             <input id="editDueDatePicker" type="date" value={dueDate ? dueDate.slice(0, 10) : ""} onChange={(e) => setDueDate(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
               style={{ background: "var(--bg)", border: "1px solid var(--card-border)", color: "var(--text)" }} />
+          </div>
+          {/* الفترة المناسبة */}
+          <div>
+            <label className="block text-sm font-semibold mb-1.5" style={{ color: "var(--text)" }}>الفترة المناسبة</label>
+            <div className="flex gap-1.5 flex-wrap">
+              {SUITABLE_PERIODS.map(sp => (
+                <button key={sp.key} type="button" onClick={() => setEditPeriod(sp.key)}
+                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all"
+                  style={{ background: editPeriod === sp.key ? "#2C2C54" : "var(--bg)", color: editPeriod === sp.key ? "#fff" : "var(--muted)", border: `1px solid ${editPeriod === sp.key ? "#2C2C54" : "var(--card-border)"}` }}>
+                  {sp.icon} {sp.label}
+                </button>
+              ))}
+            </div>
           </div>
           {/* خيارات */}
           <div className="flex gap-3 flex-wrap">

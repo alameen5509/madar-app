@@ -205,6 +205,17 @@ public class TasksController : BaseController
                 ? System.Text.RegularExpressions.Regex.Replace(note, @"ctx:\w+", $"ctx:{req.TaskContext}")
                 : (string.IsNullOrEmpty(note) ? $"ctx:{req.TaskContext}" : $"{note}|ctx:{req.TaskContext}");
         }
+        if (req.SuitablePeriod is not null)
+        {
+            var note = task.ContextNote ?? "";
+            var periodMatch = System.Text.RegularExpressions.Regex.Match(note, @"period:\w+");
+            var periodVal = req.SuitablePeriod == "all" ? null : $"period:{req.SuitablePeriod}";
+            if (periodMatch.Success)
+                note = System.Text.RegularExpressions.Regex.Replace(note, @"\|?period:\w+", "");
+            if (periodVal != null)
+                note = string.IsNullOrEmpty(note) ? periodVal : $"{note}|{periodVal}";
+            task.ContextNote = note.Trim('|');
+        }
         task.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);
@@ -413,6 +424,7 @@ public class UpdateTaskRequest
     public string? Description { get; set; }
     public int? UserPriority { get; set; }
     public string? TaskContext { get; set; }
+    public string? SuitablePeriod { get; set; }
     public Guid? LifeCircleId { get; set; }
     public Guid? GoalId { get; set; }
     public DateTime? DueDate { get; set; }
