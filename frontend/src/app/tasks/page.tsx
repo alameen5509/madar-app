@@ -337,6 +337,8 @@ export function NewTaskDialog({
         suitablePeriod: suitablePeriod !== "all" ? suitablePeriod : undefined,
         assignedToEmail: assignTo || undefined,
       });
+      // Debug: show what API returned
+      console.log("Created task contextNote:", task.contextNote, "period parsed:", (task.contextNote ?? "").match(/period:(\w+)/)?.[1] ?? "all");
       onCreated(toRow(task));
       onClose();
     } catch (err: unknown) {
@@ -1145,6 +1147,8 @@ function EditTaskDialog({ task, onClose, onSaved }: {
           suitablePeriod: editPeriod !== "all" ? editPeriod : "all",
         });
       }
+      // Debug
+      alert("تم الحفظ — الفترة: " + editPeriod);
       onSaved();
       onClose();
     } catch { setError("فشل الحفظ"); }
