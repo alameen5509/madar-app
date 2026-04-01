@@ -825,8 +825,8 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
       return a.startMin - b.startMin;
     });
 
-    // Find first available period for habits
-    const firstAvailable = sortedPeriods.find(p => !p.blocked);
+    // Find first available NON-PAST period for habits
+    const firstAvailable = sortedPeriods.find(p => !p.blocked && p.endMin > now);
     const habitPeriodName = firstAvailable?.name ?? "";
 
     const periodTasks = new Map<string, TaskRow[]>();
@@ -1458,8 +1458,16 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onTog
         const usedIds = new Set(Object.values(cleaned).flat());
         const newTasks = pending.filter(t => !usedIds.has(t.id));
         if (newTasks.length > 0) {
-          const first = allPeriods.find(p => !p.blocked)?.name ?? "";
+          const first = allPeriods.find(p => !p.blocked && p.endMin > now)?.name ?? allPeriods.find(p => !p.blocked)?.name ?? "";
           if (first) cleaned[first] = [...(cleaned[first] ?? []), ...newTasks.map(t => t.id)];
+        }
+        // نقل مهام الفترات الماضية للفترة الحالية/القادمة
+        const currentPeriodName = allPeriods.find(p => !p.blocked && p.endMin > now)?.name ?? "";
+        for (const p of allPeriods) {
+          if (p.endMin <= now && cleaned[p.name]?.length) {
+            cleaned[currentPeriodName] = [...(cleaned[currentPeriodName] ?? []), ...cleaned[p.name]];
+            cleaned[p.name] = [];
+          }
         }
         // حفظ المُنظّف
         try { localStorage.setItem("madar_plan_overrides", JSON.stringify(cleaned)); } catch {}
