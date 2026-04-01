@@ -844,7 +844,9 @@ function DayPlannerDialog({ onClose, prayers, tasks, blockedPeriods, onBlockTogg
       const pCtx = periodContexts[period.name];
       const pt: TaskRow[] = [];
       const now = nowMin();
-      const isPastPeriod = period.endMin <= now;
+      // فترة بعد منتصف الليل (endMin صغير) لا تُعتبر ماضية في المساء
+      const isNightWrap = period.endMin < period.startMin || period.name === "بعد منتصف الليل";
+      const isPastPeriod = isNightWrap ? false : period.endMin <= now;
 
       // أضف العادات أولاً في هذه الفترة
       if (isHabitPeriod) {
@@ -1461,10 +1463,11 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onTog
           const first = allPeriods.find(p => !p.blocked && p.endMin > now)?.name ?? allPeriods.find(p => !p.blocked)?.name ?? "";
           if (first) cleaned[first] = [...(cleaned[first] ?? []), ...newTasks.map(t => t.id)];
         }
-        // نقل مهام الفترات الماضية للفترة الحالية/القادمة
-        const currentPeriodName = allPeriods.find(p => !p.blocked && p.endMin > now)?.name ?? "";
+        // نقل مهام الفترات الماضية للفترة الحالية/القادمة (استثناء الليلية)
+        const nightPeriods = new Set(["العشاء", "بعد منتصف الليل"]);
+        const currentPeriodName = allPeriods.find(p => !p.blocked && (p.endMin > now || nightPeriods.has(p.name)))?.name ?? "";
         for (const p of allPeriods) {
-          if (p.endMin <= now && cleaned[p.name]?.length) {
+          if (p.endMin <= now && !nightPeriods.has(p.name) && cleaned[p.name]?.length) {
             cleaned[currentPeriodName] = [...(cleaned[currentPeriodName] ?? []), ...cleaned[p.name]];
             cleaned[p.name] = [];
           }
@@ -1489,7 +1492,8 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onTog
     const result = allPeriods.map(p => {
       const isHabit = p.name === habitPeriodName && habitTasks.length > 0;
       if (p.blocked) return { ...p, tasks: [] as TaskRow[], habitSlot: false };
-      const isPast = p.endMin <= now && p.name !== "بعد منتصف الليل";
+      const isNightWrap2 = p.endMin < p.startMin || p.name === "بعد منتصف الليل" || p.name === "العشاء";
+      const isPast = isNightWrap2 ? false : p.endMin <= now;
       const pCtx = periodContexts[p.name];
       const pKey = periodKeyMap2[p.name] ?? "";
       const slots = Math.floor(p.duration / 30);
