@@ -2052,16 +2052,33 @@ export default function TasksPage() {
     setLoading(true);
     setError("");
     try {
-      const [rawTasks, circles, habitsRes] = await Promise.all([
+      const [rawTasks, circles] = await Promise.all([
         getTasks(),
         import("@/lib/api").then(m => m.getCircles()),
-        import("@/lib/api").then(m => m.api.get("/api/habits")).then(r => r.data as { id: string; title: string; icon: string; category: string; isIdea: boolean; streak: number; lastCompletedDate?: string; todayDone: boolean }[]).catch(() => [] as { id: string; title: string; icon: string; category: string; isIdea: boolean; streak: number; lastCompletedDate?: string; todayDone: boolean }[]),
       ]);
       const orderMap = new Map(circles.map((c) => [c.id, c.displayOrder]));
       const rows = rawTasks.map((t) => toRow(t, orderMap));
 
-      // Add habits as task-like rows
-      const activeHabits = (habitsRes ?? []).filter((h) => !h.isIdea);
+      // Load ALL habits from localStorage (general + hygiene)
+      let allLocalHabits: { id: string; title: string; icon: string; category?: string; isIdea?: boolean; streak: number; todayDone: boolean; enabled?: boolean }[] = [];
+      try {
+        // General habits
+        const gh = JSON.parse(localStorage.getItem("madar_habits") ?? "[]");
+        const ghDate = localStorage.getItem("madar_habits_date");
+        const today = new Date().toDateString();
+        for (const h of gh) {
+          if (h.isIdea) continue;
+          allLocalHabits.push({ ...h, todayDone: ghDate === today ? h.todayDone : false });
+        }
+        // Hygiene habits
+        const hh = JSON.parse(localStorage.getItem("madar_hygiene") ?? "[]");
+        const hhDate = localStorage.getItem("madar_hygiene_date");
+        for (const h of hh) {
+          if (h.enabled === false) continue;
+          allLocalHabits.push({ ...h, id: "hyg_" + h.id, todayDone: hhDate === today ? h.todayDone : false });
+        }
+      } catch {}
+      const activeHabits = allLocalHabits;
       for (const h of activeHabits) {
         rows.push({
           id: `habit_${h.id}`,
@@ -2085,8 +2102,12 @@ export default function TasksPage() {
       }
 
       rows.sort((a, b) => {
-        if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
+        // العادات دائماً في الأعلى
+        const aHabit = a.context === "habit" ? 0 : 1;
+        const bHabit = b.context === "habit" ? 0 : 1;
+        if (aHabit !== bHabit) return aHabit - bHabit;
         if (a.done !== b.done) return a.done ? 1 : -1;
+        if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
         return a.circleOrder - b.circleOrder;
       });
       setTasks(rows);
