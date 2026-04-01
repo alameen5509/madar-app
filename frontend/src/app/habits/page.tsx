@@ -297,11 +297,33 @@ function PrayerSection() {
     return localStorage.getItem("madar_prayer_city") ?? "auto";
   });
 
-  // Interactive question flow state
-  const [prayerSteps, setPrayerSteps] = useState<Record<string, number>>({});
-  const [waitingPrayed, setWaitingPrayed] = useState<Record<string, boolean>>({});
-  const [waitingSunnah, setWaitingSunnah] = useState<Record<string, boolean>>({});
-  const [prayerAnswers, setPrayerAnswers] = useState<Record<string, { inMosque: boolean; onTime: boolean }>>({});
+  // Interactive question flow state — persisted in localStorage
+  const WIZARD_KEY = "madar_prayer_wizard";
+  const WIZARD_DATE_KEY = "madar_prayer_wizard_date";
+
+  function loadWizardState() {
+    if (typeof window === "undefined") return { steps: {}, waiting: {}, waitingS: {}, answers: {} };
+    try {
+      const today = new Date().toDateString();
+      if (localStorage.getItem(WIZARD_DATE_KEY) !== today) {
+        localStorage.removeItem(WIZARD_KEY);
+        localStorage.setItem(WIZARD_DATE_KEY, today);
+        return { steps: {}, waiting: {}, waitingS: {}, answers: {} };
+      }
+      return JSON.parse(localStorage.getItem(WIZARD_KEY) ?? "null") ?? { steps: {}, waiting: {}, waitingS: {}, answers: {} };
+    } catch { return { steps: {}, waiting: {}, waitingS: {}, answers: {} }; }
+  }
+
+  const initial = loadWizardState();
+  const [prayerSteps, setPrayerSteps] = useState<Record<string, number>>(initial.steps);
+  const [waitingPrayed, setWaitingPrayed] = useState<Record<string, boolean>>(initial.waiting);
+  const [waitingSunnah, setWaitingSunnah] = useState<Record<string, boolean>>(initial.waitingS);
+  const [prayerAnswers, setPrayerAnswers] = useState<Record<string, { inMosque: boolean; onTime: boolean }>>(initial.answers);
+
+  // Save wizard state to localStorage on every change
+  useEffect(() => {
+    localStorage.setItem(WIZARD_KEY, JSON.stringify({ steps: prayerSteps, waiting: waitingPrayed, waitingS: waitingSunnah, answers: prayerAnswers }));
+  }, [prayerSteps, waitingPrayed, waitingSunnah, prayerAnswers]);
 
   const loadSalahTimes = useCallback((selectedCity: string) => {
     if (selectedCity === "auto") {
