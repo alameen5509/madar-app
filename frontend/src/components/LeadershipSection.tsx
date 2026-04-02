@@ -1,6 +1,9 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
+
+const Whiteboard = dynamic(() => import("@/components/Whiteboard"), { ssr: false });
 
 interface Note { id: string; content: string; convertedTaskId?: string; createdAt: string }
 interface DevReq { id: string; title: string; description?: string; status: string; createdAt: string }
@@ -21,7 +24,7 @@ export default function LeadershipSection({ workId, workName, workColor = "#5E54
   const [devReqs, setDevReqs] = useState<DevReq[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [tab, setTab] = useState<"notes" | "dev">("notes");
+  const [tab, setTab] = useState<"notes" | "dev" | "board">("notes");
   const [newNote, setNewNote] = useState("");
   const [showNewDev, setShowNewDev] = useState(false);
   const [newDev, setNewDev] = useState({ title: "", desc: "" });
@@ -179,6 +182,10 @@ export default function LeadershipSection({ workId, workName, workColor = "#5E54
           style={{ background: tab === "dev" ? "#D4AF37" : "var(--bg)", color: tab === "dev" ? "#fff" : "var(--muted)" }}>
           🔧 تطوير ({devReqs.length})
         </button>
+        <button onClick={() => setTab("board")} className="px-3 py-1 rounded-lg text-[10px] font-semibold"
+          style={{ background: tab === "board" ? "#2D6B9E" : "var(--bg)", color: tab === "board" ? "#fff" : "var(--muted)" }}>
+          🎨 السبورة
+        </button>
       </div>
 
       {/* Notes */}
@@ -235,6 +242,13 @@ export default function LeadershipSection({ workId, workName, workColor = "#5E54
             );
           })}
           {devReqs.length === 0 && <p className="text-center text-[10px] py-2" style={{ color: "var(--muted)" }}>لا توجد طلبات</p>}
+        </div>
+      )}
+
+      {/* Whiteboard */}
+      {tab === "board" && (
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--card-border)", height: 500 }}>
+          <Whiteboard entityType="job" entityId={workId} entityName={workName + " — سبورة القيادة"} />
         </div>
       )}
     </div>
