@@ -3560,7 +3560,7 @@ export default function TasksPage() {
                         </div>
                         <span className="text-[10px] px-2.5 py-1 rounded-lg font-bold flex-shrink-0" style={{ background: "#3B82F615", color: "#3B82F6" }}>اجتماع</span>
                       </div>
-                    ) : (
+                    ) : (<>
                     <div
                       className={`flex items-center gap-3 py-3 border-b border-[#e2d5b0]/60 last:border-0
                                   rounded-lg px-2 transition-all
@@ -3719,7 +3719,7 @@ export default function TasksPage() {
                         try { const s = await import("@/lib/api").then(m => m.getSubTasks(t.id)); setSubTasks(prev => ({ ...prev, [t.id]: s })); } catch {}
                       }} />
                     )}
-                    )}
+                    </>)}
                   </div>
                 ))}
                   </details>
