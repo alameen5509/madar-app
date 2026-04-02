@@ -3,6 +3,8 @@
 import { use, useState, useEffect } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { GeometricDivider } from "@/components/IslamicPattern";
+import LeadershipSection from "@/components/LeadershipSection";
 
 export default function WorkJobPage({ params }: { params: Promise<{ id: string; jobId: string }> }) {
   const { id: workId, jobId } = use(params);
@@ -56,15 +58,17 @@ export default function WorkJobPage({ params }: { params: Promise<{ id: string; 
         <nav className="flex gap-1.5 mt-3 overflow-x-auto pb-0.5">
           {NAV.map(n => (
             <Link key={n.href} href={n.href}
-              className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition whitespace-nowrap"
+              className="px-3 py-2.5 rounded-lg text-xs font-semibold transition whitespace-nowrap min-h-[40px] flex items-center"
               style={{ background: "#F3F4F6", color: "#6B7280" }}>
               {n.icon} {n.label}
             </Link>
           ))}
         </nav>
       </header>
-      <div className="px-6 py-5">
+      <div className="px-6 py-5 space-y-6">
         <p className="text-xs text-center" style={{ color: "var(--muted)" }}>اختر قسماً من الأعلى للدخول</p>
+        <GeometricDivider label="القيادة" />
+        <LeadershipSection workId={jobId} workName={job.title + " — " + work.name} workColor="#2D6B9E" workIcon="💼" />
       </div>
     </main>
   );

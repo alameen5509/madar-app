@@ -57,15 +57,15 @@ export default function WarRoomIndexPage() {
     });
     if (w.jobs) {
       for (const j of w.jobs) {
-        const jRole = roles.find(r => r.title?.includes(j.title) && r.workId === w.id);
+        const jRole = roles.find(r => r.workId === j.id || (r.title?.includes(j.title) && r.workId === w.id));
         items.push({
-          workId: w.id,
+          workId: j.id,
           workName: j.title + " — " + w.name,
           workType: "وظيفة فرعية",
           icon: "👔",
           color: "#5E5495",
           role: jRole,
-          href: "/works/" + w.id,
+          href: "/works/" + w.id + "/jobs/" + j.id,
         });
       }
     }
