@@ -1173,9 +1173,9 @@ function SubTasksPanel({ taskId, subs, onRefresh, onUpdateSubs }: { taskId: stri
           </button>
           <span className={`text-xs flex-1 ${sub.status === "Completed" ? "line-through text-[#9CA3AF]" : "text-[#1A1830]"}`}>{sub.title}</span>
           <div className="flex gap-0.5 flex-shrink-0">
-            <button onClick={() => moveStep(sub.id, "up")} disabled={i === 0} className="text-[9px] px-1 py-0.5 rounded disabled:opacity-20 hover:bg-[#D4AF37]/20" style={{ color: "#D4AF37" }}>▲</button>
-            <button onClick={() => moveStep(sub.id, "down")} disabled={i === subs.length - 1} className="text-[9px] px-1 py-0.5 rounded disabled:opacity-20 hover:bg-[#D4AF37]/20" style={{ color: "#D4AF37" }}>▼</button>
-            <button onClick={() => deleteStep(sub.id)} className="text-[9px] px-1 py-0.5 rounded hover:bg-red-50" style={{ color: "#DC2626" }}>✕</button>
+            <button onClick={() => moveStep(sub.id, "up")} disabled={i === 0} className="w-8 h-8 flex items-center justify-center rounded-lg text-sm disabled:opacity-20 hover:bg-[#D4AF37]/20 transition" style={{ color: "#D4AF37" }}>▲</button>
+            <button onClick={() => moveStep(sub.id, "down")} disabled={i === subs.length - 1} className="w-8 h-8 flex items-center justify-center rounded-lg text-sm disabled:opacity-20 hover:bg-[#D4AF37]/20 transition" style={{ color: "#D4AF37" }}>▼</button>
+            <button onClick={() => deleteStep(sub.id)} className="w-8 h-8 flex items-center justify-center rounded-lg text-sm hover:bg-red-50 transition" style={{ color: "#DC2626" }}>✕</button>
           </div>
         </div>
       ))}
@@ -2306,7 +2306,9 @@ export default function TasksPage() {
         import("@/lib/api").then(m => m.getMeetingsToday()).catch(() => [] as import("@/lib/api").Meeting[]),
       ]);
       const orderMap = new Map(circles.map((c) => [c.id, c.displayOrder]));
-      const rows = rawTasks.map((t) => toRow(t, orderMap));
+      // Filter out subtasks (steps) — they should only appear inside their parent task
+      const rootTasks = rawTasks.filter((t: SmartTask & { parentTaskId?: string }) => !t.parentTaskId);
+      const rows = rootTasks.map((t) => toRow(t, orderMap));
 
       // Add today's meetings as special task rows (highest priority)
       for (const m of todayMeetings) {

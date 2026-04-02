@@ -49,6 +49,7 @@ public class TasksController : BaseController
                 wasCompletedOnTime       = t.WasCompletedOnTime,
                 cost             = t.Cost,
                 costCurrency     = t.CostCurrency,
+                parentTaskId     = t.ParentTaskId,
                 assignedToId     = t.AssignedToId,
                 projectId        = t.ProjectId,
                 goal = t.Goal == null ? null : new { t.Goal.Id, t.Goal.Title },
