@@ -696,7 +696,10 @@ function PrayerSection() {
 /* ─── Page ─────────────────────────────────────────────────────────────── */
 
 export default function HabitsPage() {
-  const [habits, setHabits] = useState<Habit[]>([]);
+  const [habits, setHabits] = useState<Habit[]>(() => {
+    if (typeof window === "undefined") return DEFAULT_HABITS;
+    try { const s = localStorage.getItem("madar_habits"); return s ? JSON.parse(s) : DEFAULT_HABITS; } catch { return DEFAULT_HABITS; }
+  });
   const [showAdd, setShowAdd] = useState(false);
   const [tab, setTab] = useState<"active" | "ideas">("active");
   const [newTitle, setNewTitle] = useState("");
@@ -712,32 +715,20 @@ export default function HabitsPage() {
   const [editIcon, setEditIcon] = useState("");
   const [editCat, setEditCat] = useState<Habit["category"]>("worship");
 
-  // Load — try API first, fallback to localStorage
+  // Reset todayDone at start of new day
   useEffect(() => {
-    async function load() {
-      try {
-        const { data } = await api.get("/api/habits");
-        if (data && data.length >= 0) {
-          const mapped: Habit[] = data.map((h: { id: string; title: string; icon?: string; category?: string; isIdea: boolean; streak: number; todayDone?: boolean; lastCompletedDate?: string }) => ({
-            id: h.id,
-            title: h.title,
-            icon: h.icon ?? "⭐",
-            streak: h.streak ?? 0,
-            todayDone: h.todayDone ?? (h.lastCompletedDate ? h.lastCompletedDate.slice(0, 10) === new Date().toISOString().slice(0, 10) : false),
-            category: (h.category as Habit["category"]) ?? "worship",
-            isIdea: h.isIdea,
-          }));
-          setHabits(mapped);
-          localStorage.setItem("madar_habits", JSON.stringify(mapped));
-          localStorage.setItem("madar_habits_date", new Date().toDateString());
-          return;
-        }
-      } catch {}
-      const saved = localStorage.getItem("madar_habits");
-      if (saved) { try { setHabits(JSON.parse(saved)); } catch { setHabits(DEFAULT_HABITS); } }
-      else setHabits(DEFAULT_HABITS);
+    const today = new Date().toDateString();
+    const lastDate = localStorage.getItem("madar_habits_date");
+    if (lastDate && lastDate !== today) {
+      setHabits(prev => {
+        const reset = prev.map(h => ({ ...h, todayDone: false }));
+        localStorage.setItem("madar_habits", JSON.stringify(reset));
+        localStorage.setItem("madar_habits_date", today);
+        return reset;
+      });
+    } else if (!lastDate) {
+      localStorage.setItem("madar_habits_date", today);
     }
-    load();
   }, []);
 
   function saveLocal(updated: Habit[]) {

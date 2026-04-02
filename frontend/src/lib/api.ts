@@ -13,7 +13,7 @@ function getCookieValue(name: string): string {
 
 export const api = axios.create({
   baseURL: BASE_URL,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
 });
 
 // Attach JWT token from cookie or localStorage to every request
