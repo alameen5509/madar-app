@@ -1478,8 +1478,8 @@ function TransferTaskDialog({ taskId, taskTitle, onClose, onDone }: {
 
 /* ─── Inline Day Planner (مدمج في الصفحة) ─────────────────────────────────── */
 
-function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onToggleDone, onEditTask, onPostpone }: {
-  prayers: Prayer[]; tasks: TaskRow[]; blockedPeriods: string[]; onBlockToggle: (name: string) => void; onToggleDone?: (id: string, currentDone: boolean) => void; onEditTask?: (t: TaskRow) => void; onPostpone?: (id: string) => void;
+function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onToggleDone, onEditTask, onPostpone, subTasks: parentSubTasks, onRefreshSubs }: {
+  prayers: Prayer[]; tasks: TaskRow[]; blockedPeriods: string[]; onBlockToggle: (name: string) => void; onToggleDone?: (id: string, currentDone: boolean) => void; onEditTask?: (t: TaskRow) => void; onPostpone?: (id: string) => void; subTasks?: Record<string, { id: string; title: string; status: string; userPriority: number }[]>; onRefreshSubs?: (id: string) => void;
 }) {
   const habitDuration = (() => {
     try { return JSON.parse(localStorage.getItem("madar_settings") ?? "{}").habitDuration ?? 30; } catch { return 30; }
@@ -1702,6 +1702,8 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onTog
     return `${h > 12 ? h - 12 : h}:${String(m).padStart(2, "0")} ${h >= 12 ? "م" : "ص"}`;
   }
 
+  const [planExpanded, setPlanExpanded] = useState<string | null>(null);
+
   // لا نخفي الفترات أبداً — نعرض فترات افتراضية حتى لو الصلوات لم تُحمّل
 
   return (
@@ -1746,30 +1748,43 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onTog
                       {ctxIcon(t.context)} {TASK_CONTEXTS.find(c => c.key === t.context)?.label ?? t.context}
                     </span>
                   )}
-                  <div className="flex-1 min-w-0 cursor-pointer" onClick={(e) => { e.stopPropagation(); if (onEditTask && t.context !== "habit") onEditTask(t); }}>
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={(e) => { e.stopPropagation(); if (t.context === "habit") return; setPlanExpanded(planExpanded === t.id ? null : t.id); if (!parentSubTasks?.[t.id] && onRefreshSubs) onRefreshSubs(t.id); }}>
                     <span className={`text-sm truncate block hover:underline ${t.done ? "line-through opacity-50" : ""}`} style={{ color: "var(--text)" }}>{t.title}</span>
                     {t.goalTitle && <span className="text-[9px] truncate block" style={{ color: "#D4AF37" }}>📁 {t.goalTitle}</span>}
+                    {parentSubTasks?.[t.id] && parentSubTasks[t.id].length > 0 && (() => {
+                      const total = parentSubTasks[t.id].length; const done = parentSubTasks[t.id].filter(s => s.status === "Completed").length;
+                      return <div className="flex items-center gap-1.5 mt-0.5"><div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "#E5E7EB" }}><div className="h-full rounded-full" style={{ width: `${Math.round(done/total*100)}%`, background: done === total ? "#3D8C5A" : "#D4AF37" }} /></div><span className="text-[8px] font-bold" style={{ color: done === total ? "#3D8C5A" : "#6B7280" }}>{done}/{total}</span></div>;
+                    })()}
                   </div>
                   <div className="flex gap-0.5 flex-shrink-0">
                     {!t.done && t.context !== "habit" && onPostpone && (
                       <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); onPostpone(t.id); }}
-                        className="text-[8px] px-1.5 py-1 rounded-lg font-bold transition hover:scale-105"
+                        className="text-[10px] px-2 py-1.5 rounded-lg font-bold transition hover:scale-105 min-h-[36px]"
                         style={{ background: "#5E549510", color: "#5E5495" }} title="غداً">غداً</button>
                     )}
                     {!t.done && t.context !== "habit" && (
                       <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); moveToNextPeriod(p.name, t.id); }}
-                        className="text-[8px] px-1.5 py-1 rounded-lg font-bold transition hover:scale-105"
+                        className="text-[10px] px-2 py-1.5 rounded-lg font-bold transition hover:scale-105 min-h-[36px]"
                         style={{ background: "#D4AF3710", color: "#D4AF37" }} title="الفترة التالية">→</button>
                     )}
                     {onToggleDone && (
                       <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleDone(t.id, t.done); }}
-                        className="w-7 h-7 rounded-full border-2 flex items-center justify-center transition hover:scale-110"
+                        className="w-8 h-8 rounded-full border-2 flex items-center justify-center transition hover:scale-110"
                         style={{ borderColor: t.done ? "#3D8C5A" : "#C9A84C", background: t.done ? "#3D8C5A" : "transparent" }}>
-                        {t.done && <span className="text-white text-[9px]">✓</span>}
+                        {t.done && <span className="text-white text-[10px]">✓</span>}
                       </button>
                     )}
                   </div>
                 </div>
+                {planExpanded === t.id && t.context !== "habit" && (
+                  <div className="px-4 pb-2">
+                    <SubTasksPanel taskId={t.id} subs={parentSubTasks?.[t.id]} onRefresh={() => { if (onRefreshSubs) onRefreshSubs(t.id); }} />
+                    <button onClick={(e) => { e.stopPropagation(); if (onEditTask) onEditTask(t); }}
+                      className="w-full py-2 rounded-lg text-[10px] font-semibold mt-1 transition hover:bg-[#5E5495]/10" style={{ color: "#5E5495", border: "1px solid #5E549520" }}>
+                      ✏️ تعديل المهمة
+                    </button>
+                  </div>
+                )}
               ))}
             </div>
           );
@@ -3743,6 +3758,10 @@ export default function TasksPage() {
           onPostpone={async (id) => {
             const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
             try { await api.post("/api/tasks/" + id + "/update", { dueDate: tomorrow.toISOString() }); fetchTasks(); } catch {}
+          }}
+          subTasks={subTasks}
+          onRefreshSubs={async (id) => {
+            try { const s = await import("@/lib/api").then(m => m.getSubTasks(id)); setSubTasks(prev => ({ ...prev, [id]: s })); } catch {}
           }} />
         </div>
 
