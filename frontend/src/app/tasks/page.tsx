@@ -3719,7 +3719,6 @@ export default function TasksPage() {
                         try { const s = await import("@/lib/api").then(m => m.getSubTasks(t.id)); setSubTasks(prev => ({ ...prev, [t.id]: s })); } catch {}
                       }} />
                     )}
-                  </div>
                     )}
                   </div>
                 ))}
