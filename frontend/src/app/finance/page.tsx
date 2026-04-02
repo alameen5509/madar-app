@@ -257,21 +257,15 @@ function DebtSection({ debts, onUpdate, onPayment }: { debts: Debt[]; onUpdate: 
 
       {/* Debt list - sorted smallest first */}
       <GeometricDivider label="الديون — من الأقل إلى الأكثر" />
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
         <p className="text-[10px] text-[#6B7280]">طريقة كرة الثلج: سدد الأصغر أولاً</p>
-        <button onClick={() => setShowAdd(!showAdd)} className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white" style={{ background: "#2C2C54" }}>+ دين جديد</button>
+        <button onClick={() => setShowAdd(!showAdd)} className="w-full sm:w-auto text-sm px-4 py-2.5 min-h-[44px] rounded-xl font-bold text-white" style={{ background: "#2C2C54" }}>+ دين جديد</button>
       </div>
 
       {/* Add debt form — at top */}
       {showAdd && (
         <div className="bg-white rounded-xl p-5 border border-gray-200 fade-up space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="font-bold text-sm text-[#16213E]">إضافة دين جديد</p>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setShowAdd(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6B7280] bg-gray-100">إلغاء</button>
-              <button onClick={addDebt} className="px-4 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: "#2C2C54" }}>إضافة</button>
-            </div>
-          </div>
+          <p className="font-bold text-sm text-[#16213E] mb-2">إضافة دين جديد</p>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="اسم الدائن *" autoFocus
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
           <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="رقم الجوال (اختياري)" type="tel"
@@ -282,6 +276,10 @@ function DebtSection({ debts, onUpdate, onPayment }: { debts: Debt[]; onUpdate: 
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
           <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ملاحظات (اختياري)"
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#D4AF37]" />
+          <div className="flex flex-col sm:flex-row gap-2 pt-1">
+            <button onClick={addDebt} className="flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white" style={{ background: "#2C2C54" }}>إضافة</button>
+            <button onClick={() => setShowAdd(false)} className="flex-1 sm:flex-none py-3 min-h-[44px] rounded-xl text-sm font-semibold text-[#6B7280] bg-gray-100">إلغاء</button>
+          </div>
         </div>
       )}
 
@@ -301,7 +299,7 @@ function DebtSection({ debts, onUpdate, onPayment }: { debts: Debt[]; onUpdate: 
           <div key={d.id} className={`bg-white rounded-xl border shadow-sm overflow-hidden ${isFirst ? "border-[#D4AF37] ring-2 ring-[#D4AF37]/20" : "border-gray-200"}`}>
             {isFirst && <div className="bg-[#D4AF37] text-white text-[10px] font-bold text-center py-1">⚡ أولوية السداد</div>}
             <div className="p-5">
-              <div className="flex items-start justify-between mb-3">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 mb-3">
                 <div>
                   <p className="font-bold text-[#16213E]">{d.creditorName}</p>
                   {d.creditorPhone && (
@@ -311,15 +309,15 @@ function DebtSection({ debts, onUpdate, onPayment }: { debts: Debt[]; onUpdate: 
                   )}
                   {d.notes && <p className="text-[10px] text-[#9CA3AF] mt-1">{d.notes}</p>}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0">
                   {d.creditorPhone && (
                     <a href={`https://wa.me/${d.creditorPhone.replace(/\D/g, "")}`} target="_blank"
-                      className="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-600 border border-green-200 hover:bg-green-100">
-                      واتساب
+                      className="text-xs px-3 py-2 min-h-[40px] flex items-center rounded-xl bg-green-50 text-green-600 border border-green-200 hover:bg-green-100">
+                      واتساب 💬
                     </a>
                   )}
-                  <button onClick={() => onUpdate(debts.filter((x) => x.id !== d.id))}
-                    className="text-[#9CA3AF] hover:text-red-400 text-xs">✕</button>
+                  <button onClick={() => { if (confirm("حذف الدين؟")) onUpdate(debts.filter((x) => x.id !== d.id)); }}
+                    className="text-red-400 hover:text-red-600 text-sm px-2 py-2 min-h-[40px] rounded-xl hover:bg-red-50 transition">🗑️</button>
                 </div>
               </div>
 
@@ -354,33 +352,35 @@ function DebtSection({ debts, onUpdate, onPayment }: { debts: Debt[]; onUpdate: 
                   )}
 
                   {payId === d.id ? (
-                    <div className="space-y-2 mt-2 fade-up">
-                      <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-3 mt-2 fade-up">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <button onClick={() => { setPayAmt(String(remaining)); }}
-                          className="py-2.5 rounded-lg text-xs font-bold text-white transition hover:opacity-90"
+                          className="w-full sm:flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white transition hover:opacity-90"
                           style={{ background: "#3D8C5A" }}>
                           ✅ سداد كامل ({remaining.toLocaleString()})
                         </button>
                         {d.monthlyPayment > 0 && d.monthlyPayment < remaining && (
                           <button onClick={() => { setPayAmt(String(d.monthlyPayment)); }}
-                            className="py-2.5 rounded-lg text-xs font-bold text-white transition hover:opacity-90"
+                            className="w-full sm:flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white transition hover:opacity-90"
                             style={{ background: "#D4AF37" }}>
                             📋 القسط ({d.monthlyPayment.toLocaleString()})
                           </button>
                         )}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <input type="number" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} placeholder="مبلغ مخصص"
-                          className="flex-1 px-3 py-2.5 rounded-lg border border-gray-200 text-sm text-center font-bold focus:outline-none focus:border-[#D4AF37]" />
-                        <button onClick={payDebt} disabled={!payAmt || Number(payAmt) <= 0}
-                          className="px-5 py-2.5 rounded-lg text-xs font-bold text-white disabled:opacity-40 transition"
-                          style={{ background: "#2C2C54" }}>سدد</button>
-                        <button onClick={() => setPayId(null)} className="px-3 py-2.5 rounded-lg text-xs text-[#6B7280] bg-gray-100">✕</button>
+                          className="flex-1 px-4 py-3 min-h-[44px] rounded-xl border border-gray-200 text-sm text-center font-bold focus:outline-none focus:border-[#D4AF37]" />
+                        <div className="flex gap-2">
+                          <button onClick={payDebt} disabled={!payAmt || Number(payAmt) <= 0}
+                            className="flex-1 sm:flex-none px-6 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white disabled:opacity-40 transition"
+                            style={{ background: "#2C2C54" }}>سدد</button>
+                          <button onClick={() => setPayId(null)} className="px-4 py-3 min-h-[44px] rounded-xl text-sm text-[#6B7280] bg-gray-100">إلغاء</button>
+                        </div>
                       </div>
                     </div>
                   ) : (
                     <button onClick={() => { setPayId(d.id); setPayAmt(""); }}
-                      className="w-full py-2.5 rounded-lg text-xs font-bold text-white mt-1" style={{ background: "#2C2C54" }}>
+                      className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white mt-2" style={{ background: "#2C2C54" }}>
                       💳 تسجيل سداد
                     </button>
                   )}
