@@ -1096,7 +1096,7 @@ function BatchTaskDialog({ onClose, onCreated }: {
 
 /* ─── SubTasks Panel (خطوات المهمة) ────────────────────────────────────────── */
 
-function SubTasksPanel({ taskId, subs, onRefresh }: { taskId: string; subs?: { id: string; title: string; status: string; userPriority: number }[]; onRefresh: () => void }) {
+function SubTasksPanel({ taskId, subs, onRefresh, onUpdateSubs }: { taskId: string; subs?: { id: string; title: string; status: string; userPriority: number }[]; onRefresh: () => void; onUpdateSubs?: (taskId: string, subs: { id: string; title: string; status: string; userPriority: number }[]) => void }) {
   const [newStep, setNewStep] = useState("");
   const [adding, setAdding] = useState(false);
 
@@ -1114,14 +1114,19 @@ function SubTasksPanel({ taskId, subs, onRefresh }: { taskId: string; subs?: { i
   }
 
   async function toggleStep(id: string, currentStatus: string) {
+    // Optimistic update
+    if (subs && onUpdateSubs) {
+      const newStatus = currentStatus === "Completed" ? "Todo" : "Completed";
+      onUpdateSubs(taskId, subs.map(s => s.id === id ? { ...s, status: newStatus } : s));
+    }
     try {
       await api.patch("/api/tasks/" + id + "/status", { status: currentStatus === "Completed" ? 1 : 4 });
-      onRefresh();
-    } catch {}
+    } catch { onRefresh(); }
   }
 
   async function deleteStep(id: string) {
-    try { await api.delete("/api/tasks/" + id); onRefresh(); } catch {}
+    if (subs && onUpdateSubs) onUpdateSubs(taskId, subs.filter(s => s.id !== id));
+    try { await api.delete("/api/tasks/" + id); } catch { onRefresh(); }
   }
 
   async function moveStep(id: string, dir: "up" | "down") {
@@ -1129,14 +1134,16 @@ function SubTasksPanel({ taskId, subs, onRefresh }: { taskId: string; subs?: { i
     const idx = subs.findIndex(s => s.id === id);
     const swapIdx = dir === "up" ? idx - 1 : idx + 1;
     if (swapIdx < 0 || swapIdx >= subs.length) return;
-    // Reorder: swap items then assign sequential priorities
+    // Optimistic: swap locally first
     const reordered = [...subs];
     [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
+    const renumbered = reordered.map((s, i) => ({ ...s, userPriority: i + 1 }));
+    if (onUpdateSubs) onUpdateSubs(taskId, renumbered);
+    // Then persist to API
     try {
-      await Promise.all(reordered.map((s, i) =>
+      await Promise.all(renumbered.map((s, i) =>
         api.post("/api/tasks/" + s.id + "/update", { userPriority: i + 1 })
       ));
-      onRefresh();
     } catch {}
   }
 
@@ -1480,8 +1487,8 @@ function TransferTaskDialog({ taskId, taskTitle, onClose, onDone }: {
 
 /* ─── Inline Day Planner (مدمج في الصفحة) ─────────────────────────────────── */
 
-function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onToggleDone, onEditTask, onPostpone, subTasks: parentSubTasks, onRefreshSubs }: {
-  prayers: Prayer[]; tasks: TaskRow[]; blockedPeriods: string[]; onBlockToggle: (name: string) => void; onToggleDone?: (id: string, currentDone: boolean) => void; onEditTask?: (t: TaskRow) => void; onPostpone?: (id: string) => void; subTasks?: Record<string, { id: string; title: string; status: string; userPriority: number }[]>; onRefreshSubs?: (id: string) => void;
+function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onToggleDone, onEditTask, onPostpone, subTasks: parentSubTasks, onRefreshSubs, onUpdateSubs }: {
+  prayers: Prayer[]; tasks: TaskRow[]; blockedPeriods: string[]; onBlockToggle: (name: string) => void; onToggleDone?: (id: string, currentDone: boolean) => void; onEditTask?: (t: TaskRow) => void; onPostpone?: (id: string) => void; subTasks?: Record<string, { id: string; title: string; status: string; userPriority: number }[]>; onRefreshSubs?: (id: string) => void; onUpdateSubs?: (taskId: string, subs: { id: string; title: string; status: string; userPriority: number }[]) => void;
 }) {
   const habitDuration = (() => {
     try { return JSON.parse(localStorage.getItem("madar_settings") ?? "{}").habitDuration ?? 30; } catch { return 30; }
@@ -1781,7 +1788,8 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onTog
                 </div>
                 {planExpanded === t.id && t.context !== "habit" && (
                   <div className="px-4 pb-2">
-                    <SubTasksPanel taskId={t.id} subs={parentSubTasks?.[t.id]} onRefresh={() => { if (onRefreshSubs) onRefreshSubs(t.id); }} />
+                    <SubTasksPanel taskId={t.id} subs={parentSubTasks?.[t.id]} onRefresh={() => { if (onRefreshSubs) onRefreshSubs(t.id); }}
+                      onUpdateSubs={(tid, updated) => { if (onUpdateSubs) onUpdateSubs(tid, updated); }} />
                     <button onClick={(e) => { e.stopPropagation(); if (onEditTask) onEditTask(t); }}
                       className="w-full py-2 rounded-lg text-[10px] font-semibold mt-1 transition hover:bg-[#5E5495]/10" style={{ color: "#5E5495", border: "1px solid #5E549520" }}>
                       ✏️ تعديل المهمة
@@ -3735,7 +3743,9 @@ export default function TasksPage() {
                     )}
                     {/* Subtasks / Steps */}
                     {expandedTask === t.id && (
-                      <SubTasksPanel taskId={t.id} subs={subTasks[t.id]} onRefresh={async () => {
+                      <SubTasksPanel taskId={t.id} subs={subTasks[t.id]}
+                        onUpdateSubs={(tid, updated) => setSubTasks(prev => ({ ...prev, [tid]: updated }))}
+                        onRefresh={async () => {
                         try { const s = await import("@/lib/api").then(m => m.getSubTasks(t.id)); setSubTasks(prev => ({ ...prev, [t.id]: s })); } catch {}
                       }} />
                     )}
@@ -3766,7 +3776,8 @@ export default function TasksPage() {
           subTasks={subTasks}
           onRefreshSubs={async (id) => {
             try { const s = await import("@/lib/api").then(m => m.getSubTasks(id)); setSubTasks(prev => ({ ...prev, [id]: s })); } catch {}
-          }} />
+          }}
+          onUpdateSubs={(tid, updated) => setSubTasks(prev => ({ ...prev, [tid]: updated }))} />
         </div>
 
         {/* ── المهام المستقبلية ── */}
