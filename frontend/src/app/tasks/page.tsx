@@ -1172,11 +1172,12 @@ function SubTasksPanel({ taskId, subs, onRefresh }: { taskId: string; subs?: { i
       ))}
 
       {/* Add step */}
-      <div className="flex gap-2 mt-1">
+      <div className="flex gap-2 mt-2">
         <input value={newStep} onChange={e => setNewStep(e.target.value)} placeholder="خطوة جديدة..."
           onKeyDown={e => { if (e.key === "Enter") addStep(); }}
-          className="flex-1 px-3 py-2 rounded-lg border text-xs focus:outline-none" style={{ background: "var(--card, #fff)", borderColor: "var(--card-border, #E2D5B0)", color: "var(--text)" }} />
-        <button onClick={addStep} disabled={!newStep.trim() || adding} className="px-3 py-2 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>+</button>
+          className="flex-1 px-3 py-3 min-h-[44px] rounded-xl border text-sm focus:outline-none" style={{ background: "var(--card, #fff)", borderColor: "var(--card-border, #E2D5B0)", color: "var(--text)" }} />
+        <button onClick={addStep} disabled={!newStep.trim() || adding}
+          className="px-5 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white disabled:opacity-40 flex-shrink-0" style={{ background: "#5E5495" }}>+</button>
       </div>
 
       {total === 0 && <p className="text-[10px] text-center py-1" style={{ color: "var(--muted, #9CA3AF)" }}>اضغط + لإضافة خطوات</p>}
