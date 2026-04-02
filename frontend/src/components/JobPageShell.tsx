@@ -185,7 +185,7 @@ export default function JobPageShell({ jobId, children }: { jobId: string; child
             const active = pathname === href;
             return (
               <Link key={n.key} href={href}
-                className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition whitespace-nowrap flex-shrink-0"
+                className="px-3 py-2.5 rounded-lg text-xs font-semibold transition whitespace-nowrap flex-shrink-0 min-h-[40px] flex items-center"
                 style={{ background: active ? "#2D6B9E" : "transparent", color: active ? "#fff" : "#6B7280" }}>
                 {n.icon} {n.label}
               </Link>

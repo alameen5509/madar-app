@@ -174,15 +174,15 @@ export default function LeadershipSection({ workId, workName, workColor = "#5E54
 
       {/* Tabs */}
       <div className="flex gap-1.5">
-        <button onClick={() => setTab("notes")} className="px-3 py-1 rounded-lg text-[10px] font-semibold"
+        <button onClick={() => setTab("notes")} className="px-3 py-2 rounded-lg text-xs font-semibold min-h-[40px]"
           style={{ background: tab === "notes" ? "#5E5495" : "var(--bg)", color: tab === "notes" ? "#fff" : "var(--muted)" }}>
           📝 ملاحظات ({notes.length})
         </button>
-        <button onClick={() => setTab("dev")} className="px-3 py-1 rounded-lg text-[10px] font-semibold"
+        <button onClick={() => setTab("dev")} className="px-3 py-2 rounded-lg text-xs font-semibold min-h-[40px]"
           style={{ background: tab === "dev" ? "#D4AF37" : "var(--bg)", color: tab === "dev" ? "#fff" : "var(--muted)" }}>
           🔧 تطوير ({devReqs.length})
         </button>
-        <button onClick={() => setTab("board")} className="px-3 py-1 rounded-lg text-[10px] font-semibold"
+        <button onClick={() => setTab("board")} className="px-3 py-2 rounded-lg text-xs font-semibold min-h-[40px]"
           style={{ background: tab === "board" ? "#2D6B9E" : "var(--bg)", color: tab === "board" ? "#fff" : "var(--muted)" }}>
           🎨 السبورة
         </button>
@@ -201,7 +201,7 @@ export default function LeadershipSection({ workId, workName, workColor = "#5E54
             <div key={n.id} className="flex items-start gap-2 px-3 py-2 rounded-lg text-xs group" style={{ background: "var(--bg)" }}>
               <span className="flex-1" style={{ color: "var(--text)" }}>{n.content}</span>
               <span className="text-[8px] flex-shrink-0" style={{ color: "var(--muted)" }}>{new Date(n.createdAt).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>
-              {n.convertedTaskId && <span className="text-[8px] px-1 rounded" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>📋</span>}
+              {n.convertedTaskId && <span className="text-[10px] px-2 py-1 rounded-lg" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>📋</span>}
               <button onClick={() => deleteNote(n.id)} className="text-[8px] opacity-0 group-hover:opacity-100 transition" style={{ color: "#DC2626" }}>✕</button>
             </div>
           ))}
@@ -231,11 +231,11 @@ export default function LeadershipSection({ workId, workName, workColor = "#5E54
               <div key={d.id} className="px-3 py-2 rounded-lg" style={{ background: "var(--bg)" }}>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium flex-1" style={{ color: "var(--text)" }}>{d.title}</span>
-                  <span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: `${sc}15`, color: sc }}>{sl}</span>
+                  <span className="text-[10px] px-2 py-1 rounded-full font-bold" style={{ background: `${sc}15`, color: sc }}>{sl}</span>
                   {d.status !== "done" && (
-                    <button onClick={() => toggleDevDone(d.id)} className="text-[8px] px-1.5 py-0.5 rounded-lg" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>✓</button>
+                    <button onClick={() => toggleDevDone(d.id)} className="text-[10px] px-2 py-1.5 rounded-lg" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>✓</button>
                   )}
-                  <button onClick={() => deleteDevReq(d.id)} className="text-[8px] px-1 rounded" style={{ color: "#DC2626" }}>🗑️</button>
+                  <button onClick={() => deleteDevReq(d.id)} className="text-[10px] px-2 py-1 rounded-lg" style={{ color: "#DC2626" }}>🗑️</button>
                 </div>
                 {d.description && <p className="text-[9px] mt-1" style={{ color: "var(--muted)" }}>{d.description}</p>}
               </div>

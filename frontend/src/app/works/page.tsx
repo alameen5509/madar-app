@@ -117,11 +117,11 @@ export default function WorksPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-bold text-sm" style={{ color: "var(--text)" }}>{w.name}</h3>
-                      <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold"
+                      <span className="text-[10px] px-2.5 py-1 rounded-full font-semibold"
                         style={{ background: w.status === "active" ? "#3D8C5A15" : "#6B728015", color: w.status === "active" ? "#3D8C5A" : "#6B7280" }}>
                         {w.status === "active" ? "نشط" : "منتهي"}
                       </span>
-                      <span className="text-[9px] px-2 py-0.5 rounded-full font-medium"
+                      <span className="text-[10px] px-2.5 py-1 rounded-full font-medium"
                         style={{ background: w.type === "entrepreneur" ? "#D4AF3715" : "#2D6B9E15", color: w.type === "entrepreneur" ? "#D4AF37" : "#2D6B9E" }}>
                         {w.type === "entrepreneur" ? "رجل أعمال" : "وظيفة"}
                       </span>
