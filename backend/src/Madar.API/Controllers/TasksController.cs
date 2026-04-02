@@ -25,7 +25,7 @@ public class TasksController : BaseController
             .Include(t => t.LifeCircle)
             .Include(t => t.Goal)
             .Include(t => t.AssignedTo)
-            .Where(t => t.OwnerId == userId && t.Status != Madar.Domain.Enums.TaskStatus.Cancelled)
+            .Where(t => t.OwnerId == userId && t.Status != Madar.Domain.Enums.TaskStatus.Cancelled && t.ParentTaskId == null)
             .OrderByDescending(t => t.AiPriorityScore)
             .ThenByDescending(t => t.UserPriority)
             .ThenBy(t => t.CreatedAt)
