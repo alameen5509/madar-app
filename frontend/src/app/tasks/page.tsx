@@ -1724,7 +1724,8 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onTog
                 </div>
               )}
               {p.tasks.filter((t: TaskRow) => t.context !== "habit").map((t: TaskRow, i: number, arr: TaskRow[]) => (
-                <div key={t.id} draggable
+                <div key={t.id}>
+                <div draggable
                   onDragStart={() => setDragTask({ taskId: t.id, fromPeriod: p.name })}
                   className="flex items-center gap-2 py-1.5 px-1 rounded cursor-grab active:cursor-grabbing hover:opacity-80 transition"
                   style={{ background: i % 2 === 0 ? "transparent" : "var(--bg)" }}>
@@ -1785,6 +1786,7 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onTog
                     </button>
                   </div>
                 )}
+                </div>
               ))}
             </div>
           );
