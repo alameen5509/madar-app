@@ -2272,12 +2272,38 @@ export default function TasksPage() {
     setLoading(true);
     setError("");
     try {
-      const [rawTasks, circles] = await Promise.all([
+      const [rawTasks, circles, todayMeetings] = await Promise.all([
         getTasks(),
         import("@/lib/api").then(m => m.getCircles()),
+        import("@/lib/api").then(m => m.getMeetingsToday()).catch(() => [] as import("@/lib/api").Meeting[]),
       ]);
       const orderMap = new Map(circles.map((c) => [c.id, c.displayOrder]));
       const rows = rawTasks.map((t) => toRow(t, orderMap));
+
+      // Add today's meetings as special task rows (highest priority)
+      for (const m of todayMeetings) {
+        if (m.status === "cancelled" || m.status === "completed") continue;
+        const startTime = m.startTime ? new Date(m.startTime).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" }) : "";
+        rows.push({
+          id: "mtg_" + m.id,
+          title: `📅 ${m.title}${startTime ? " — " + startTime : ""}`,
+          circle: m.work?.name ?? m.project?.title ?? "اجتماع",
+          circleColor: "#3B82F6",
+          circleOrder: -10, // أعلى أولوية
+          priority: "عالية",
+          done: m.status === "completed",
+          isInbox: false,
+          isWork: true,
+          isRecurring: false,
+          description: [m.description, m.location, m.platform, m.meetingLink].filter(Boolean).join(" · "),
+          isUrgent: true,
+          dueDate: m.startTime?.slice(0, 10),
+          hasSubtasks: false,
+          context: "meeting",
+          suitablePeriod: "all",
+          createdAt: m.createdAt,
+        });
+      }
 
       // Load ALL habits from localStorage (general + hygiene)
       let allLocalHabits: { id: string; title: string; icon: string; category?: string; isIdea?: boolean; streak: number; todayDone: boolean; enabled?: boolean }[] = [];
@@ -2323,10 +2349,10 @@ export default function TasksPage() {
       }
 
       rows.sort((a, b) => {
-        // العادات دائماً في الأعلى
-        const aHabit = a.context === "habit" ? 0 : 1;
-        const bHabit = b.context === "habit" ? 0 : 1;
-        if (aHabit !== bHabit) return aHabit - bHabit;
+        // الاجتماعات أولاً، ثم العادات، ثم المهام
+        const typeOrder = (t: TaskRow) => t.context === "meeting" ? -2 : t.context === "habit" ? -1 : 0;
+        const to = typeOrder(a) - typeOrder(b);
+        if (to !== 0) return to;
         if (a.done !== b.done) return a.done ? 1 : -1;
         if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
         return a.circleOrder - b.circleOrder;
@@ -3522,6 +3548,19 @@ export default function TasksPage() {
                     </summary>
                 {dayTasks.map((t) => (
                   <div key={t.id}>
+                    {t.context === "meeting" ? (
+                      /* ═══ Meeting card — special design ═══ */
+                      <div className="flex items-center gap-3 py-3 px-3 my-1 rounded-xl transition-all"
+                        style={{ background: "linear-gradient(135deg, #3B82F608, #5E549508)", border: "2px solid #3B82F630", borderInlineStart: "4px solid #3B82F6" }}>
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style={{ background: "#3B82F615" }}>📅</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold truncate" style={{ color: "#3B82F6" }}>{t.title.replace("📅 ", "")}</p>
+                          {t.description && <p className="text-[10px] truncate mt-0.5" style={{ color: "var(--muted)" }}>{t.description}</p>}
+                          {t.circle !== "اجتماع" && <span className="text-[9px] px-1.5 py-0.5 rounded-full mt-0.5 inline-block" style={{ background: "#3B82F610", color: "#3B82F6" }}>{t.circle}</span>}
+                        </div>
+                        <span className="text-[10px] px-2.5 py-1 rounded-lg font-bold flex-shrink-0" style={{ background: "#3B82F615", color: "#3B82F6" }}>اجتماع</span>
+                      </div>
+                    ) : (
                     <div
                       className={`flex items-center gap-3 py-3 border-b border-[#e2d5b0]/60 last:border-0
                                   rounded-lg px-2 transition-all
@@ -3679,6 +3718,8 @@ export default function TasksPage() {
                       <SubTasksPanel taskId={t.id} subs={subTasks[t.id]} onRefresh={async () => {
                         try { const s = await import("@/lib/api").then(m => m.getSubTasks(t.id)); setSubTasks(prev => ({ ...prev, [t.id]: s })); } catch {}
                       }} />
+                    )}
+                  </div>
                     )}
                   </div>
                 ))}
