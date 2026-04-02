@@ -1102,12 +1102,33 @@ function SubTasksPanel({ taskId, subs, onRefresh, onUpdateSubs }: { taskId: stri
 
   useEffect(() => { if (!subs) onRefresh(); }, []);
 
+  // Track subtask IDs in localStorage so main list can filter them out
+  function trackSubtaskId(id: string) {
+    try {
+      const ids = JSON.parse(localStorage.getItem("madar_subtask_ids") ?? "[]") as string[];
+      if (!ids.includes(id)) { ids.push(id); localStorage.setItem("madar_subtask_ids", JSON.stringify(ids)); }
+    } catch {}
+  }
+
+  function untrackSubtaskId(id: string) {
+    try {
+      const ids = (JSON.parse(localStorage.getItem("madar_subtask_ids") ?? "[]") as string[]).filter(x => x !== id);
+      localStorage.setItem("madar_subtask_ids", JSON.stringify(ids));
+    } catch {}
+  }
+
+  // Track existing subs on load
+  useEffect(() => {
+    if (subs) subs.forEach(s => trackSubtaskId(s.id));
+  }, [subs]);
+
   async function addStep() {
     if (!newStep.trim()) return;
     setAdding(true);
     const nextPriority = subs ? Math.max(0, ...subs.map(s => s.userPriority)) + 1 : 1;
     try {
-      await api.post("/api/tasks", { title: newStep.trim(), parentTaskId: taskId, userPriority: nextPriority });
+      const { data } = await api.post("/api/tasks", { title: newStep.trim(), parentTaskId: taskId, userPriority: nextPriority });
+      if (data?.id) trackSubtaskId(data.id);
       setNewStep(""); onRefresh();
     } catch { alert("فشل الإضافة"); }
     setAdding(false);
@@ -1126,6 +1147,7 @@ function SubTasksPanel({ taskId, subs, onRefresh, onUpdateSubs }: { taskId: stri
 
   async function deleteStep(id: string) {
     if (subs && onUpdateSubs) onUpdateSubs(taskId, subs.filter(s => s.id !== id));
+    untrackSubtaskId(id);
     try { await api.delete("/api/tasks/" + id); } catch { onRefresh(); }
   }
 
@@ -2306,8 +2328,14 @@ export default function TasksPage() {
         import("@/lib/api").then(m => m.getMeetingsToday()).catch(() => [] as import("@/lib/api").Meeting[]),
       ]);
       const orderMap = new Map(circles.map((c) => [c.id, c.displayOrder]));
-      // Filter out subtasks (steps) — they should only appear inside their parent task
-      const rootTasks = rawTasks.filter((t: SmartTask & { parentTaskId?: string }) => !t.parentTaskId);
+      // Filter out subtasks — get all subtask IDs then exclude them
+      const subtaskIds = new Set<string>();
+      try {
+        const savedIds = JSON.parse(localStorage.getItem("madar_subtask_ids") ?? "[]");
+        for (const id of savedIds) subtaskIds.add(id);
+      } catch {}
+      // Also check parentTaskId if backend returns it
+      const rootTasks = rawTasks.filter((t: SmartTask & { parentTaskId?: string }) => !t.parentTaskId && !subtaskIds.has(t.id));
       const rows = rootTasks.map((t) => toRow(t, orderMap));
 
       // Add today's meetings as special task rows (highest priority)
