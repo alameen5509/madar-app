@@ -68,6 +68,35 @@ public class PrayerTrackingController : BaseController
         else if (req.Field == "inMosque")
             log.PrayedInMosque = req.Value;
 
+        // If toggled OFF → create penalty if not exists
+        if (!req.Value)
+        {
+            var reason = req.Field == "onTime" ? "not_on_time" : "not_in_mosque";
+            var penaltyExists = await _db.PrayerPenalties.AnyAsync(p =>
+                p.OwnerId == UserId && p.Date == today && p.Prayer == req.Prayer && p.Reason == reason, ct);
+            if (!penaltyExists)
+            {
+                var settings = await _db.PrayerSettings.FirstOrDefaultAsync(s => s.OwnerId == UserId, ct);
+                var penaltyType = "quran";
+                if (settings != null)
+                {
+                    try
+                    {
+                        var config = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(settings.PenaltyConfigJson);
+                        var key = $"{req.Prayer}_{(req.Field == "onTime" ? "time" : "mosque")}";
+                        if (config != null && config.TryGetValue(key, out var pt)) penaltyType = pt;
+                    }
+                    catch { }
+                }
+                _db.PrayerPenalties.Add(new PrayerPenalty
+                {
+                    Id = Guid.NewGuid(), OwnerId = UserId,
+                    Date = today, Prayer = req.Prayer,
+                    Reason = reason, PenaltyType = penaltyType,
+                });
+            }
+        }
+
         // If toggled ON, mark matching penalty as fulfilled (don't delete)
         if (req.Value)
         {
