@@ -1094,6 +1094,102 @@ function BatchTaskDialog({ onClose, onCreated }: {
   );
 }
 
+/* ─── SubTasks Panel (خطوات المهمة) ────────────────────────────────────────── */
+
+function SubTasksPanel({ taskId, subs, onRefresh }: { taskId: string; subs?: { id: string; title: string; status: string; userPriority: number }[]; onRefresh: () => void }) {
+  const [newStep, setNewStep] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  useEffect(() => { if (!subs) onRefresh(); }, []);
+
+  async function addStep() {
+    if (!newStep.trim()) return;
+    setAdding(true);
+    try {
+      await api.post("/api/tasks", { title: newStep.trim(), parentTaskId: taskId, userPriority: 3 });
+      setNewStep(""); onRefresh();
+    } catch { alert("فشل الإضافة"); }
+    setAdding(false);
+  }
+
+  async function toggleStep(id: string, currentStatus: string) {
+    try {
+      await api.patch("/api/tasks/" + id + "/status", { status: currentStatus === "Completed" ? 1 : 4 });
+      onRefresh();
+    } catch {}
+  }
+
+  async function deleteStep(id: string) {
+    try { await api.delete("/api/tasks/" + id); onRefresh(); } catch {}
+  }
+
+  async function moveStep(id: string, dir: "up" | "down") {
+    if (!subs) return;
+    const idx = subs.findIndex(s => s.id === id);
+    const swapIdx = dir === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= subs.length) return;
+    // Swap priorities
+    try {
+      await Promise.all([
+        api.post("/api/tasks/" + subs[idx].id + "/update", { userPriority: subs[swapIdx].userPriority }),
+        api.post("/api/tasks/" + subs[swapIdx].id + "/update", { userPriority: subs[idx].userPriority }),
+      ]);
+      onRefresh();
+    } catch {}
+  }
+
+  if (!subs) return <div className="pr-10 pb-2"><p className="text-[10px] text-[#7C7A8E] py-1 animate-pulse">جارٍ التحميل...</p></div>;
+
+  const total = subs.length;
+  const done = subs.filter(s => s.status === "Completed").length;
+
+  return (
+    <div className="pr-10 pb-3 space-y-1.5">
+      {/* Progress */}
+      {total > 0 && (
+        <div className="flex items-center gap-2 mb-2">
+          <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "#E5E7EB" }}>
+            <div className="h-full rounded-full transition-all" style={{ width: `${Math.round(done/total*100)}%`, background: done === total ? "#3D8C5A" : "#D4AF37" }} />
+          </div>
+          <span className="text-[10px] font-bold" style={{ color: done === total ? "#3D8C5A" : "#6B7280" }}>{done}/{total} خطوة</span>
+        </div>
+      )}
+
+      {/* Steps */}
+      {subs.map((sub, i) => (
+        <div key={sub.id} className="flex items-center gap-2 py-1.5 px-3 rounded-lg" style={{ background: "var(--bg, #F8F6F0)", border: "1px solid var(--card-border, #E2D5B0)" }}>
+          <button onClick={() => toggleStep(sub.id, sub.status)}
+            className={`w-5 h-5 rounded-full flex-shrink-0 border-2 flex items-center justify-center transition hover:scale-110 ${sub.status === "Completed" ? "bg-[#5E5495] border-[#5E5495]" : "border-[#C9A84C] bg-transparent"}`}>
+            {sub.status === "Completed" && <span className="text-white text-[8px]">✓</span>}
+          </button>
+          <span className={`text-xs flex-1 ${sub.status === "Completed" ? "line-through text-[#9CA3AF]" : "text-[#1A1830]"}`}>{sub.title}</span>
+          <div className="flex gap-0.5 flex-shrink-0">
+            <button onClick={() => moveStep(sub.id, "up")} disabled={i === 0} className="text-[9px] px-1 py-0.5 rounded disabled:opacity-20 hover:bg-[#D4AF37]/20" style={{ color: "#D4AF37" }}>▲</button>
+            <button onClick={() => moveStep(sub.id, "down")} disabled={i === subs.length - 1} className="text-[9px] px-1 py-0.5 rounded disabled:opacity-20 hover:bg-[#D4AF37]/20" style={{ color: "#D4AF37" }}>▼</button>
+            <button onClick={() => deleteStep(sub.id)} className="text-[9px] px-1 py-0.5 rounded hover:bg-red-50" style={{ color: "#DC2626" }}>✕</button>
+          </div>
+        </div>
+      ))}
+
+      {/* Add step */}
+      <div className="flex gap-2 mt-1">
+        <input value={newStep} onChange={e => setNewStep(e.target.value)} placeholder="خطوة جديدة..."
+          onKeyDown={e => { if (e.key === "Enter") addStep(); }}
+          className="flex-1 px-3 py-2 rounded-lg border text-xs focus:outline-none" style={{ background: "var(--card, #fff)", borderColor: "var(--card-border, #E2D5B0)", color: "var(--text)" }} />
+        <button onClick={addStep} disabled={!newStep.trim() || adding} className="px-3 py-2 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>+</button>
+      </div>
+
+      {total === 0 && <p className="text-[10px] text-center py-1" style={{ color: "var(--muted, #9CA3AF)" }}>اضغط + لإضافة خطوات</p>}
+
+      {/* Edit task button */}
+      <button onClick={() => { const ev = new CustomEvent("edit-task", { detail: taskId }); window.dispatchEvent(ev); }}
+        className="w-full py-2 rounded-lg text-[10px] font-semibold mt-1 transition hover:bg-[#5E5495]/10" style={{ color: "#5E5495", border: "1px solid #5E549520" }}>
+        ✏️ تعديل المهمة
+      </button>
+    </div>
+  );
+}
+
 /* ─── Edit Task Dialog (تعديل المهمة) ─────────────────────────────────────── */
 
 function EditTaskDialog({ task, onClose, onSaved }: {
@@ -2103,6 +2199,17 @@ export default function TasksPage() {
   const [editingTask, setEditingTask] = useState<TaskRow | null>(null);
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [bulkMode, setBulkMode] = useState(false);
+
+  // Listen for edit-task event from SubTasksPanel
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const taskId = (e as CustomEvent).detail;
+      const t = tasks.find(x => x.id === taskId);
+      if (t) setEditingTask(t);
+    };
+    window.addEventListener("edit-task", handler);
+    return () => window.removeEventListener("edit-task", handler);
+  }, [tasks]);
 
   function toggleSelect(id: string) {
     setSelectedTasks(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
@@ -3434,11 +3541,23 @@ export default function TasksPage() {
                       </div>
                       )}
                       {/* اسم المهمة + المشروع + التذكير */}
-                      <div onClick={() => t.context !== "habit" ? setEditingTask(t) : undefined}
+                      <div onClick={() => { if (t.context === "habit") return; toggleExpand(t.id); }}
                         className="flex-1 min-w-0 cursor-pointer hover:underline">
                         <p className={`text-sm truncate ${t.done ? "line-through text-[#7C7A8E]" : "text-[#1A1830] font-medium"}`}>
                           {t.title}
                         </p>
+                        {subTasks[t.id] && subTasks[t.id].length > 0 && (() => {
+                          const total = subTasks[t.id].length;
+                          const done = subTasks[t.id].filter(s => s.status === "Completed").length;
+                          return (
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "#E5E7EB" }}>
+                                <div className="h-full rounded-full transition-all" style={{ width: `${Math.round(done/total*100)}%`, background: done === total ? "#3D8C5A" : "#D4AF37" }} />
+                              </div>
+                              <span className="text-[8px] font-bold" style={{ color: done === total ? "#3D8C5A" : "#6B7280" }}>{done}/{total}</span>
+                            </div>
+                          );
+                        })()}
                         {t.goalTitle && (
                           <p className="text-[10px] truncate" style={{ color: "#D4AF37" }}>
                             📁 {t.goalTitle}
@@ -3555,28 +3674,11 @@ export default function TasksPage() {
                         </div>
                       </div>
                     )}
-                    {/* Subtasks */}
+                    {/* Subtasks / Steps */}
                     {expandedTask === t.id && (
-                      <div className="pr-10 pb-2 space-y-1">
-                        {!subTasks[t.id] ? (
-                          <p className="text-[10px] text-[#7C7A8E] py-1 animate-pulse">جارٍ التحميل...</p>
-                        ) : subTasks[t.id].length === 0 ? (
-                          <p className="text-[10px] text-[#9CA3AF] py-1">لا توجد مهام فرعية</p>
-                        ) : (
-                          subTasks[t.id].map((sub) => (
-                            <div key={sub.id} className="flex items-center gap-2 py-1.5 px-3 rounded-lg bg-[#F8F6F0] border border-[#E2D5B0]/50">
-                              <div className={`w-3.5 h-3.5 rounded-full flex-shrink-0 border flex items-center justify-center
-                                ${sub.status === "Completed" ? "bg-[#5E5495] border-[#5E5495]" : "border-[#C9A84C] bg-transparent"}`}>
-                                {sub.status === "Completed" && <span className="text-white text-[8px]">✓</span>}
-                              </div>
-                              <span className={`text-xs flex-1 ${sub.status === "Completed" ? "line-through text-[#9CA3AF]" : "text-[#1A1830]"}`}>{sub.title}</span>
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${P_COLORS[priorityLabel(sub.userPriority)]}`}>
-                                {priorityLabel(sub.userPriority)}
-                              </span>
-                            </div>
-                          ))
-                        )}
-                      </div>
+                      <SubTasksPanel taskId={t.id} subs={subTasks[t.id]} onRefresh={async () => {
+                        try { const s = await import("@/lib/api").then(m => m.getSubTasks(t.id)); setSubTasks(prev => ({ ...prev, [t.id]: s })); } catch {}
+                      }} />
                     )}
                   </div>
                 ))}
