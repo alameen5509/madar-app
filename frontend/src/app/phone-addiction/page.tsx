@@ -205,7 +205,7 @@ export default function PhoneAddictionPage() {
         {!loading && tab === "plan" && (<TreatmentPlanTab plan={plan} goal={goal} logs={logs} />)}
         {!loading && tab === "triggers" && (<TriggersTab triggers={triggers} onUpdate={(newT) => { if (useLocal) { LS.set("triggers", newT); setTriggers(newT); } else load(); }} useLocal={useLocal} />)}
         {!loading && tab === "zones" && (<FreeZonesTab zones={zones} onUpdate={(newZ) => { if (useLocal) { LS.set("zones", newZ); setZones(newZ); } else load(); }} useLocal={useLocal} />)}
-        {!loading && tab === "goal" && (<GoalTab goal={goal} onSave={(g) => { if (useLocal) { LS.set("goal", g); setGoal(g); } else load(); setTab("dashboard"); }} useLocal={useLocal} />)}
+        {!loading && tab === "goal" && (<GoalTab goal={goal} onSave={(g) => { if (useLocal) { LS.set("goal", g); setGoal(g); } else load(); setTab("dashboard"); }} onDelete={() => { LS.set("goal", null); LS.set("logs", []); LS.set("tasks", []); setGoal(null); setLogs([]); setTasks([]); setPlan(null); setStats(null); setTab("dashboard"); }} useLocal={useLocal} />)}
       </div>
     </main>
   );
@@ -442,7 +442,7 @@ function FreeZonesTab({ zones, onUpdate, useLocal }: { zones: FreeZone[]; onUpda
 }
 
 // ═══ GOAL ═══
-function GoalTab({ goal, onSave, useLocal }: { goal: Goal|null; onSave: (g: Goal) => void; useLocal: boolean }) {
+function GoalTab({ goal, onSave, onDelete, useLocal }: { goal: Goal|null; onSave: (g: Goal) => void; onDelete: () => void; useLocal: boolean }) {
   const [cur, setCur] = useState(goal ? String(goal.currentDailyHours) : "");
   const [tgt, setTgt] = useState(goal ? String(goal.targetDailyHours) : "2");
   const [red, setRed] = useState(goal ? String(goal.weeklyReductionMinutes) : "15");
@@ -473,6 +473,12 @@ function GoalTab({ goal, onSave, useLocal }: { goal: Goal|null; onSave: (g: Goal
         <div><label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>📅 تاريخ الوصول (اختياري)</label><input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)} className="w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none" style={is} /></div>
         {cur && tgt && <div className="rounded-xl p-3" style={{ background: "#3D8C5A08", border: "1px solid #3D8C5A15" }}><p className="text-[10px]" style={{ color: "#3D8C5A" }}>📊 من {cur}س → {tgt}س · تخفيض {red}د/أسبوع · ≈{Math.ceil(((Number(cur) - Number(tgt)) * 60) / (Number(red) || 15))} أسبوع</p></div>}
         <button onClick={save} disabled={!cur} className="w-full py-3 rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#DC2626" }}>{goal ? "تحديث الهدف" : "🚀 ابدأ الرحلة"}</button>
+        {goal && (
+          <button onClick={() => { if (confirm("حذف الرحلة الحالية وكل بياناتها؟ لا يمكن التراجع!")) onDelete(); }}
+            className="w-full py-3 rounded-xl text-sm font-semibold transition hover:bg-red-50 mt-2" style={{ color: "#DC2626", border: "1px solid #DC262630" }}>
+            🗑️ حذف الرحلة والبدء من جديد
+          </button>
+        )}
       </div>
     </div>
   );
