@@ -238,7 +238,7 @@ public class TasksController : BaseController
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var subs = await _db.SmartTasks
             .Where(t => t.ParentTaskId == id && t.OwnerId == userId)
-            .OrderBy(t => t.CreatedAt)
+            .OrderBy(t => t.UserPriority).ThenBy(t => t.CreatedAt)
             .Select(t => new { t.Id, t.Title, status = t.Status.ToString(), t.UserPriority })
             .ToListAsync(ct);
         return Ok(subs);

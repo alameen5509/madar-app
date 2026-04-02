@@ -1105,8 +1105,9 @@ function SubTasksPanel({ taskId, subs, onRefresh }: { taskId: string; subs?: { i
   async function addStep() {
     if (!newStep.trim()) return;
     setAdding(true);
+    const nextPriority = subs ? Math.max(0, ...subs.map(s => s.userPriority)) + 1 : 1;
     try {
-      await api.post("/api/tasks", { title: newStep.trim(), parentTaskId: taskId, userPriority: 3 });
+      await api.post("/api/tasks", { title: newStep.trim(), parentTaskId: taskId, userPriority: nextPriority });
       setNewStep(""); onRefresh();
     } catch { alert("فشل الإضافة"); }
     setAdding(false);
@@ -1128,12 +1129,13 @@ function SubTasksPanel({ taskId, subs, onRefresh }: { taskId: string; subs?: { i
     const idx = subs.findIndex(s => s.id === id);
     const swapIdx = dir === "up" ? idx - 1 : idx + 1;
     if (swapIdx < 0 || swapIdx >= subs.length) return;
-    // Swap priorities
+    // Reorder: swap items then assign sequential priorities
+    const reordered = [...subs];
+    [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
     try {
-      await Promise.all([
-        api.post("/api/tasks/" + subs[idx].id + "/update", { userPriority: subs[swapIdx].userPriority }),
-        api.post("/api/tasks/" + subs[swapIdx].id + "/update", { userPriority: subs[idx].userPriority }),
-      ]);
+      await Promise.all(reordered.map((s, i) =>
+        api.post("/api/tasks/" + s.id + "/update", { userPriority: i + 1 })
+      ));
       onRefresh();
     } catch {}
   }
