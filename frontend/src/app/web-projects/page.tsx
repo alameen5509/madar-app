@@ -19,17 +19,10 @@ export default function WebProjectsPage() {
 
   const LS_KEY = "madar_web_projects";
   function lsGet(): Project[] { try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]"); } catch { return []; } }
-  function lsSave(p: Project[]) {
-    localStorage.setItem(LS_KEY, JSON.stringify(p));
-    // Sync to cloud via preferences (works across devices)
-    syncToCloud(p);
-  }
-
   const LS_KEYS = ["wp_completed_","wp_p1doc_","wp_p1tasks_","wp_p3_","wp_p4_","wp_p5_","wp_p6_","wp_p7_"];
-  const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState("");
 
-  async function syncToCloud(p: Project[]) {
+  // Auto cloud sync: push all data to preferences
+  const pushToCloud = useCallback(async (p: Project[]) => {
     try {
       const { data: prefs } = await api.get("/api/users/me/preferences");
       const current = (typeof prefs === "object" && prefs !== null) ? prefs : {};
@@ -43,15 +36,29 @@ export default function WebProjectsPage() {
         projectsData[proj.id] = pd;
       }
       await api.put("/api/users/me/preferences", { ...current, webProjects: p, webProjectsData: projectsData });
-      return true;
-    } catch { return false; }
+    } catch {}
+  }, []);
+
+  function lsSave(p: Project[]) {
+    localStorage.setItem(LS_KEY, JSON.stringify(p));
+    pushToCloud(p); // Auto sync on every save
   }
 
-  async function pullFromCloud() {
+  const load = useCallback(async () => {
+    setLoading(true);
+    // 1. Try dedicated API
+    try {
+      const { data } = await api.get("/api/web-projects");
+      if (data && data.length > 0) { setProjects(data); setLoading(false); return; }
+    } catch {}
+    // 2. Try cloud preferences (for cross-device sync)
     try {
       const { data: prefs } = await api.get("/api/users/me/preferences");
-      if (prefs?.webProjects && prefs.webProjects.length > 0) {
-        localStorage.setItem(LS_KEY, JSON.stringify(prefs.webProjects));
+      if (prefs?.webProjects?.length > 0) {
+        const cloud = prefs.webProjects as Project[];
+        setProjects(cloud);
+        localStorage.setItem(LS_KEY, JSON.stringify(cloud));
+        // Restore phase data
         if (prefs.webProjectsData) {
           for (const [projId, pd] of Object.entries(prefs.webProjectsData as Record<string, Record<string, string>>)) {
             for (const [key, val] of Object.entries(pd)) {
@@ -59,40 +66,11 @@ export default function WebProjectsPage() {
             }
           }
         }
-        return prefs.webProjects as Project[];
+        setLoading(false); return;
       }
     } catch {}
-    return null;
-  }
-
-  async function manualSync() {
-    setSyncing(true); setSyncMsg("");
-    const ok = await syncToCloud(projects);
-    setSyncMsg(ok ? "✅ تمت المزامنة" : "❌ فشلت المزامنة");
-    setSyncing(false);
-    setTimeout(() => setSyncMsg(""), 3000);
-  }
-
-  async function manualPull() {
-    setSyncing(true); setSyncMsg("");
-    const cloud = await pullFromCloud();
-    if (cloud) { setProjects(cloud); setSyncMsg("✅ تم التحميل من السحابة — " + cloud.length + " موقع"); }
-    else setSyncMsg("❌ لا توجد بيانات في السحابة");
-    setSyncing(false);
-    setTimeout(() => setSyncMsg(""), 3000);
-  }
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    // Try dedicated API first
-    try {
-      const { data } = await api.get("/api/web-projects");
-      if (data && data.length > 0) { setProjects(data); setLoading(false); return; }
-    } catch {}
-    // Try cloud preferences
-    const cloud = await pullFromCloud();
-    if (cloud && cloud.length > 0) { setProjects(cloud); }
-    else { setProjects(lsGet()); }
+    // 3. Fallback to localStorage
+    setProjects(lsGet());
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -137,17 +115,6 @@ export default function WebProjectsPage() {
 
       <div className="px-4 sm:px-6 py-4 space-y-3 max-w-3xl mx-auto">
         <button onClick={() => setShowNew(!showNew)} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #2D6B9E, #D4AF37)" }}>+ موقع جديد</button>
-
-        {/* Sync buttons */}
-        <div className="flex gap-2">
-          <button onClick={manualSync} disabled={syncing || projects.length === 0} className="flex-1 py-2.5 min-h-[40px] rounded-xl text-xs font-bold transition disabled:opacity-40" style={{ background: "#5E549510", color: "#5E5495", border: "1px solid #5E549520" }}>
-            {syncing ? "⏳ جارٍ..." : "☁️ رفع للسحابة"}
-          </button>
-          <button onClick={manualPull} disabled={syncing} className="flex-1 py-2.5 min-h-[40px] rounded-xl text-xs font-bold transition disabled:opacity-40" style={{ background: "#2D6B9E10", color: "#2D6B9E", border: "1px solid #2D6B9E20" }}>
-            {syncing ? "⏳ جارٍ..." : "📥 تحميل من السحابة"}
-          </button>
-        </div>
-        {syncMsg && <p className="text-center text-xs font-bold py-1" style={{ color: syncMsg.startsWith("✅") ? "#3D8C5A" : "#DC2626" }}>{syncMsg}</p>}
 
         {showNew && (
           <div className="rounded-2xl border p-5 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
