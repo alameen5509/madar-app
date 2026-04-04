@@ -146,14 +146,33 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
 // ═══ Members Panel ═══
 function MembersPanel({ projectId, members, onUpdate }: { projectId: string; members: Member[]; onUpdate: () => void }) {
   const [showAdd, setShowAdd] = useState(false);
-  const [nm, setNm] = useState({ name: "", email: "", role: "employee" });
+  const [nm, setNm] = useState({ name: "", email: "", password: "", role: "employee", addToAll: false });
+  const [addStatus, setAddStatus] = useState("");
 
   async function add() {
-    if (!nm.name.trim()) return;
+    if (!nm.name.trim() || !nm.email.trim() || !nm.password.trim()) return;
+    setAddStatus("جارٍ الإنشاء...");
     try {
-      await api.post("/api/web-projects/" + projectId + "/members", { name: nm.name.trim(), email: nm.email.trim() || undefined, role: nm.role });
-      setNm({ name: "", email: "", role: "employee" }); setShowAdd(false); onUpdate();
-    } catch { alert("فشل الإضافة"); }
+      // 1. Register the user account
+      await api.post("/api/auth/register", { fullName: nm.name.trim(), email: nm.email.trim(), password: nm.password, role: "User" });
+      // 2. Add as project member
+      if (nm.addToAll) {
+        // Add to ALL projects
+        const { data: allProjects } = await api.get("/api/web-projects");
+        for (const proj of (allProjects ?? [])) {
+          await api.post("/api/web-projects/" + proj.id + "/members", { name: nm.name.trim(), email: nm.email.trim(), role: nm.role }).catch(() => {});
+        }
+        setAddStatus("✅ تم إنشاء الحساب وإضافته لجميع المشاريع");
+      } else {
+        await api.post("/api/web-projects/" + projectId + "/members", { name: nm.name.trim(), email: nm.email.trim(), role: nm.role });
+        setAddStatus("✅ تم إنشاء الحساب وإضافة العضو");
+      }
+      setNm({ name: "", email: "", password: "", role: "employee", addToAll: false }); setShowAdd(false); onUpdate();
+      setTimeout(() => setAddStatus(""), 3000);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { errors?: string[] } } })?.response?.data?.errors?.[0] ?? "فشل — تأكد أن الإيميل غير مستخدم وكلمة المرور 6 أحرف على الأقل";
+      setAddStatus("❌ " + msg);
+    }
   }
 
   async function remove(mid: string) {
@@ -161,7 +180,10 @@ function MembersPanel({ projectId, members, onUpdate }: { projectId: string; mem
     try { await api.delete("/api/web-projects/" + projectId + "/members/" + mid); onUpdate(); } catch {}
   }
 
-  const ROLES: Record<string, { label: string; color: string }> = { owner: { label: "مالك", color: "#D4AF37" }, employee: { label: "موظف", color: "#2D6B9E" } };
+  const ROLES: Record<string, { label: string; color: string; desc: string }> = {
+    owner: { label: "مالك", color: "#D4AF37", desc: "يرى كل شيء ويدير الأوامر" },
+    employee: { label: "موظف", color: "#2D6B9E", desc: "يرى الأمر الحالي فقط وينفذه" },
+  };
 
   return (
     <div className="rounded-2xl border p-5 space-y-3" style={{ background: "var(--card)", borderColor: "#2D6B9E30" }}>
@@ -170,10 +192,13 @@ function MembersPanel({ projectId, members, onUpdate }: { projectId: string; mem
         <button onClick={() => setShowAdd(!showAdd)} className="px-4 py-2 min-h-[40px] rounded-xl text-xs font-bold text-white" style={{ background: "#2D6B9E" }}>+ عضو</button>
       </div>
 
+      {addStatus && <p className="text-center text-xs font-bold py-1" style={{ color: addStatus.startsWith("✅") ? "#3D8C5A" : addStatus.startsWith("❌") ? "#DC2626" : "var(--muted)" }}>{addStatus}</p>}
+
       {showAdd && (
         <div className="space-y-3 p-3 rounded-xl" style={{ background: "var(--bg)", border: "1px solid var(--card-border)" }}>
-          <input value={nm.name} onChange={e => setNm({...nm, name: e.target.value})} placeholder="اسم العضو *" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
-          <input value={nm.email} onChange={e => setNm({...nm, email: e.target.value})} placeholder="الإيميل (اختياري)" type="email" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none font-mono" dir="ltr" style={is} />
+          <input value={nm.name} onChange={e => setNm({...nm, name: e.target.value})} placeholder="الاسم الكامل *" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
+          <input value={nm.email} onChange={e => setNm({...nm, email: e.target.value})} placeholder="الإيميل *" type="email" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none font-mono" dir="ltr" style={is} />
+          <input value={nm.password} onChange={e => setNm({...nm, password: e.target.value})} placeholder="كلمة المرور * (6 أحرف على الأقل)" type="text" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none font-mono" dir="ltr" style={is} />
           <div>
             <p className="text-[10px] font-bold mb-1" style={{ color: "var(--muted)" }}>الصلاحية:</p>
             <div className="flex gap-2">
@@ -185,11 +210,17 @@ function MembersPanel({ projectId, members, onUpdate }: { projectId: string; mem
               ))}
             </div>
             <p className="text-[9px] mt-1" style={{ color: "var(--muted)" }}>
-              المالك: يرى كل شيء ويدير الأوامر · الموظف: يرى الأمر الحالي فقط وينفذه
+              {ROLES[nm.role]?.desc ?? ""}
             </p>
           </div>
+          <label className="flex items-center gap-3 cursor-pointer py-1">
+            <div onClick={() => setNm({...nm, addToAll: !nm.addToAll})} className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition" style={{ background: nm.addToAll ? "#2D6B9E" : "#E5E7EB" }}>
+              {nm.addToAll && <span className="text-white text-[9px]">✓</span>}
+            </div>
+            <span className="text-xs" style={{ color: "var(--text)" }}>إضافة لجميع المشاريع (موظف عام)</span>
+          </label>
           <div className="flex gap-2">
-            <button onClick={add} disabled={!nm.name.trim()} className="flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#2D6B9E" }}>إضافة</button>
+            <button onClick={add} disabled={!nm.name.trim() || !nm.email.trim() || !nm.password.trim()} className="flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#2D6B9E" }}>إنشاء الحساب وإضافة</button>
             <button onClick={() => setShowAdd(false)} className="py-3 px-4 rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button>
           </div>
         </div>
