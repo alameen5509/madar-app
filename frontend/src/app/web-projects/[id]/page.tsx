@@ -16,6 +16,7 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
   const [phase, setPhase] = useState<Phase>(1);
   const [loading, setLoading] = useState(true);
   const [showEdit, setShowEdit] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
   const [completedPhases, setCompletedPhases] = useState<Set<number>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem("wp_completed_" + id) ?? "[]")); } catch { return new Set(); }
   });
@@ -77,6 +78,7 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
           <h2 className="font-bold text-base" style={{ color: "var(--text)" }}>🌐 {project.title}</h2>
           {project.clientName && <span className="text-xs" style={{ color: "var(--muted)" }}>👤 {project.clientName}</span>}
           <button onClick={() => setShowEdit(!showEdit)} className="text-xs px-2.5 py-1.5 rounded-lg min-h-[36px]" style={{ color: "#5E5495", background: "#5E549510" }}>✏️</button>
+          <button onClick={() => setShowMembers(!showMembers)} className="text-xs px-2.5 py-1.5 rounded-lg min-h-[36px]" style={{ color: "#2D6B9E", background: "#2D6B9E10" }}>👥 {members.length}</button>
         </div>
         {/* Phase tabs */}
         <div className="flex gap-1 mt-2 overflow-x-auto pb-0.5">
@@ -102,6 +104,9 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
           } catch {}
           api.put("/api/web-projects/" + id, updated).catch(() => {});
         }} onClose={() => setShowEdit(false)} />)}
+
+        {/* Members panel */}
+        {showMembers && <MembersPanel projectId={id} members={members} onUpdate={load} />}
 
         {phase === 1 && <Phase1 projectId={id} />}
         {phase === 2 && <Phase2 />}
@@ -135,6 +140,84 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
         })()}
       </div>
     </main>
+  );
+}
+
+// ═══ Members Panel ═══
+function MembersPanel({ projectId, members, onUpdate }: { projectId: string; members: Member[]; onUpdate: () => void }) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [nm, setNm] = useState({ name: "", email: "", role: "employee" });
+
+  async function add() {
+    if (!nm.name.trim()) return;
+    try {
+      await api.post("/api/web-projects/" + projectId + "/members", { name: nm.name.trim(), email: nm.email.trim() || undefined, role: nm.role });
+      setNm({ name: "", email: "", role: "employee" }); setShowAdd(false); onUpdate();
+    } catch { alert("فشل الإضافة"); }
+  }
+
+  async function remove(mid: string) {
+    if (!confirm("إزالة العضو؟")) return;
+    try { await api.delete("/api/web-projects/" + projectId + "/members/" + mid); onUpdate(); } catch {}
+  }
+
+  const ROLES: Record<string, { label: string; color: string }> = { owner: { label: "مالك", color: "#D4AF37" }, employee: { label: "موظف", color: "#2D6B9E" } };
+
+  return (
+    <div className="rounded-2xl border p-5 space-y-3" style={{ background: "var(--card)", borderColor: "#2D6B9E30" }}>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold" style={{ color: "#2D6B9E" }}>👥 فريق العمل ({members.length})</p>
+        <button onClick={() => setShowAdd(!showAdd)} className="px-4 py-2 min-h-[40px] rounded-xl text-xs font-bold text-white" style={{ background: "#2D6B9E" }}>+ عضو</button>
+      </div>
+
+      {showAdd && (
+        <div className="space-y-3 p-3 rounded-xl" style={{ background: "var(--bg)", border: "1px solid var(--card-border)" }}>
+          <input value={nm.name} onChange={e => setNm({...nm, name: e.target.value})} placeholder="اسم العضو *" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
+          <input value={nm.email} onChange={e => setNm({...nm, email: e.target.value})} placeholder="الإيميل (اختياري)" type="email" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none font-mono" dir="ltr" style={is} />
+          <div>
+            <p className="text-[10px] font-bold mb-1" style={{ color: "var(--muted)" }}>الصلاحية:</p>
+            <div className="flex gap-2">
+              {Object.entries(ROLES).map(([k, v]) => (
+                <button key={k} onClick={() => setNm({...nm, role: k})} className="flex-1 py-2.5 rounded-xl text-xs font-bold min-h-[40px] transition"
+                  style={{ background: nm.role === k ? v.color : "var(--card)", color: nm.role === k ? "#fff" : v.color, border: "1px solid " + (nm.role === k ? v.color : "var(--card-border)") }}>
+                  {k === "owner" ? "👑" : "👤"} {v.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[9px] mt-1" style={{ color: "var(--muted)" }}>
+              المالك: يرى كل شيء ويدير الأوامر · الموظف: يرى الأمر الحالي فقط وينفذه
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={add} disabled={!nm.name.trim()} className="flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#2D6B9E" }}>إضافة</button>
+            <button onClick={() => setShowAdd(false)} className="py-3 px-4 rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button>
+          </div>
+        </div>
+      )}
+
+      {members.length === 0 && !showAdd && (
+        <p className="text-center text-xs py-4" style={{ color: "var(--muted)" }}>لا يوجد أعضاء — أضف موظفاً للعمل معك</p>
+      )}
+
+      {members.map(m => {
+        const r = ROLES[m.role] ?? ROLES.employee;
+        return (
+          <div key={m.id} className="flex items-center gap-3 py-2 border-b last:border-0" style={{ borderColor: "var(--card-border)" }}>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0" style={{ background: r.color + "15" }}>
+              {m.role === "owner" ? "👑" : "👤"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold" style={{ color: "var(--text)" }}>{m.name}</p>
+              <div className="flex items-center gap-2">
+                {m.email && <span className="text-[10px] font-mono" dir="ltr" style={{ color: "var(--muted)" }}>{m.email}</span>}
+                <span className="text-[9px] px-2 py-0.5 rounded-full font-bold" style={{ background: r.color + "15", color: r.color }}>{r.label}</span>
+              </div>
+            </div>
+            <button onClick={() => remove(m.id)} className="text-sm px-2 py-1.5 rounded-lg hover:bg-red-50 min-h-[36px]" style={{ color: "#DC2626" }}>🗑️</button>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
