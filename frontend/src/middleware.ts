@@ -24,10 +24,13 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Has token and on public page → redirect to tasks
+  // Has token and on public page → redirect to home
   if (token && isPublic) {
     return NextResponse.redirect(new URL('/habits', request.url));
   }
+
+  // Root path → let client-side decide (owner→habits, employee→web-projects)
+
 
   return NextResponse.next();
 }
