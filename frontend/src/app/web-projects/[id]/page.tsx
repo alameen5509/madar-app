@@ -25,8 +25,14 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
   function togglePhaseComplete(n: number) {
     setCompletedPhases(prev => {
       const s = new Set(prev);
-      s.has(n) ? s.delete(n) : s.add(n);
+      const wasComplete = s.has(n);
+      wasComplete ? s.delete(n) : s.add(n);
       localStorage.setItem("wp_completed_" + id, JSON.stringify([...s]));
+      // Auto-advance to next phase if completing
+      if (!wasComplete) {
+        const nextPhase = PHASES.find(p => p.n > n && !s.has(p.n));
+        if (nextPhase) setTimeout(() => setPhase(nextPhase.n), 300);
+      }
       return s;
     });
   }
@@ -83,15 +89,20 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
           {userRole === "owner" && <button onClick={() => setShowMembers(!showMembers)} className="text-xs px-2.5 py-1.5 rounded-lg min-h-[36px]" style={{ color: "#2D6B9E", background: "#2D6B9E10" }}>👥 {members.length}</button>}
           {userRole !== "owner" && <span className="text-[10px] px-2 py-1 rounded-full font-bold" style={{ background: "#2D6B9E15", color: "#2D6B9E" }}>👤 موظف</span>}
         </div>
-        {/* Phase tabs */}
+        {/* Phase tabs — sequential: must complete previous to unlock next */}
         <div className="flex gap-1 mt-2 overflow-x-auto pb-0.5">
-          {PHASES.map(p => (
-            <button key={p.n} onClick={() => { setPhase(p.n); api.put("/api/web-projects/" + id, { currentPhase: p.n }).catch(() => {}); }}
-              className="px-3 py-2 rounded-xl text-[10px] font-bold transition whitespace-nowrap min-h-[38px] flex items-center gap-1"
-              style={{ background: phase === p.n ? "#2D6B9E" : completedPhases.has(p.n) ? "#3D8C5A" : "var(--bg)", color: phase === p.n ? "#fff" : completedPhases.has(p.n) ? "#fff" : "var(--muted)", border: `1px solid ${phase === p.n ? "#2D6B9E" : completedPhases.has(p.n) ? "#3D8C5A" : "var(--card-border)"}` }}>
-              {completedPhases.has(p.n) ? "✓" : p.icon} {p.n}. {p.label}
-            </button>
-          ))}
+          {PHASES.map((p, i) => {
+            const prevCompleted = i === 0 || completedPhases.has(PHASES[i - 1].n);
+            const locked = !prevCompleted && !completedPhases.has(p.n) && phase !== p.n;
+            return (
+              <button key={p.n} onClick={() => { if (!locked) { setPhase(p.n); api.put("/api/web-projects/" + id, { currentPhase: p.n }).catch(() => {}); } }}
+                disabled={locked}
+                className="px-3 py-2 rounded-xl text-[10px] font-bold transition whitespace-nowrap min-h-[38px] flex items-center gap-1 disabled:opacity-40"
+                style={{ background: phase === p.n ? "#2D6B9E" : completedPhases.has(p.n) ? "#3D8C5A" : "var(--bg)", color: phase === p.n ? "#fff" : completedPhases.has(p.n) ? "#fff" : "var(--muted)", border: `1px solid ${phase === p.n ? "#2D6B9E" : completedPhases.has(p.n) ? "#3D8C5A" : "var(--card-border)"}` }}>
+                {completedPhases.has(p.n) ? "✓" : locked ? "🔒" : p.icon} {p.n}. {p.label}
+              </button>
+            );
+          })}
         </div>
       </header>
 
