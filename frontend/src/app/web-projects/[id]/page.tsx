@@ -47,26 +47,24 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
   }, [id]);
   useEffect(() => { load(); }, [load]);
 
-  // Auto-sync to cloud when any localStorage changes
+  // Auto-sync to cloud every 15 seconds via DevContext
   useEffect(() => {
-    const syncTimer = setInterval(() => {
+    const LS_KEYS = ["wp_completed_","wp_p1doc_","wp_p1tasks_","wp_p3_","wp_p4_","wp_p5_","wp_p6_","wp_p7_"];
+    const sync = () => {
       try {
         const allProjects = JSON.parse(localStorage.getItem("madar_web_projects") ?? "[]");
         if (allProjects.length === 0) return;
-        const LS_KEYS = ["wp_completed_","wp_p1doc_","wp_p1tasks_","wp_p3_","wp_p4_","wp_p5_","wp_p6_","wp_p7_"];
-        api.get("/api/users/me/preferences").then(({ data: prefs }) => {
-          const current = (typeof prefs === "object" && prefs !== null) ? prefs : {};
-          const projectsData: Record<string, Record<string, string>> = {};
-          for (const proj of allProjects) {
-            const pd: Record<string, string> = {};
-            for (const k of LS_KEYS) { const v = localStorage.getItem(k + proj.id); if (v) pd[k] = v; }
-            projectsData[proj.id] = pd;
-          }
-          api.put("/api/users/me/preferences", { ...current, webProjects: allProjects, webProjectsData: projectsData }).catch(() => {});
-        }).catch(() => {});
+        const bundle: { projects: typeof allProjects; phases: Record<string, Record<string, string>> } = { projects: allProjects, phases: {} };
+        for (const proj of allProjects) {
+          bundle.phases[proj.id] = {};
+          for (const k of LS_KEYS) { const v = localStorage.getItem(k + proj.id); if (v) bundle.phases[proj.id][k] = v; }
+        }
+        api.put("/api/dev-tickets/context", { content: "WP_DATA:" + JSON.stringify(bundle) }).catch(() => {});
       } catch {}
-    }, 30000); // Sync every 30 seconds
-    return () => clearInterval(syncTimer);
+    };
+    sync(); // Sync immediately on mount
+    const timer = setInterval(sync, 15000);
+    return () => clearInterval(timer);
   }, []);
 
   if (loading || !project) return <main className="flex-1 flex items-center justify-center" style={{ background: "var(--bg)" }}><p className="animate-pulse" style={{ color: "var(--muted)" }}>جارٍ التحميل...</p></main>;

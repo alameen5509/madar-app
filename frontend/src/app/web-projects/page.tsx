@@ -19,65 +19,69 @@ export default function WebProjectsPage() {
   const [syncStatus, setSyncStatus] = useState("");
 
   const LS_KEY = "madar_web_projects";
-  function lsGet(): Project[] { try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]"); } catch { return []; } }
   const LS_KEYS = ["wp_completed_","wp_p1doc_","wp_p1tasks_","wp_p3_","wp_p4_","wp_p5_","wp_p6_","wp_p7_"];
 
-  // Auto cloud sync: push all data to preferences
-  const pushToCloud = useCallback(async (p: Project[]) => {
-    try {
-      const { data: prefs } = await api.get("/api/users/me/preferences");
-      const current = (typeof prefs === "object" && prefs !== null) ? prefs : {};
-      const projectsData: Record<string, Record<string, string>> = {};
-      for (const proj of p) {
-        const pd: Record<string, string> = {};
-        for (const k of LS_KEYS) {
-          const v = localStorage.getItem(k + proj.id);
-          if (v) pd[k] = v;
-        }
-        projectsData[proj.id] = pd;
+  // ═══ CLOUD SYNC via DevContext API (already deployed) ═══
+  function getAllData(p: Project[]): string {
+    const bundle: { projects: Project[]; phases: Record<string, Record<string, string>> } = { projects: p, phases: {} };
+    for (const proj of p) {
+      bundle.phases[proj.id] = {};
+      for (const k of LS_KEYS) {
+        const v = localStorage.getItem(k + proj.id);
+        if (v) bundle.phases[proj.id][k] = v;
       }
-      await api.put("/api/users/me/preferences", { ...current, webProjects: p, webProjectsData: projectsData });
+    }
+    return JSON.stringify(bundle);
+  }
+
+  async function pushToCloud(p: Project[]) {
+    try {
+      await api.put("/api/dev-tickets/context", { content: "WP_DATA:" + getAllData(p) });
     } catch {}
-  }, []);
+  }
+
+  async function pullFromCloud(): Promise<{ projects: Project[]; phases: Record<string, Record<string, string>> } | null> {
+    try {
+      const { data } = await api.get("/api/dev-tickets/context");
+      const content = data?.content as string ?? "";
+      if (content.startsWith("WP_DATA:")) {
+        return JSON.parse(content.slice(8));
+      }
+    } catch {}
+    return null;
+  }
+
+  function lsGet(): Project[] { try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]"); } catch { return []; } }
 
   function lsSave(p: Project[]) {
     localStorage.setItem(LS_KEY, JSON.stringify(p));
-    pushToCloud(p); // Auto sync on every save
+    pushToCloud(p);
   }
 
   const load = useCallback(async () => {
     setLoading(true); setSyncStatus("جارٍ التحميل...");
-    // 1. Try dedicated API
-    try {
-      const { data } = await api.get("/api/web-projects");
-      if (data && data.length > 0) { setProjects(data); setSyncStatus("✅ من API"); setLoading(false); return; }
-    } catch {}
-    // 2. Try cloud preferences (for cross-device sync)
-    try {
-      const { data: prefs } = await api.get("/api/users/me/preferences");
-      if (prefs?.webProjects?.length > 0) {
-        const cloud = prefs.webProjects as Project[];
-        setProjects(cloud);
-        localStorage.setItem(LS_KEY, JSON.stringify(cloud));
-        if (prefs.webProjectsData) {
-          for (const [projId, pd] of Object.entries(prefs.webProjectsData as Record<string, Record<string, string>>)) {
-            for (const [key, val] of Object.entries(pd)) {
-              if (val) localStorage.setItem(key + projId, val);
-            }
-          }
+    // 1. Try cloud (DevContext)
+    const cloud = await pullFromCloud();
+    if (cloud && cloud.projects.length > 0) {
+      setProjects(cloud.projects);
+      localStorage.setItem(LS_KEY, JSON.stringify(cloud.projects));
+      for (const [projId, pd] of Object.entries(cloud.phases)) {
+        for (const [key, val] of Object.entries(pd)) {
+          if (val) localStorage.setItem(key + projId, val);
         }
-        setSyncStatus("☁️ من السحابة — " + cloud.length + " موقع");
-        setLoading(false); return;
-      } else {
-        setSyncStatus("☁️ السحابة فارغة");
       }
-    } catch (e) {
-      setSyncStatus("⚠️ فشل الاتصال بالسحابة");
+      setSyncStatus("☁️ " + cloud.projects.length + " موقع");
+      setLoading(false); return;
     }
-    // 3. Fallback to localStorage
+    // 2. Fallback to localStorage
     const local = lsGet();
-    setProjects(local);
-    setSyncStatus(local.length > 0 ? "💾 من الذاكرة المحلية — " + local.length : "لا توجد بيانات");
+    if (local.length > 0) {
+      setProjects(local);
+      setSyncStatus("💾 محلي — " + local.length);
+      pushToCloud(local); // Push local to cloud for other devices
+    } else {
+      setSyncStatus("");
+    }
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -123,28 +127,6 @@ export default function WebProjectsPage() {
       <div className="px-4 sm:px-6 py-4 space-y-3 max-w-3xl mx-auto">
         <button onClick={() => setShowNew(!showNew)} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #2D6B9E, #D4AF37)" }}>+ موقع جديد</button>
         {syncStatus && <p className="text-center text-[10px] py-1" style={{ color: "var(--muted)" }}>{syncStatus}</p>}
-        {projects.length > 0 && (
-          <button onClick={async () => {
-            setSyncStatus("⏳ جارٍ الرفع...");
-            try {
-              const { data: prefs } = await api.get("/api/users/me/preferences");
-              const current = (typeof prefs === "object" && prefs !== null) ? prefs : {};
-              const projectsData: Record<string, Record<string, string>> = {};
-              for (const proj of projects) {
-                const pd: Record<string, string> = {};
-                for (const k of LS_KEYS) { const v = localStorage.getItem(k + proj.id); if (v) pd[k] = v; }
-                projectsData[proj.id] = pd;
-              }
-              await api.put("/api/users/me/preferences", { ...current, webProjects: projects, webProjectsData: projectsData });
-              setSyncStatus("✅ تم الرفع — " + projects.length + " موقع");
-            } catch (err: unknown) {
-              const msg = err instanceof Error ? err.message : String(err);
-              setSyncStatus("❌ فشل: " + msg);
-            }
-          }} className="w-full py-2.5 min-h-[40px] rounded-xl text-xs font-bold transition" style={{ background: "#5E549510", color: "#5E5495", border: "1px solid #5E549520" }}>
-            ☁️ رفع للسحابة يدوياً
-          </button>
-        )}
 
         {showNew && (
           <div className="rounded-2xl border p-5 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
