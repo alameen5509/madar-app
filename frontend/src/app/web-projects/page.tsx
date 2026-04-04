@@ -5,8 +5,8 @@ import { api } from "@/lib/api";
 
 interface Project { id:string; title:string; clientName?:string; description?:string; currentPhase:number; status:string; createdAt:string; updatedAt:string }
 
-const PHASES = ["بناء الفكرة","الوثيقة العامة","التأسيس","الاستضافة","التطوير","العميل"];
-const PHASE_ICONS = ["📝","📁","⚡","🔐","🚀","💬"];
+const PHASES = ["بناء الفكرة","الوثيقة العامة","التأسيس","الاستضافة","التطوير","العميل","المستخدمين"];
+const PHASE_ICONS = ["📝","📁","⚡","🔐","🚀","💬","👤"];
 const STATUS_MAP: Record<string,{label:string;color:string}> = { active:{label:"نشط",color:"#3D8C5A"}, completed:{label:"مكتمل",color:"#5E5495"}, onHold:{label:"معلّق",color:"#F59E0B"} };
 const is = { background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" } as const;
 
@@ -80,7 +80,9 @@ export default function WebProjectsPage() {
 
         {!loading && filtered.map(p => {
           const st = STATUS_MAP[p.status] ?? STATUS_MAP.active;
-          const phasePct = Math.round((p.currentPhase / 6) * 100);
+          let completedCount = 0;
+          try { completedCount = JSON.parse(localStorage.getItem("wp_completed_" + p.id) ?? "[]").length; } catch {}
+          const phasePct = Math.round((completedCount / 7) * 100);
           return (
             <Link key={p.id} href={"/web-projects/" + p.id} className="block rounded-2xl border overflow-hidden transition-all hover:shadow-lg hover:border-[#2D6B9E]" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
               <div className="p-4">
@@ -99,7 +101,7 @@ export default function WebProjectsPage() {
                   <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "#E5E7EB" }}>
                     <div className="h-full rounded-full transition-all" style={{ width: `${phasePct}%`, background: "#2D6B9E" }} />
                   </div>
-                  <span className="text-[10px] font-bold" style={{ color: "#2D6B9E" }}>المرحلة {p.currentPhase}/6</span>
+                  <span className="text-[10px] font-bold" style={{ color: "#2D6B9E" }}>{completedCount}/7 مراحل</span>
                 </div>
                 <p className="text-[10px]" style={{ color: "var(--muted)" }}>{PHASE_ICONS[p.currentPhase - 1]} {PHASES[p.currentPhase - 1]}</p>
               </div>
