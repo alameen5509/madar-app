@@ -405,34 +405,99 @@ function Phase3({ projectId }: { projectId: string }) {
 }
 
 // ═══ PHASE 4: Credentials ═══
+// ═══ PHASE 4: Hosting (6 steps) ═══
 function Phase4({ projectId }: { projectId: string }) {
-  const lk4 = "wp_p4_" + projectId;
-  const [creds, setCreds] = useState<{id:string;type:string;label:string;value:string}[]>(() => { try { return JSON.parse(localStorage.getItem(lk4) ?? "[]"); } catch { return []; } });
-  function saveCreds(c: typeof creds) { setCreds(c); localStorage.setItem(lk4, JSON.stringify(c)); }
-  const [showNew, setShowNew] = useState(false); const [nc, setNc] = useState({ type: "hosting", label: "", value: "" });
-  const [visible, setVisible] = useState<Set<string>>(new Set());
-  useEffect(() => { api.get("/api/web-projects/" + projectId + "/phase4/credentials").then(r => { if (r.data?.length) saveCreds(r.data); }).catch(() => {}); }, [projectId]);
-  async function add() { if (!nc.label.trim() || !nc.value.trim()) return; const n = { id: "cr_" + Date.now(), ...nc }; saveCreds([...creds, n]); setNc({ type: "hosting", label: "", value: "" }); setShowNew(false); api.post("/api/web-projects/" + projectId + "/phase4/credentials", nc).catch(() => {}); }
-  async function del(cid: string) { if (!confirm("حذف؟")) return; saveCreds(creds.filter(c => c.id !== cid)); api.delete("/api/web-projects/" + projectId + "/phase4/credentials/" + cid).catch(() => {}); }
-  const TYPES: Record<string,string> = { hosting: "🖥️ استضافة", domain: "🌐 دومين", database: "🗃️ قاعدة بيانات", other: "🔑 أخرى" };
+  const lk = "wp_hosting_" + projectId;
+  interface HostingData { hosting: { provider: string; user: string; pass: string; panel: string; done: boolean }; domain: { name: string; registrar: string; dns: string; done: boolean }; ssl: { type: string; done: boolean }; db: { host: string; name: string; user: string; pass: string; done: boolean }; connect: { notes: string; done: boolean }; launch: { url: string; done: boolean } }
+  const empty: HostingData = { hosting: { provider: "", user: "", pass: "", panel: "", done: false }, domain: { name: "", registrar: "", dns: "", done: false }, ssl: { type: "Let's Encrypt", done: false }, db: { host: "", name: "", user: "", pass: "", done: false }, connect: { notes: "", done: false }, launch: { url: "", done: false } };
+  const [data, setData] = useState<HostingData>(() => { try { return { ...empty, ...JSON.parse(localStorage.getItem(lk) ?? "null") }; } catch { return empty; } });
+  const [vis, setVis] = useState<Set<string>>(new Set());
+  function save(d: HostingData) { setData(d); localStorage.setItem(lk, JSON.stringify(d)); }
+  function toggleVis(k: string) { setVis(prev => { const s = new Set(prev); s.has(k) ? s.delete(k) : s.add(k); return s; }); }
+  function copy(v: string) { navigator.clipboard.writeText(v); }
+
+  const steps = [
+    { key: "hosting", n: 1, label: "الاستضافة", icon: "🖥️", done: data.hosting.done },
+    { key: "domain", n: 2, label: "الدومين", icon: "🌐", done: data.domain.done },
+    { key: "ssl", n: 3, label: "شهادة SSL", icon: "🔒", done: data.ssl.done },
+    { key: "db", n: 4, label: "قاعدة البيانات", icon: "🗃️", done: data.db.done },
+    { key: "connect", n: 5, label: "ربط الموقع", icon: "🔗", done: data.connect.done },
+    { key: "launch", n: 6, label: "تشغيل الموقع", icon: "🚀", done: data.launch.done },
+  ];
+  const doneCount = steps.filter(s => s.done).length;
+  const SecretField = ({ label, value, k, onChange }: { label: string; value: string; k: string; onChange: (v: string) => void }) => (
+    <div className="flex items-center gap-2">
+      <span className="text-[10px] w-20 font-bold flex-shrink-0" style={{ color: "var(--muted)" }}>{label}:</span>
+      {onChange ? <input value={value} onChange={e => onChange(e.target.value)} className="flex-1 px-2 py-2 rounded-lg border text-xs font-mono focus:outline-none" dir="ltr" style={is} /> : <span className="flex-1 text-xs font-mono" dir="ltr" style={{ color: "var(--text)" }}>{vis.has(k) ? value : "••••••••"}</span>}
+      <button onClick={() => toggleVis(k)} className="px-2 py-1.5 rounded-lg min-h-[36px]" style={{ color: "#5E5495" }}>{vis.has(k) ? "🙈" : "👁️"}</button>
+      {value && <button onClick={() => copy(value)} className="px-2 py-1.5 rounded-lg min-h-[36px]" style={{ color: "#D4AF37" }}>📋</button>}
+    </div>
+  );
 
   return (<div className="space-y-4">
-    <div className="flex items-center justify-between"><span className="text-xs font-bold" style={{ color: "var(--text)" }}>🔐 البيانات السرية ({creds.length})</span><button onClick={() => setShowNew(true)} className="px-4 py-2.5 min-h-[40px] rounded-xl text-xs font-bold text-white" style={{ background: "#2D6B9E" }}>+ بيان</button></div>
-    {showNew && (<div className="rounded-xl border p-4 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-      <select value={nc.type} onChange={e => setNc({...nc, type: e.target.value})} className="w-full px-3 py-3 rounded-xl border text-sm" style={is}>{Object.entries(TYPES).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select>
-      <input value={nc.label} onChange={e => setNc({...nc, label: e.target.value})} placeholder="التسمية (مثل: كلمة مرور الاستضافة)" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
-      <input value={nc.value} onChange={e => setNc({...nc, value: e.target.value})} placeholder="القيمة" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none font-mono" dir="ltr" style={is} />
-      <div className="flex gap-2"><button onClick={add} disabled={!nc.label.trim()} className="flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#2D6B9E" }}>إضافة</button><button onClick={() => setShowNew(false)} className="py-3 px-4 rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button></div>
-    </div>)}
-    {creds.map(c => (<div key={c.id} className="rounded-xl border p-4" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-      <div className="flex items-center gap-2 mb-2"><span className="text-sm">{TYPES[c.type]?.split(" ")[0] ?? "🔑"}</span><span className="text-xs font-bold" style={{ color: "var(--text)" }}>{c.label}</span><span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--bg)", color: "var(--muted)" }}>{TYPES[c.type]?.split(" ").slice(1).join(" ")}</span></div>
-      <div className="flex items-center gap-2">
-        <span className="flex-1 text-sm font-mono" dir="ltr" style={{ color: "var(--text)" }}>{visible.has(c.id) ? c.value : "••••••••••"}</span>
-        <button onClick={() => setVisible(prev => { const s = new Set(prev); s.has(c.id) ? s.delete(c.id) : s.add(c.id); return s; })} className="text-sm px-2 py-1.5 rounded-lg" style={{ color: "#5E5495" }}>{visible.has(c.id) ? "🙈" : "👁️"}</button>
-        <button onClick={() => { navigator.clipboard.writeText(c.value); }} className="text-sm px-2 py-1.5 rounded-lg" style={{ color: "#D4AF37" }}>📋</button>
-        <button onClick={() => del(c.id)} className="text-sm px-2 py-1.5 rounded-lg" style={{ color: "#DC2626" }}>🗑️</button>
+    {/* Progress */}
+    <div className="flex items-center gap-2 mb-2">
+      <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: "#E5E7EB" }}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${Math.round(doneCount/6*100)}%`, background: doneCount === 6 ? "#3D8C5A" : "#2D6B9E" }} />
       </div>
-    </div>))}
+      <span className="text-xs font-bold" style={{ color: "#2D6B9E" }}>{doneCount}/6</span>
+    </div>
+
+    {/* Steps */}
+    {steps.map((s, i) => {
+      const prevDone = i === 0 || steps[i - 1].done;
+      const locked = !prevDone && !s.done;
+      return (
+        <div key={s.key} className="rounded-2xl border p-4 space-y-3" style={{ background: s.done ? "#3D8C5A08" : "var(--card)", borderColor: s.done ? "#3D8C5A30" : locked ? "var(--card-border)" : "#2D6B9E30", opacity: locked ? 0.5 : 1 }}>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0" style={{ background: s.done ? "#3D8C5A" : "#2D6B9E", color: "#fff" }}>{s.done ? "✓" : s.n}</div>
+            <span className="text-sm font-bold flex-1" style={{ color: "var(--text)" }}>{s.icon} {s.label}</span>
+            {s.done && <span className="text-[10px] px-2 py-1 rounded-full font-bold" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>✅ مكتمل</span>}
+          </div>
+
+          {!locked && s.key === "hosting" && (<div className="space-y-2">
+            <input value={data.hosting.provider} onChange={e => save({...data, hosting: {...data.hosting, provider: e.target.value}})} placeholder="مزود الاستضافة (Hostinger, AWS...)" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
+            <SecretField label="المستخدم" value={data.hosting.user} k="h_user" onChange={v => save({...data, hosting: {...data.hosting, user: v}})} />
+            <SecretField label="كلمة السر" value={data.hosting.pass} k="h_pass" onChange={v => save({...data, hosting: {...data.hosting, pass: v}})} />
+            <input value={data.hosting.panel} onChange={e => save({...data, hosting: {...data.hosting, panel: e.target.value}})} placeholder="رابط لوحة التحكم" className="w-full px-3 py-3 rounded-xl border text-sm font-mono focus:outline-none" dir="ltr" style={is} />
+            {!s.done && <button onClick={() => save({...data, hosting: {...data.hosting, done: true}})} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white" style={{ background: "#3D8C5A" }}>✅ تم شراء الاستضافة</button>}
+          </div>)}
+
+          {!locked && s.key === "domain" && (<div className="space-y-2">
+            <input value={data.domain.name} onChange={e => save({...data, domain: {...data.domain, name: e.target.value}})} placeholder="اسم الدومين (example.com)" className="w-full px-3 py-3 rounded-xl border text-sm font-mono focus:outline-none" dir="ltr" style={is} />
+            <input value={data.domain.registrar} onChange={e => save({...data, domain: {...data.domain, registrar: e.target.value}})} placeholder="مسجل الدومين (Namecheap, GoDaddy...)" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
+            <input value={data.domain.dns} onChange={e => save({...data, domain: {...data.domain, dns: e.target.value}})} placeholder="DNS / Nameservers" className="w-full px-3 py-3 rounded-xl border text-sm font-mono focus:outline-none" dir="ltr" style={is} />
+            {!s.done && <button onClick={() => save({...data, domain: {...data.domain, done: true}})} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white" style={{ background: "#3D8C5A" }}>✅ تم ربط الدومين</button>}
+          </div>)}
+
+          {!locked && s.key === "ssl" && (<div className="space-y-2">
+            <select value={data.ssl.type} onChange={e => save({...data, ssl: {...data.ssl, type: e.target.value}})} className="w-full px-3 py-3 rounded-xl border text-sm" style={is}>
+              <option value="Let's Encrypt">Let&apos;s Encrypt (مجاني)</option><option value="Cloudflare">Cloudflare SSL</option><option value="Paid">شهادة مدفوعة</option><option value="Other">أخرى</option>
+            </select>
+            {!s.done && <button onClick={() => save({...data, ssl: {...data.ssl, done: true}})} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white" style={{ background: "#3D8C5A" }}>✅ تم تفعيل SSL</button>}
+          </div>)}
+
+          {!locked && s.key === "db" && (<div className="space-y-2">
+            <SecretField label="Host" value={data.db.host} k="db_host" onChange={v => save({...data, db: {...data.db, host: v}})} />
+            <SecretField label="DB Name" value={data.db.name} k="db_name" onChange={v => save({...data, db: {...data.db, name: v}})} />
+            <SecretField label="User" value={data.db.user} k="db_user" onChange={v => save({...data, db: {...data.db, user: v}})} />
+            <SecretField label="Password" value={data.db.pass} k="db_pass" onChange={v => save({...data, db: {...data.db, pass: v}})} />
+            {!s.done && <button onClick={() => save({...data, db: {...data.db, done: true}})} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white" style={{ background: "#3D8C5A" }}>✅ تم إنشاء قاعدة البيانات</button>}
+          </div>)}
+
+          {!locked && s.key === "connect" && (<div className="space-y-2">
+            <textarea value={data.connect.notes} onChange={e => save({...data, connect: {...data.connect, notes: e.target.value}})} rows={3} placeholder="ملاحظات الربط..." className="w-full px-3 py-2 rounded-xl border text-sm resize-none focus:outline-none" style={is} />
+            {!s.done && <button onClick={() => save({...data, connect: {...data.connect, done: true}})} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white" style={{ background: "#3D8C5A" }}>✅ تم الربط</button>}
+          </div>)}
+
+          {!locked && s.key === "launch" && (<div className="space-y-2">
+            <input value={data.launch.url} onChange={e => save({...data, launch: {...data.launch, url: e.target.value}})} placeholder="الرابط النهائي للموقع (https://...)" className="w-full px-3 py-3 rounded-xl border text-sm font-mono focus:outline-none" dir="ltr" style={is} />
+            {data.launch.url && !s.done && <button onClick={() => save({...data, launch: {...data.launch, done: true}})} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #3D8C5A, #2D6B9E)" }}>🚀 الموقع يعمل الآن</button>}
+            {s.done && data.launch.url && <a href={data.launch.url} target="_blank" className="block w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-center text-white" style={{ background: "#2D6B9E" }}>🌐 فتح الموقع</a>}
+          </div>)}
+        </div>
+      );
+    })}
   </div>);
 }
 
