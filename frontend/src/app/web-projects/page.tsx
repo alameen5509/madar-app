@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 
-interface Project { id:string; title:string; clientName?:string; description?:string; currentPhase:number; status:string; createdAt:string; updatedAt:string }
+interface Project { id:string; title:string; clientName?:string; description?:string; currentPhase:number; status:string; priority?:string; dueDate?:string; createdAt:string; updatedAt:string }
 
 const PHASES = ["بناء الفكرة","الوثيقة العامة","المستخدمين","التأسيس","الاستضافة","التطوير","العميل"];
 const PHASE_ICONS = ["📝","📁","👤","⚡","🔐","🚀","💬"];
@@ -14,7 +14,7 @@ export default function WebProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
-  const [np, setNp] = useState({ title: "", client: "", desc: "" });
+  const [np, setNp] = useState({ title: "", client: "", desc: "", priority: "medium", dueDate: "" });
   const [filter, setFilter] = useState<"all"|"active"|"completed"|"onHold">("all");
 
   const LS_KEY = "madar_web_projects";
@@ -34,17 +34,26 @@ export default function WebProjectsPage() {
 
   async function create() {
     if (!np.title.trim()) return;
-    const newP: Project = { id: "wp_" + Date.now(), title: np.title.trim(), clientName: np.client.trim() || undefined, description: np.desc.trim() || undefined, currentPhase: 1, status: "active", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const newP: Project = { id: "wp_" + Date.now(), title: np.title.trim(), clientName: np.client.trim() || undefined, description: np.desc.trim() || undefined, priority: np.priority, dueDate: np.dueDate || undefined, currentPhase: 1, status: "active", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     try {
       const { data } = await api.post("/api/web-projects", { title: np.title, clientName: np.client || undefined, description: np.desc || undefined });
       if (data?.id) newP.id = data.id;
     } catch {}
     const updated = [newP, ...projects];
     setProjects(updated); lsSave(updated);
-    setNp({ title: "", client: "", desc: "" }); setShowNew(false);
+    setNp({ title: "", client: "", desc: "", priority: "medium", dueDate: "" }); setShowNew(false);
   }
 
-  const filtered = filter === "all" ? projects : projects.filter(p => p.status === filter);
+  const PRIORITIES: Record<string,{label:string;color:string;icon:string}> = {
+    urgent: { label: "عاجل", color: "#DC2626", icon: "🔴" },
+    high: { label: "مرتفع", color: "#F59E0B", icon: "🟡" },
+    medium: { label: "متوسط", color: "#3B82F6", icon: "🔵" },
+    low: { label: "منخفض", color: "#6B7280", icon: "⚪" },
+  };
+
+  const priorityOrder: Record<string,number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+  const filtered = (filter === "all" ? projects : projects.filter(p => p.status === filter))
+    .sort((a, b) => (priorityOrder[a.priority ?? "medium"] ?? 2) - (priorityOrder[b.priority ?? "medium"] ?? 2));
 
   return (
     <main className="flex-1 overflow-y-auto" dir="rtl" style={{ background: "var(--bg)" }}>
@@ -69,6 +78,22 @@ export default function WebProjectsPage() {
             <input value={np.title} onChange={e => setNp({...np, title: e.target.value})} placeholder="اسم الموقع *" className="w-full px-4 py-3 rounded-xl border text-sm font-bold focus:outline-none" style={is} />
             <input value={np.client} onChange={e => setNp({...np, client: e.target.value})} placeholder="اسم العميل" className="w-full px-4 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
             <textarea value={np.desc} onChange={e => setNp({...np, desc: e.target.value})} placeholder="وصف المشروع" rows={2} className="w-full px-4 py-2.5 rounded-xl border text-sm resize-none focus:outline-none" style={is} />
+            <div>
+              <label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>الأولوية</label>
+              <div className="flex gap-1.5">
+                {Object.entries(PRIORITIES).map(([k, v]) => (
+                  <button key={k} type="button" onClick={() => setNp({...np, priority: k})}
+                    className="flex-1 py-2.5 rounded-xl text-xs font-bold transition min-h-[40px]"
+                    style={{ background: np.priority === k ? v.color : "var(--bg)", color: np.priority === k ? "#fff" : v.color, border: `1px solid ${np.priority === k ? v.color : "var(--card-border)"}` }}>
+                    {v.icon} {v.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>تاريخ التسليم (اختياري)</label>
+              <input type="date" value={np.dueDate} onChange={e => setNp({...np, dueDate: e.target.value})} className="w-full px-4 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
+            </div>
             <div className="flex gap-2">
               <button onClick={create} disabled={!np.title.trim()} className="flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#2D6B9E" }}>إنشاء</button>
               <button onClick={() => setShowNew(false)} className="py-3 px-6 min-h-[44px] rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button>
@@ -98,7 +123,9 @@ export default function WebProjectsPage() {
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {p.clientName && <span className="text-[10px]" style={{ color: "var(--muted)" }}>👤 {p.clientName}</span>}
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: st.color + "15", color: st.color }}>{st.label}</span>
+                      {(() => { const pr = PRIORITIES[p.priority ?? "medium"]; return pr ? <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: pr.color + "15", color: pr.color }}>{pr.icon} {pr.label}</span> : null; })()}
                       <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "#2D6B9E15", color: "#2D6B9E" }}>{currentPhaseIcon} {currentPhaseName}</span>
+                      {p.dueDate && <span className="text-[10px]" style={{ color: "var(--muted)" }}>📅 {new Date(p.dueDate).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>}
                     </div>
                   </div>
                   <span className="text-2xl">{completedCount === 7 ? "✅" : currentPhaseIcon}</span>
