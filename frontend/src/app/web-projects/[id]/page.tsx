@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 type Phase = 1|2|3|4|5|6|7;
 interface Project { id:string; title:string; clientName?:string; description?:string; currentPhase:number; status:string; completedPhases?: number[] }
 interface Member { id:string; name:string; email?:string; role:string }
-const PHASES: {n:Phase;label:string;icon:string}[] = [{n:1,label:"بناء الفكرة",icon:"📝"},{n:2,label:"الوثيقة العامة",icon:"📁"},{n:3,label:"التأسيس",icon:"⚡"},{n:4,label:"الاستضافة",icon:"🔐"},{n:5,label:"التطوير",icon:"🚀"},{n:6,label:"العميل",icon:"💬"},{n:7,label:"المستخدمين",icon:"👤"}];
+const PHASES: {n:Phase;label:string;icon:string}[] = [{n:1,label:"بناء الفكرة",icon:"📝"},{n:2,label:"الوثيقة العامة",icon:"📁"},{n:3,label:"المستخدمين",icon:"👤"},{n:4,label:"التأسيس",icon:"⚡"},{n:5,label:"الاستضافة",icon:"🔐"},{n:6,label:"التطوير",icon:"🚀"},{n:7,label:"العميل",icon:"💬"}];
 const is = { background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" } as const;
 
 export default function WebProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -71,11 +71,11 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
       <div className="px-4 sm:px-6 py-4 space-y-4 max-w-3xl mx-auto">
         {phase === 1 && <Phase1 projectId={id} />}
         {phase === 2 && <Phase2 />}
-        {phase === 3 && <Phase3 projectId={id} />}
-        {phase === 4 && <Phase4 projectId={id} />}
-        {phase === 5 && <Phase5 projectId={id} />}
-        {phase === 6 && <Phase6 projectId={id} />}
-        {phase === 7 && <Phase7 projectId={id} />}
+        {phase === 3 && <Phase7 projectId={id} />}
+        {phase === 4 && <Phase3 projectId={id} />}
+        {phase === 5 && <Phase4 projectId={id} />}
+        {phase === 6 && <Phase5 projectId={id} />}
+        {phase === 7 && <Phase6 projectId={id} />}
 
         {/* Complete phase button */}
         <div className="mt-6 flex flex-col sm:flex-row gap-2">

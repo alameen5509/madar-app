@@ -5,8 +5,8 @@ import { api } from "@/lib/api";
 
 interface Project { id:string; title:string; clientName?:string; description?:string; currentPhase:number; status:string; createdAt:string; updatedAt:string }
 
-const PHASES = ["بناء الفكرة","الوثيقة العامة","التأسيس","الاستضافة","التطوير","العميل","المستخدمين"];
-const PHASE_ICONS = ["📝","📁","⚡","🔐","🚀","💬","👤"];
+const PHASES = ["بناء الفكرة","الوثيقة العامة","المستخدمين","التأسيس","الاستضافة","التطوير","العميل"];
+const PHASE_ICONS = ["📝","📁","👤","⚡","🔐","🚀","💬"];
 const STATUS_MAP: Record<string,{label:string;color:string}> = { active:{label:"نشط",color:"#3D8C5A"}, completed:{label:"مكتمل",color:"#5E5495"}, onHold:{label:"معلّق",color:"#F59E0B"} };
 const is = { background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" } as const;
 
