@@ -14,6 +14,7 @@ export default function WebProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
+  const [isOwner, setIsOwner] = useState(true);
   const [np, setNp] = useState({ title: "", client: "", desc: "", priority: "medium", dueDate: "" });
   const [filter, setFilter] = useState<"all"|"active"|"completed"|"onHold">("all");
   const [syncStatus, setSyncStatus] = useState("");
@@ -23,6 +24,9 @@ export default function WebProjectsPage() {
     try {
       const { data } = await api.get("/api/web-projects");
       setProjects(data ?? []);
+      // Check if any project is owned by this user (has ownerId matching)
+      const works = await api.get("/api/works").then(r => r.data?.length ?? 0).catch(() => 0);
+      setIsOwner(works > 0 || (data ?? []).some((p: Project & { ownerId?: string }) => p.ownerId));
       setSyncStatus("");
     } catch {
       setSyncStatus("⚠️ فشل التحميل");
@@ -67,7 +71,7 @@ export default function WebProjectsPage() {
       </header>
 
       <div className="px-4 sm:px-6 py-4 space-y-3 max-w-3xl mx-auto">
-        <button onClick={() => setShowNew(!showNew)} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #2D6B9E, #D4AF37)" }}>+ موقع جديد</button>
+        {isOwner && <button onClick={() => setShowNew(!showNew)} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #2D6B9E, #D4AF37)" }}>+ موقع جديد</button>}
         {syncStatus && <p className="text-center text-[10px] py-1" style={{ color: "var(--muted)" }}>{syncStatus}</p>}
 
         {showNew && (
@@ -149,8 +153,8 @@ export default function WebProjectsPage() {
                   <span className="text-[10px] font-bold" style={{ color: "#2D6B9E" }}>{completedCount}/7</span>
                 </div>
               </Link>
-              {/* Actions: priority change + edit + delete */}
-              <div className="flex items-center gap-1.5 px-4 pb-3 -mt-1 flex-wrap">
+              {/* Actions: priority change + edit + delete (owner only) */}
+              {isOwner && <div className="flex items-center gap-1.5 px-4 pb-3 -mt-1 flex-wrap">
                 {Object.entries(PRIORITIES).map(([k, v]) => (
                   <button key={k} onClick={(e) => { e.stopPropagation(); setProjects(prev => prev.map(x => x.id === p.id ? { ...x, priority: k } : x)); api.put("/api/web-projects/" + p.id, { priority: k }).catch(() => {}); }}
                     className="text-[10px] px-2 py-1.5 rounded-lg font-bold min-h-[32px] transition"
@@ -166,7 +170,7 @@ export default function WebProjectsPage() {
                   try { await api.delete("/api/web-projects/" + p.id); } catch {}
                   setProjects(prev => prev.filter(x => x.id !== p.id));
                 }} className="text-[10px] px-2 py-1.5 rounded-lg min-h-[32px] hover:bg-red-50" style={{ color: "#DC2626" }}>🗑️</button>
-              </div>
+              </div>}
             </div>
           );
         })}

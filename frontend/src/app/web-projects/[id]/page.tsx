@@ -85,8 +85,8 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
         </div>
         {/* Phase tabs */}
         <div className="flex gap-1 mt-2 overflow-x-auto pb-0.5">
-          {PHASES.filter(p => userRole === "owner" || ![1, 2, 5].includes(p.n)).map(p => (
-            <button key={p.n} onClick={() => { setPhase(p.n); if (userRole === "owner") api.put("/api/web-projects/" + id, { currentPhase: p.n }).catch(() => {}); }}
+          {PHASES.map(p => (
+            <button key={p.n} onClick={() => { setPhase(p.n); api.put("/api/web-projects/" + id, { currentPhase: p.n }).catch(() => {}); }}
               className="px-3 py-2 rounded-xl text-[10px] font-bold transition whitespace-nowrap min-h-[38px] flex items-center gap-1"
               style={{ background: phase === p.n ? "#2D6B9E" : completedPhases.has(p.n) ? "#3D8C5A" : "var(--bg)", color: phase === p.n ? "#fff" : completedPhases.has(p.n) ? "#fff" : "var(--muted)", border: `1px solid ${phase === p.n ? "#2D6B9E" : completedPhases.has(p.n) ? "#3D8C5A" : "var(--card-border)"}` }}>
               {completedPhases.has(p.n) ? "✓" : p.icon} {p.n}. {p.label}
