@@ -109,7 +109,6 @@ export default function WebProjectsPage() {
                   </div>
                   <span className="text-[10px] font-bold" style={{ color: "#2D6B9E" }}>{completedCount}/7 مراحل</span>
                 </div>
-              </div>
               </Link>
               <div className="flex justify-end px-4 pb-3 -mt-1">
                 <button onClick={async (e) => {
