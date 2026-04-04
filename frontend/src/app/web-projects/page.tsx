@@ -19,15 +19,62 @@ export default function WebProjectsPage() {
 
   const LS_KEY = "madar_web_projects";
   function lsGet(): Project[] { try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]"); } catch { return []; } }
-  function lsSave(p: Project[]) { localStorage.setItem(LS_KEY, JSON.stringify(p)); }
+  function lsSave(p: Project[]) {
+    localStorage.setItem(LS_KEY, JSON.stringify(p));
+    // Sync to cloud via preferences (works across devices)
+    syncToCloud(p);
+  }
+
+  // Cloud sync via user preferences
+  async function syncToCloud(p: Project[]) {
+    try {
+      const { data: prefs } = await api.get("/api/users/me/preferences");
+      const current = typeof prefs === "object" ? prefs : {};
+      // Collect all project data from localStorage
+      const projectsData: Record<string, Record<string, unknown>> = {};
+      for (const proj of p) {
+        const pd: Record<string, unknown> = {};
+        for (const k of ["wp_completed_","wp_p1doc_","wp_p1tasks_","wp_p3_","wp_p4_","wp_p5_","wp_p6_","wp_p7_"]) {
+          const v = localStorage.getItem(k + proj.id);
+          if (v) pd[k.replace("wp_", "")] = v;
+        }
+        projectsData[proj.id] = pd;
+      }
+      await api.put("/api/users/me/preferences", { ...current, webProjects: p, webProjectsData: projectsData });
+    } catch {}
+  }
+
+  async function loadFromCloud(): Promise<{ projects: Project[]; data: Record<string, Record<string, string>> } | null> {
+    try {
+      const { data: prefs } = await api.get("/api/users/me/preferences");
+      if (prefs?.webProjects?.length > 0) {
+        return { projects: prefs.webProjects, data: prefs.webProjectsData ?? {} };
+      }
+    } catch {}
+    return null;
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
+    // Try API first, then cloud sync, then localStorage
     try {
       const { data } = await api.get("/api/web-projects");
-      if (data && data.length >= 0) { setProjects(data); lsSave(data); }
-      else { setProjects(lsGet()); }
-    } catch { setProjects(lsGet()); }
+      if (data && data.length > 0) { setProjects(data); lsGet(); /* don't overwrite LS */ setLoading(false); return; }
+    } catch {}
+    // Try cloud sync
+    const cloud = await loadFromCloud();
+    if (cloud && cloud.projects.length > 0) {
+      setProjects(cloud.projects);
+      localStorage.setItem(LS_KEY, JSON.stringify(cloud.projects));
+      // Restore phase data from cloud
+      for (const [projId, pd] of Object.entries(cloud.data)) {
+        for (const [key, val] of Object.entries(pd)) {
+          if (val) localStorage.setItem("wp_" + key + projId, val as string);
+        }
+      }
+    } else {
+      setProjects(lsGet());
+    }
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
