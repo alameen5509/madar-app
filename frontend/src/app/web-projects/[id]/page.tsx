@@ -17,6 +17,7 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
   const [loading, setLoading] = useState(true);
   const [showEdit, setShowEdit] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+  const [userRole, setUserRole] = useState<string>("owner");
   const [completedPhases, setCompletedPhases] = useState<Set<number>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem("wp_completed_" + id) ?? "[]")); } catch { return new Set(); }
   });
@@ -36,6 +37,7 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
       const { data } = await api.get("/api/web-projects/" + id);
       setProject(data.project); setMembers(data.members ?? []);
       setPhase(data.project?.currentPhase ?? 1);
+      if (data.userRole) setUserRole(data.userRole);
     } catch {
       // Fallback: load from localStorage
       try {
@@ -77,13 +79,14 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
         <div className="flex items-center gap-3">
           <h2 className="font-bold text-base" style={{ color: "var(--text)" }}>🌐 {project.title}</h2>
           {project.clientName && <span className="text-xs" style={{ color: "var(--muted)" }}>👤 {project.clientName}</span>}
-          <button onClick={() => setShowEdit(!showEdit)} className="text-xs px-2.5 py-1.5 rounded-lg min-h-[36px]" style={{ color: "#5E5495", background: "#5E549510" }}>✏️</button>
-          <button onClick={() => setShowMembers(!showMembers)} className="text-xs px-2.5 py-1.5 rounded-lg min-h-[36px]" style={{ color: "#2D6B9E", background: "#2D6B9E10" }}>👥 {members.length}</button>
+          {userRole === "owner" && <button onClick={() => setShowEdit(!showEdit)} className="text-xs px-2.5 py-1.5 rounded-lg min-h-[36px]" style={{ color: "#5E5495", background: "#5E549510" }}>✏️</button>}
+          {userRole === "owner" && <button onClick={() => setShowMembers(!showMembers)} className="text-xs px-2.5 py-1.5 rounded-lg min-h-[36px]" style={{ color: "#2D6B9E", background: "#2D6B9E10" }}>👥 {members.length}</button>}
+          {userRole !== "owner" && <span className="text-[10px] px-2 py-1 rounded-full font-bold" style={{ background: "#2D6B9E15", color: "#2D6B9E" }}>👤 موظف</span>}
         </div>
         {/* Phase tabs */}
         <div className="flex gap-1 mt-2 overflow-x-auto pb-0.5">
-          {PHASES.map(p => (
-            <button key={p.n} onClick={() => { setPhase(p.n); api.put("/api/web-projects/" + id, { currentPhase: p.n }).catch(() => {}); }}
+          {PHASES.filter(p => userRole === "owner" || ![1, 2, 5].includes(p.n)).map(p => (
+            <button key={p.n} onClick={() => { setPhase(p.n); if (userRole === "owner") api.put("/api/web-projects/" + id, { currentPhase: p.n }).catch(() => {}); }}
               className="px-3 py-2 rounded-xl text-[10px] font-bold transition whitespace-nowrap min-h-[38px] flex items-center gap-1"
               style={{ background: phase === p.n ? "#2D6B9E" : completedPhases.has(p.n) ? "#3D8C5A" : "var(--bg)", color: phase === p.n ? "#fff" : completedPhases.has(p.n) ? "#fff" : "var(--muted)", border: `1px solid ${phase === p.n ? "#2D6B9E" : completedPhases.has(p.n) ? "#3D8C5A" : "var(--card-border)"}` }}>
               {completedPhases.has(p.n) ? "✓" : p.icon} {p.n}. {p.label}

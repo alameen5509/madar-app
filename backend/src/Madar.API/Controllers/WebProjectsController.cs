@@ -17,15 +17,32 @@ public class WebProjectsController : ControllerBase
     // ═══ PROJECTS CRUD ═══
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
-        Ok(await Q("SELECT * FROM WebProjects WHERE OwnerId=@uid ORDER BY CreatedAt DESC", Ps("@uid", Uid), ct));
+        Ok(await Q(@"SELECT DISTINCT wp.* FROM WebProjects wp
+            LEFT JOIN WebProjectMembers wm ON wm.ProjectId = wp.Id
+            WHERE wp.OwnerId=@uid OR wm.Email=(SELECT Email FROM AspNetUsers WHERE Id=@uid LIMIT 1)
+            ORDER BY wp.CreatedAt DESC", Ps("@uid", Uid), ct));
 
     [HttpGet("{id}")]
     public async Task<IActionResult> Get(string id, CancellationToken ct)
     {
-        var p = await Q("SELECT * FROM WebProjects WHERE Id=@id AND OwnerId=@uid", [P("@id",id),P("@uid",Uid)], ct);
+        var p = await Q(@"SELECT DISTINCT wp.* FROM WebProjects wp
+            LEFT JOIN WebProjectMembers wm ON wm.ProjectId = wp.Id
+            WHERE wp.Id=@id AND (wp.OwnerId=@uid OR wm.Email=(SELECT Email FROM AspNetUsers WHERE Id=@uid LIMIT 1))",
+            [P("@id",id),P("@uid",Uid)], ct);
         if (p.Count == 0) return NotFound();
         var members = await Q("SELECT * FROM WebProjectMembers WHERE ProjectId=@id", Ps("@id",id), ct);
-        return Ok(new { project = p[0], members });
+        // Determine user role: owner or member role
+        var isOwner = p[0]["ownerId"]?.ToString() == Uid;
+        var memberRole = isOwner ? "owner" : "employee";
+        if (!isOwner) {
+            var myEmail = await Q("SELECT Email FROM AspNetUsers WHERE Id=@uid LIMIT 1", Ps("@uid", Uid), ct);
+            if (myEmail.Count > 0) {
+                var email = myEmail[0]["email"]?.ToString();
+                var myMember = members.FirstOrDefault(m => m["email"]?.ToString() == email);
+                if (myMember != null) memberRole = myMember["role"]?.ToString() ?? "employee";
+            }
+        }
+        return Ok(new { project = p[0], members, userRole = memberRole });
     }
 
     [HttpPost]
