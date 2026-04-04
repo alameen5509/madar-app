@@ -16,6 +16,7 @@ export default function WebProjectsPage() {
   const [showNew, setShowNew] = useState(false);
   const [np, setNp] = useState({ title: "", client: "", desc: "", priority: "medium", dueDate: "" });
   const [filter, setFilter] = useState<"all"|"active"|"completed"|"onHold">("all");
+  const [syncStatus, setSyncStatus] = useState("");
 
   const LS_KEY = "madar_web_projects";
   function lsGet(): Project[] { try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]"); } catch { return []; } }
@@ -45,11 +46,11 @@ export default function WebProjectsPage() {
   }
 
   const load = useCallback(async () => {
-    setLoading(true);
+    setLoading(true); setSyncStatus("جارٍ التحميل...");
     // 1. Try dedicated API
     try {
       const { data } = await api.get("/api/web-projects");
-      if (data && data.length > 0) { setProjects(data); setLoading(false); return; }
+      if (data && data.length > 0) { setProjects(data); setSyncStatus("✅ من API"); setLoading(false); return; }
     } catch {}
     // 2. Try cloud preferences (for cross-device sync)
     try {
@@ -58,7 +59,6 @@ export default function WebProjectsPage() {
         const cloud = prefs.webProjects as Project[];
         setProjects(cloud);
         localStorage.setItem(LS_KEY, JSON.stringify(cloud));
-        // Restore phase data
         if (prefs.webProjectsData) {
           for (const [projId, pd] of Object.entries(prefs.webProjectsData as Record<string, Record<string, string>>)) {
             for (const [key, val] of Object.entries(pd)) {
@@ -66,11 +66,18 @@ export default function WebProjectsPage() {
             }
           }
         }
+        setSyncStatus("☁️ من السحابة — " + cloud.length + " موقع");
         setLoading(false); return;
+      } else {
+        setSyncStatus("☁️ السحابة فارغة");
       }
-    } catch {}
+    } catch (e) {
+      setSyncStatus("⚠️ فشل الاتصال بالسحابة");
+    }
     // 3. Fallback to localStorage
-    setProjects(lsGet());
+    const local = lsGet();
+    setProjects(local);
+    setSyncStatus(local.length > 0 ? "💾 من الذاكرة المحلية — " + local.length : "لا توجد بيانات");
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -115,6 +122,7 @@ export default function WebProjectsPage() {
 
       <div className="px-4 sm:px-6 py-4 space-y-3 max-w-3xl mx-auto">
         <button onClick={() => setShowNew(!showNew)} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #2D6B9E, #D4AF37)" }}>+ موقع جديد</button>
+        {syncStatus && <p className="text-center text-[10px] py-1" style={{ color: "var(--muted)" }}>{syncStatus}</p>}
 
         {showNew && (
           <div className="rounded-2xl border p-5 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
