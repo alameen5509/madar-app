@@ -113,6 +113,8 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<Madar.Infrastructure.Persistence.MadarDbContext>();
     string[] sqls = [
+        "ALTER TABLE WebProjects ADD COLUMN Priority VARCHAR(20) NOT NULL DEFAULT 'medium';",
+        "ALTER TABLE WebProjects ADD COLUMN DueDate VARCHAR(20) NULL;",
         "ALTER TABLE SmartTasks ADD COLUMN Cost DECIMAL(18,2) NULL;",
         "ALTER TABLE SmartTasks ADD COLUMN CostCurrency VARCHAR(10) NULL DEFAULT 'SAR';",
         "ALTER TABLE SmartTasks ADD COLUMN AssignedToId CHAR(36) NULL;",
@@ -457,6 +459,8 @@ using (var scope = app.Services.CreateScope())
                 Description TEXT NULL,
                 CurrentPhase INT NOT NULL DEFAULT 1,
                 `Status` VARCHAR(30) NOT NULL DEFAULT 'active',
+                Priority VARCHAR(20) NOT NULL DEFAULT 'medium',
+                DueDate VARCHAR(20) NULL,
                 CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
                 UpdatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
                 INDEX IX_WebProjects_Owner (OwnerId)

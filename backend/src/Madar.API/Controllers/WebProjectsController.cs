@@ -32,9 +32,9 @@ public class WebProjectsController : ControllerBase
     public async Task<IActionResult> Create([FromBody] WpReq req, CancellationToken ct)
     {
         var id = NewId();
-        await E(@"INSERT INTO WebProjects (Id,OwnerId,Title,ClientName,Description,CurrentPhase,Status,CreatedAt,UpdatedAt)
-            VALUES(@id,@uid,@t,@c,@d,1,'active',NOW(),NOW())",
-            [P("@id",id),P("@uid",Uid),P("@t",req.Title),P("@c",req.ClientName),P("@d",req.Description)], ct);
+        await E(@"INSERT INTO WebProjects (Id,OwnerId,Title,ClientName,Description,CurrentPhase,Status,Priority,DueDate,CreatedAt,UpdatedAt)
+            VALUES(@id,@uid,@t,@c,@d,1,'active',@pr,@dd,NOW(),NOW())",
+            [P("@id",id),P("@uid",Uid),P("@t",req.Title),P("@c",req.ClientName),P("@d",req.Description),P("@pr",req.Priority??"medium"),P("@dd",req.DueDate)], ct);
         return Ok(new { id });
     }
 
@@ -42,9 +42,10 @@ public class WebProjectsController : ControllerBase
     public async Task<IActionResult> Update(string id, [FromBody] WpReq req, CancellationToken ct)
     {
         await E(@"UPDATE WebProjects SET Title=COALESCE(@t,Title),ClientName=COALESCE(@c,ClientName),
-            Description=COALESCE(@d,Description),CurrentPhase=COALESCE(@p,CurrentPhase),Status=COALESCE(@s,Status),UpdatedAt=NOW()
+            Description=COALESCE(@d,Description),CurrentPhase=COALESCE(@p,CurrentPhase),Status=COALESCE(@s,Status),
+            Priority=COALESCE(@pr,Priority),DueDate=COALESCE(@dd,DueDate),UpdatedAt=NOW()
             WHERE Id=@id AND OwnerId=@uid",
-            [P("@id",id),P("@uid",Uid),P("@t",req.Title),P("@c",req.ClientName),P("@d",req.Description),P("@p",req.CurrentPhase),P("@s",req.Status)], ct);
+            [P("@id",id),P("@uid",Uid),P("@t",req.Title),P("@c",req.ClientName),P("@d",req.Description),P("@p",req.CurrentPhase),P("@s",req.Status),P("@pr",req.Priority),P("@dd",req.DueDate)], ct);
         return Ok(new { id });
     }
 
@@ -260,7 +261,7 @@ public class WebProjectsController : ControllerBase
     }
 }
 
-public class WpReq { public string? Title{get;set;} public string? ClientName{get;set;} public string? Description{get;set;} public int? CurrentPhase{get;set;} public string? Status{get;set;} }
+public class WpReq { public string? Title{get;set;} public string? ClientName{get;set;} public string? Description{get;set;} public int? CurrentPhase{get;set;} public string? Status{get;set;} public string? Priority{get;set;} public string? DueDate{get;set;} }
 public class WpMemberReq { public string? Name{get;set;} public string? Email{get;set;} public string? Role{get;set;} }
 public class DocReq { public string? Content{get;set;} }
 public class WpTaskReq { public string? Title{get;set;} public string? AssignedTo{get;set;} public string? Status{get;set;} }

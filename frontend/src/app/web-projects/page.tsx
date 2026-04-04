@@ -34,7 +34,7 @@ export default function WebProjectsPage() {
   async function create() {
     if (!np.title.trim()) return;
     try {
-      await api.post("/api/web-projects", { title: np.title.trim(), clientName: np.client.trim() || undefined, description: np.desc.trim() || undefined });
+      await api.post("/api/web-projects", { title: np.title.trim(), clientName: np.client.trim() || undefined, description: np.desc.trim() || undefined, priority: np.priority, dueDate: np.dueDate || undefined });
       setNp({ title: "", client: "", desc: "", priority: "medium", dueDate: "" }); setShowNew(false);
       load();
     } catch { alert("فشل الإنشاء"); }
@@ -152,7 +152,7 @@ export default function WebProjectsPage() {
               {/* Actions: priority change + edit + delete */}
               <div className="flex items-center gap-1.5 px-4 pb-3 -mt-1 flex-wrap">
                 {Object.entries(PRIORITIES).map(([k, v]) => (
-                  <button key={k} onClick={(e) => { e.stopPropagation(); setProjects(prev => prev.map(x => x.id === p.id ? { ...x, priority: k } : x)); api.put("/api/web-projects/" + p.id, { status: p.status }).catch(() => {}); }}
+                  <button key={k} onClick={(e) => { e.stopPropagation(); setProjects(prev => prev.map(x => x.id === p.id ? { ...x, priority: k } : x)); api.put("/api/web-projects/" + p.id, { priority: k }).catch(() => {}); }}
                     className="text-[10px] px-2 py-1.5 rounded-lg font-bold min-h-[32px] transition"
                     style={{ background: p.priority === k ? v.color : "transparent", color: p.priority === k ? "#fff" : v.color, border: `1px solid ${p.priority === k ? v.color : v.color + "30"}` }}>
                     {v.icon}
