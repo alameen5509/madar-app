@@ -124,6 +124,8 @@ export default function WebProjectsPage() {
           const currentPhaseIcon = PHASE_ICONS[currentPhaseNum - 1] ?? "📋";
           // Counters from localStorage
           let p1Tasks = 0, p3Cmds = 0, p5Cmds = 0, p6Reqs = 0, p7Users = 0;
+          let siteUrl = "";
+          try { siteUrl = JSON.parse(localStorage.getItem("wp_hosting_" + p.id) ?? "{}")?.launch?.url ?? ""; } catch {}
           try { p1Tasks = JSON.parse(localStorage.getItem("wp_p1tasks_" + p.id) ?? "[]").length; } catch {}
           try { p3Cmds = JSON.parse(localStorage.getItem("wp_p3_" + p.id) ?? "[]").length; } catch {}
           try { p5Cmds = JSON.parse(localStorage.getItem("wp_p5_" + p.id) ?? "[]").length; } catch {}
@@ -161,6 +163,14 @@ export default function WebProjectsPage() {
                   <span className="text-[10px] font-bold" style={{ color: "#2D6B9E" }}>{completedCount}/5</span>
                 </div>
               </Link>
+              {/* Visit site button */}
+              {siteUrl && (
+                <a href={siteUrl} target="_blank" onClick={e => e.stopPropagation()}
+                  className="flex items-center gap-2 mx-4 mb-2 py-2.5 px-4 rounded-xl text-xs font-bold transition hover:opacity-90 min-h-[40px]"
+                  style={{ background: "linear-gradient(135deg, #2D6B9E, #3D8C5A)", color: "#fff" }}>
+                  🌐 زيارة الموقع <span className="font-mono text-[10px] flex-1 truncate opacity-80" dir="ltr">{siteUrl.replace("https://","").replace("http://","")}</span> ←
+                </a>
+              )}
               {/* Actions: priority change + edit + delete (owner only) */}
               {isOwner && <div className="flex items-center gap-1.5 px-4 pb-3 -mt-1 flex-wrap">
                 {Object.entries(PRIORITIES).map(([k, v]) => (

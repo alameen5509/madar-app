@@ -76,12 +76,17 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
     return () => clearInterval(timer);
   }, []);
 
+  const siteUrl = (() => { try { return JSON.parse(localStorage.getItem("wp_hosting_" + id) ?? "{}")?.launch?.url ?? ""; } catch { return ""; } })();
+
   if (loading || !project) return <main className="flex-1 flex items-center justify-center" style={{ background: "var(--bg)" }}><p className="animate-pulse" style={{ color: "var(--muted)" }}>جارٍ التحميل...</p></main>;
 
   return (
     <main className="flex-1 overflow-y-auto" dir="rtl" style={{ background: "var(--bg)" }}>
       <header className="sticky top-0 z-20 backdrop-blur border-b px-4 sm:px-6 py-3 pr-14 md:pr-6" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-        <div className="flex items-center gap-1 text-[10px] mb-1"><Link href="/web-projects" className="hover:underline" style={{ color: "var(--muted)" }}>المواقع</Link><span style={{ color: "var(--muted)" }}>←</span><span className="font-semibold" style={{ color: "#2D6B9E" }}>{project.title}</span></div>
+        <div className="flex items-center gap-1 text-[10px] mb-1">
+          <Link href="/web-projects" className="hover:underline" style={{ color: "var(--muted)" }}>المواقع</Link><span style={{ color: "var(--muted)" }}>←</span><span className="font-semibold" style={{ color: "#2D6B9E" }}>{project.title}</span>
+          {siteUrl && <a href={siteUrl} target="_blank" className="mr-auto px-2.5 py-1 rounded-lg text-[10px] font-bold min-h-[32px] flex items-center gap-1" style={{ background: "#2D6B9E", color: "#fff" }}>🌐 الموقع</a>}
+        </div>
         <div className="flex items-center gap-3">
           <h2 className="font-bold text-base" style={{ color: "var(--text)" }}>🌐 {project.title}</h2>
           {project.clientName && <span className="text-xs" style={{ color: "var(--muted)" }}>👤 {project.clientName}</span>}
@@ -130,23 +135,48 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
 
         {/* Complete phase button */}
         {(() => {
-          // Block completion of phase 3 (users) if no accounts
           const blocked = phase === 1 && (() => { try { return JSON.parse(localStorage.getItem("wp_p7_" + id) ?? "[]").length === 0; } catch { return true; } })();
+          // Phase 3 (hosting): require site URL before completing
+          const hostingData = (() => { try { return JSON.parse(localStorage.getItem("wp_hosting_" + id) ?? "{}"); } catch { return {}; } })();
+          const hostingBlocked = phase === 3 && !hostingData?.launch?.url;
           return (
-            <div className="mt-6 flex flex-col sm:flex-row gap-2">
-              {completedPhases.has(phase) ? (
-                <button onClick={() => togglePhaseComplete(phase)} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold transition" style={{ background: "#3D8C5A15", color: "#3D8C5A", border: "1px solid #3D8C5A30" }}>
-                  ✅ مرحلة مكتملة — اضغط لإلغاء الإكمال
-                </button>
-              ) : blocked ? (
-                <button disabled className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold opacity-40" style={{ background: "#6B7280", color: "#fff" }}>
-                  ⚠️ أضف مستخدم أولاً لإكمال المرحلة
-                </button>
-              ) : (
-                <button onClick={() => togglePhaseComplete(phase)} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white transition" style={{ background: "linear-gradient(135deg, #3D8C5A, #2D6B9E)" }}>
-                  ✅ إكمال هذه المرحلة
-                </button>
+            <div className="mt-6 space-y-3">
+              {/* Ask for site URL when completing hosting phase */}
+              {phase === 3 && !completedPhases.has(3) && !hostingData?.launch?.url && (
+                <div className="rounded-xl p-4" style={{ background: "#F59E0B08", border: "1px solid #F59E0B30" }}>
+                  <p className="text-xs font-bold mb-2" style={{ color: "#F59E0B" }}>🌐 أدخل رابط الموقع النهائي لإكمال مرحلة الاستضافة</p>
+                  <input placeholder="https://example.com" dir="ltr" className="w-full px-3 py-3 rounded-xl border text-sm font-mono focus:outline-none" style={is}
+                    onChange={e => {
+                      const d = { ...hostingData, launch: { ...(hostingData?.launch ?? {}), url: e.target.value } };
+                      localStorage.setItem("wp_hosting_" + id, JSON.stringify(d));
+                    }} />
+                </div>
               )}
+              {/* Show site link if exists */}
+              {hostingData?.launch?.url && (
+                <a href={hostingData.launch.url} target="_blank" className="flex items-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition hover:opacity-90" style={{ background: "#2D6B9E15", color: "#2D6B9E", border: "1px solid #2D6B9E30" }}>
+                  🌐 زيارة الموقع: <span className="font-mono text-xs flex-1 truncate" dir="ltr">{hostingData.launch.url}</span> ←
+                </a>
+              )}
+              <div className="flex flex-col sm:flex-row gap-2">
+                {completedPhases.has(phase) ? (
+                  <button onClick={() => togglePhaseComplete(phase)} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold transition" style={{ background: "#3D8C5A15", color: "#3D8C5A", border: "1px solid #3D8C5A30" }}>
+                    ✅ مرحلة مكتملة — اضغط لإلغاء الإكمال
+                  </button>
+                ) : blocked ? (
+                  <button disabled className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold opacity-40" style={{ background: "#6B7280", color: "#fff" }}>
+                    ⚠️ أضف مستخدم أولاً لإكمال المرحلة
+                  </button>
+                ) : hostingBlocked ? (
+                  <button disabled className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold opacity-40" style={{ background: "#6B7280", color: "#fff" }}>
+                    ⚠️ أدخل رابط الموقع أولاً
+                  </button>
+                ) : (
+                  <button onClick={() => togglePhaseComplete(phase)} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white transition" style={{ background: "linear-gradient(135deg, #3D8C5A, #2D6B9E)" }}>
+                    ✅ إكمال هذه المرحلة
+                  </button>
+                )}
+              </div>
             </div>
           );
         })()}
