@@ -1,0 +1,223 @@
+"use client";
+import { use, useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { api } from "@/lib/api";
+
+type Phase = 1|2|3|4|5|6;
+interface Project { id:string; title:string; clientName?:string; description?:string; currentPhase:number; status:string }
+interface Member { id:string; name:string; email?:string; role:string }
+const PHASES: {n:Phase;label:string;icon:string}[] = [{n:1,label:"بناء الفكرة",icon:"📝"},{n:2,label:"الوثيقة العامة",icon:"📁"},{n:3,label:"التأسيس",icon:"⚡"},{n:4,label:"الاستضافة",icon:"🔐"},{n:5,label:"التطوير",icon:"🚀"},{n:6,label:"العميل",icon:"💬"}];
+const is = { background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" } as const;
+
+export default function WebProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const [project, setProject] = useState<Project|null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [phase, setPhase] = useState<Phase>(1);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get("/api/web-projects/" + id);
+      setProject(data.project); setMembers(data.members ?? []);
+      setPhase(data.project?.currentPhase ?? 1);
+    } catch {}
+    setLoading(false);
+  }, [id]);
+  useEffect(() => { load(); }, [load]);
+
+  if (loading || !project) return <main className="flex-1 flex items-center justify-center" style={{ background: "var(--bg)" }}><p className="animate-pulse" style={{ color: "var(--muted)" }}>جارٍ التحميل...</p></main>;
+
+  return (
+    <main className="flex-1 overflow-y-auto" dir="rtl" style={{ background: "var(--bg)" }}>
+      <header className="sticky top-0 z-20 backdrop-blur border-b px-4 sm:px-6 py-3 pr-14 md:pr-6" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+        <div className="flex items-center gap-1 text-[10px] mb-1"><Link href="/web-projects" className="hover:underline" style={{ color: "var(--muted)" }}>المواقع</Link><span style={{ color: "var(--muted)" }}>←</span><span className="font-semibold" style={{ color: "#2D6B9E" }}>{project.title}</span></div>
+        <div className="flex items-center gap-3">
+          <h2 className="font-bold text-base" style={{ color: "var(--text)" }}>🌐 {project.title}</h2>
+          {project.clientName && <span className="text-xs" style={{ color: "var(--muted)" }}>👤 {project.clientName}</span>}
+        </div>
+        {/* Phase tabs */}
+        <div className="flex gap-1 mt-2 overflow-x-auto pb-0.5">
+          {PHASES.map(p => (
+            <button key={p.n} onClick={() => { setPhase(p.n); api.put("/api/web-projects/" + id, { currentPhase: p.n }).catch(() => {}); }}
+              className="px-3 py-2 rounded-xl text-[10px] font-bold transition whitespace-nowrap min-h-[38px] flex items-center gap-1"
+              style={{ background: phase === p.n ? "#2D6B9E" : phase > p.n ? "#3D8C5A15" : "var(--bg)", color: phase === p.n ? "#fff" : phase > p.n ? "#3D8C5A" : "var(--muted)", border: `1px solid ${phase === p.n ? "#2D6B9E" : "var(--card-border)"}` }}>
+              {phase > p.n ? "✓" : p.icon} {p.n}. {p.label}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      <div className="px-4 sm:px-6 py-4 space-y-4 max-w-3xl mx-auto">
+        {phase === 1 && <Phase1 projectId={id} />}
+        {phase === 2 && <Phase2 />}
+        {phase === 3 && <Phase3 projectId={id} />}
+        {phase === 4 && <Phase4 projectId={id} />}
+        {phase === 5 && <Phase5 projectId={id} />}
+        {phase === 6 && <Phase6 projectId={id} />}
+      </div>
+    </main>
+  );
+}
+
+// ═══ PHASE 1: Ideas ═══
+function Phase1({ projectId }: { projectId: string }) {
+  const [doc, setDoc] = useState(""); const [tasks, setTasks] = useState<{id:string;title:string;assignedTo?:string;status:string}[]>([]); const [newTask, setNewTask] = useState(""); const [saving, setSaving] = useState(false);
+  useEffect(() => { api.get("/api/web-projects/" + projectId + "/phase1/document").then(r => setDoc(r.data?.content ?? "")).catch(() => {}); api.get("/api/web-projects/" + projectId + "/phase1/tasks").then(r => setTasks(r.data ?? [])).catch(() => {}); }, [projectId]);
+  async function saveDoc() { setSaving(true); await api.put("/api/web-projects/" + projectId + "/phase1/document", { content: doc }).catch(() => {}); setSaving(false); }
+  async function addTask() { if (!newTask.trim()) return; await api.post("/api/web-projects/" + projectId + "/phase1/tasks", { title: newTask }).catch(() => {}); setNewTask(""); const { data } = await api.get("/api/web-projects/" + projectId + "/phase1/tasks"); setTasks(data ?? []); }
+  async function toggleTask(tid: string, cur: string) { await api.patch("/api/web-projects/" + projectId + "/phase1/tasks/" + tid, { status: cur === "done" ? "pending" : "done" }).catch(() => {}); setTasks(prev => prev.map(t => t.id === tid ? { ...t, status: cur === "done" ? "pending" : "done" } : t)); }
+  async function delTask(tid: string) { await api.delete("/api/web-projects/" + projectId + "/phase1/tasks/" + tid).catch(() => {}); setTasks(prev => prev.filter(t => t.id !== tid)); }
+
+  return (<div className="space-y-4">
+    <div className="rounded-2xl border p-4" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+      <p className="text-xs font-bold mb-2" style={{ color: "var(--text)" }}>📝 وثيقة الأفكار</p>
+      <textarea value={doc} onChange={e => setDoc(e.target.value)} rows={8} placeholder="اكتب أفكارك هنا..." className="w-full px-4 py-3 rounded-xl border text-sm resize-none focus:outline-none leading-relaxed" style={is} />
+      <button onClick={saveDoc} disabled={saving} className="mt-2 px-6 py-2.5 min-h-[44px] rounded-xl text-sm font-bold text-white" style={{ background: "#2D6B9E" }}>{saving ? "جارٍ الحفظ..." : "حفظ"}</button>
+    </div>
+    <div className="rounded-2xl border p-4" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+      <p className="text-xs font-bold mb-2" style={{ color: "var(--text)" }}>✅ المهام</p>
+      <div className="flex gap-2 mb-3">
+        <input value={newTask} onChange={e => setNewTask(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addTask(); }} placeholder="مهمة جديدة..." className="flex-1 px-3 py-3 min-h-[44px] rounded-xl border text-sm focus:outline-none" style={is} />
+        <button onClick={addTask} disabled={!newTask.trim()} className="px-5 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#2D6B9E" }}>+</button>
+      </div>
+      {tasks.map(t => (
+        <div key={t.id} className="flex items-center gap-3 py-2 border-b last:border-0" style={{ borderColor: "var(--card-border)" }}>
+          <button onClick={() => toggleTask(t.id, t.status)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${t.status === "done" ? "bg-[#3D8C5A] border-[#3D8C5A]" : "border-[#C9A84C]"}`}>{t.status === "done" && <span className="text-white text-[9px]">✓</span>}</button>
+          <span className={`flex-1 text-sm ${t.status === "done" ? "line-through opacity-50" : ""}`} style={{ color: "var(--text)" }}>{t.title}</span>
+          <button onClick={() => delTask(t.id)} className="text-sm px-2 py-1 rounded-lg hover:bg-red-50" style={{ color: "#DC2626" }}>✕</button>
+        </div>
+      ))}
+    </div>
+  </div>);
+}
+
+// ═══ PHASE 2: Documents ═══
+function Phase2() {
+  return (<div className="text-center py-12"><p className="text-3xl mb-3">📁</p><p className="font-bold" style={{ color: "var(--text)" }}>الوثيقة العامة</p><p className="text-xs mt-1" style={{ color: "var(--muted)" }}>قريباً — رفع ملفات PDF والعروض</p></div>);
+}
+
+// ═══ PHASE 3: Setup Commands ═══
+function Phase3({ projectId }: { projectId: string }) {
+  const [cmds, setCmds] = useState<{id:string;title:string;command?:string;status:string;order:number}[]>([]);
+  const [showNew, setShowNew] = useState(false); const [nc, setNc] = useState({ title: "", cmd: "" });
+  useEffect(() => { api.get("/api/web-projects/" + projectId + "/phase3/commands").then(r => setCmds(r.data ?? [])).catch(() => {}); }, [projectId]);
+  async function add() { if (!nc.title.trim()) return; await api.post("/api/web-projects/" + projectId + "/phase3/commands", { title: nc.title, command: nc.cmd || undefined }).catch(() => {}); setNc({ title: "", cmd: "" }); setShowNew(false); const { data } = await api.get("/api/web-projects/" + projectId + "/phase3/commands"); setCmds(data ?? []); }
+  async function markDone(cid: string) { await api.patch("/api/web-projects/" + projectId + "/phase3/commands/" + cid + "/done").catch(() => {}); setCmds(prev => prev.map(c => c.id === cid ? { ...c, status: "done" } : c)); }
+  const nextCmd = cmds.find(c => c.status === "pending");
+  const [copied, setCopied] = useState<string|null>(null);
+
+  return (<div className="space-y-4">
+    <div className="flex items-center justify-between"><span className="text-xs font-bold" style={{ color: "var(--text)" }}>⚡ أوامر التأسيس ({cmds.length})</span><button onClick={() => setShowNew(true)} className="px-4 py-2.5 min-h-[40px] rounded-xl text-xs font-bold text-white" style={{ background: "#2D6B9E" }}>+ أمر</button></div>
+    {showNew && (<div className="rounded-xl border p-4 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+      <input value={nc.title} onChange={e => setNc({...nc, title: e.target.value})} placeholder="عنوان الأمر *" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
+      <textarea value={nc.cmd} onChange={e => setNc({...nc, cmd: e.target.value})} placeholder="الأمر الكامل..." rows={4} className="w-full px-3 py-2 rounded-xl border text-xs resize-none focus:outline-none font-mono" dir="ltr" style={is} />
+      <div className="flex gap-2"><button onClick={add} disabled={!nc.title.trim()} className="flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#2D6B9E" }}>إضافة</button><button onClick={() => setShowNew(false)} className="py-3 px-4 rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button></div>
+    </div>)}
+    {/* Employee view: next command */}
+    {nextCmd && (<div className="rounded-2xl border-2 p-5" style={{ background: "#F59E0B08", borderColor: "#F59E0B40" }}>
+      <p className="text-xs font-bold mb-1" style={{ color: "#F59E0B" }}>الأمر التالي للتنفيذ:</p>
+      <p className="text-sm font-bold mb-2" style={{ color: "var(--text)" }}>{nextCmd.title}</p>
+      {nextCmd.command && <pre className="text-xs p-3 rounded-xl mb-3 overflow-x-auto whitespace-pre-wrap" dir="ltr" style={{ background: "#1A1830", color: "#E2D5B0", fontFamily: "monospace" }}>{nextCmd.command}</pre>}
+      <div className="flex gap-2">
+        {nextCmd.command && <button onClick={() => { navigator.clipboard.writeText(nextCmd.command!); setCopied(nextCmd.id); setTimeout(() => setCopied(null), 2000); }} className="flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold" style={{ background: copied === nextCmd.id ? "#3D8C5A15" : "#D4AF3715", color: copied === nextCmd.id ? "#3D8C5A" : "#D4AF37" }}>{copied === nextCmd.id ? "✓ تم النسخ" : "📋 نسخ الأمر"}</button>}
+        <button onClick={() => markDone(nextCmd.id)} className="flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white" style={{ background: "#3D8C5A" }}>✅ تم التنفيذ</button>
+      </div>
+    </div>)}
+    {/* All commands list */}
+    {cmds.map((c, i) => (<div key={c.id} className="rounded-xl border p-3 flex items-center gap-3" style={{ background: "var(--card)", borderColor: "var(--card-border)", opacity: c.status === "done" ? 0.5 : 1 }}>
+      <span className="text-sm font-bold w-6 text-center" style={{ color: "var(--muted)" }}>{i+1}</span>
+      <span className={`text-sm flex-1 ${c.status === "done" ? "line-through" : ""}`} style={{ color: "var(--text)" }}>{c.title}</span>
+      <span className="text-[10px] px-2 py-1 rounded-full font-bold" style={{ background: c.status === "done" ? "#3D8C5A15" : "#F59E0B15", color: c.status === "done" ? "#3D8C5A" : "#F59E0B" }}>{c.status === "done" ? "✅ تم" : "⏳"}</span>
+    </div>))}
+  </div>);
+}
+
+// ═══ PHASE 4: Credentials ═══
+function Phase4({ projectId }: { projectId: string }) {
+  const [creds, setCreds] = useState<{id:string;type:string;label:string;value:string}[]>([]);
+  const [showNew, setShowNew] = useState(false); const [nc, setNc] = useState({ type: "hosting", label: "", value: "" });
+  const [visible, setVisible] = useState<Set<string>>(new Set());
+  useEffect(() => { api.get("/api/web-projects/" + projectId + "/phase4/credentials").then(r => setCreds(r.data ?? [])).catch(() => {}); }, [projectId]);
+  async function add() { if (!nc.label.trim() || !nc.value.trim()) return; await api.post("/api/web-projects/" + projectId + "/phase4/credentials", nc).catch(() => {}); setNc({ type: "hosting", label: "", value: "" }); setShowNew(false); const { data } = await api.get("/api/web-projects/" + projectId + "/phase4/credentials"); setCreds(data ?? []); }
+  async function del(cid: string) { if (!confirm("حذف؟")) return; await api.delete("/api/web-projects/" + projectId + "/phase4/credentials/" + cid).catch(() => {}); setCreds(prev => prev.filter(c => c.id !== cid)); }
+  const TYPES: Record<string,string> = { hosting: "🖥️ استضافة", domain: "🌐 دومين", database: "🗃️ قاعدة بيانات", other: "🔑 أخرى" };
+
+  return (<div className="space-y-4">
+    <div className="flex items-center justify-between"><span className="text-xs font-bold" style={{ color: "var(--text)" }}>🔐 البيانات السرية ({creds.length})</span><button onClick={() => setShowNew(true)} className="px-4 py-2.5 min-h-[40px] rounded-xl text-xs font-bold text-white" style={{ background: "#2D6B9E" }}>+ بيان</button></div>
+    {showNew && (<div className="rounded-xl border p-4 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+      <select value={nc.type} onChange={e => setNc({...nc, type: e.target.value})} className="w-full px-3 py-3 rounded-xl border text-sm" style={is}>{Object.entries(TYPES).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select>
+      <input value={nc.label} onChange={e => setNc({...nc, label: e.target.value})} placeholder="التسمية (مثل: كلمة مرور الاستضافة)" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
+      <input value={nc.value} onChange={e => setNc({...nc, value: e.target.value})} placeholder="القيمة" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none font-mono" dir="ltr" style={is} />
+      <div className="flex gap-2"><button onClick={add} disabled={!nc.label.trim()} className="flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#2D6B9E" }}>إضافة</button><button onClick={() => setShowNew(false)} className="py-3 px-4 rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button></div>
+    </div>)}
+    {creds.map(c => (<div key={c.id} className="rounded-xl border p-4" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+      <div className="flex items-center gap-2 mb-2"><span className="text-sm">{TYPES[c.type]?.split(" ")[0] ?? "🔑"}</span><span className="text-xs font-bold" style={{ color: "var(--text)" }}>{c.label}</span><span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--bg)", color: "var(--muted)" }}>{TYPES[c.type]?.split(" ").slice(1).join(" ")}</span></div>
+      <div className="flex items-center gap-2">
+        <span className="flex-1 text-sm font-mono" dir="ltr" style={{ color: "var(--text)" }}>{visible.has(c.id) ? c.value : "••••••••••"}</span>
+        <button onClick={() => setVisible(prev => { const s = new Set(prev); s.has(c.id) ? s.delete(c.id) : s.add(c.id); return s; })} className="text-sm px-2 py-1.5 rounded-lg" style={{ color: "#5E5495" }}>{visible.has(c.id) ? "🙈" : "👁️"}</button>
+        <button onClick={() => { navigator.clipboard.writeText(c.value); }} className="text-sm px-2 py-1.5 rounded-lg" style={{ color: "#D4AF37" }}>📋</button>
+        <button onClick={() => del(c.id)} className="text-sm px-2 py-1.5 rounded-lg" style={{ color: "#DC2626" }}>🗑️</button>
+      </div>
+    </div>))}
+  </div>);
+}
+
+// ═══ PHASE 5: Development ═══
+function Phase5({ projectId }: { projectId: string }) {
+  const [cmds, setCmds] = useState<{id:string;title:string;command?:string;status:string;order:number;notes?:string}[]>([]);
+  const [showNew, setShowNew] = useState(false); const [nc, setNc] = useState({ title: "", cmd: "" });
+  const [copied, setCopied] = useState<string|null>(null);
+  useEffect(() => { api.get("/api/web-projects/" + projectId + "/phase5/commands").then(r => setCmds(r.data ?? [])).catch(() => {}); }, [projectId]);
+  async function add() { if (!nc.title.trim()) return; await api.post("/api/web-projects/" + projectId + "/phase5/commands", { title: nc.title, command: nc.cmd || undefined }).catch(() => {}); setNc({ title: "", cmd: "" }); setShowNew(false); const { data } = await api.get("/api/web-projects/" + projectId + "/phase5/commands"); setCmds(data ?? []); }
+  async function employeeDone(cid: string) { await api.patch("/api/web-projects/" + projectId + "/phase5/commands/" + cid + "/employee-done").catch(() => {}); setCmds(prev => prev.map(c => c.id === cid ? { ...c, status: "employeeDone" } : c)); }
+  async function ownerApprove(cid: string) { await api.patch("/api/web-projects/" + projectId + "/phase5/commands/" + cid + "/owner-approve").catch(() => {}); setCmds(prev => prev.map(c => c.id === cid ? { ...c, status: "closed" } : c)); }
+  const ST: Record<string,{label:string;color:string;icon:string}> = { pending:{label:"لم يُنفَّذ",color:"#6B7280",icon:"⏳"}, employeeDone:{label:"بانتظار المراجعة",color:"#F59E0B",icon:"🔄"}, closed:{label:"مُغلق",color:"#3D8C5A",icon:"✅"} };
+
+  return (<div className="space-y-4">
+    <div className="flex items-center justify-between"><span className="text-xs font-bold" style={{ color: "var(--text)" }}>🚀 أوامر التطوير ({cmds.length})</span><button onClick={() => setShowNew(true)} className="px-4 py-2.5 min-h-[40px] rounded-xl text-xs font-bold text-white" style={{ background: "#2D6B9E" }}>+ أمر</button></div>
+    {showNew && (<div className="rounded-xl border p-4 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+      <input value={nc.title} onChange={e => setNc({...nc, title: e.target.value})} placeholder="عنوان *" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
+      <textarea value={nc.cmd} onChange={e => setNc({...nc, cmd: e.target.value})} placeholder="الأمر..." rows={5} className="w-full px-3 py-2 rounded-xl border text-xs resize-none focus:outline-none font-mono" dir="ltr" style={is} />
+      <div className="flex gap-2"><button onClick={add} disabled={!nc.title.trim()} className="flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#2D6B9E" }}>إضافة</button><button onClick={() => setShowNew(false)} className="py-3 px-4 rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button></div>
+    </div>)}
+    {cmds.map((c, i) => { const st = ST[c.status] ?? ST.pending; return (
+      <div key={c.id} className="rounded-xl border p-4" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+        <div className="flex items-center gap-2 mb-2"><span className="text-sm font-bold w-6 text-center" style={{ color: "var(--muted)" }}>{i+1}</span><span className="text-sm font-bold flex-1" style={{ color: "var(--text)" }}>{c.title}</span><span className="text-[10px] px-2 py-1 rounded-full font-bold" style={{ background: st.color+"15", color: st.color }}>{st.icon} {st.label}</span></div>
+        {c.command && <pre className="text-xs p-3 rounded-xl mb-2 overflow-x-auto whitespace-pre-wrap" dir="ltr" style={{ background: "#1A1830", color: "#E2D5B0", fontFamily: "monospace" }}>{c.command}</pre>}
+        <div className="flex gap-2 flex-wrap">
+          {c.command && <button onClick={() => { navigator.clipboard.writeText(c.command!); setCopied(c.id); setTimeout(() => setCopied(null), 2000); }} className="px-3 py-2 min-h-[40px] rounded-xl text-[10px] font-bold" style={{ background: copied === c.id ? "#3D8C5A15" : "#D4AF3715", color: copied === c.id ? "#3D8C5A" : "#D4AF37" }}>{copied === c.id ? "✓ تم" : "📋 نسخ"}</button>}
+          {c.status === "pending" && <button onClick={() => employeeDone(c.id)} className="px-4 py-2 min-h-[40px] rounded-xl text-[10px] font-bold text-white" style={{ background: "#F59E0B" }}>✅ تم التنفيذ</button>}
+          {c.status === "employeeDone" && <button onClick={() => ownerApprove(c.id)} className="px-4 py-2 min-h-[40px] rounded-xl text-[10px] font-bold text-white" style={{ background: "#3D8C5A" }}>✅ إنجاز وإغلاق</button>}
+        </div>
+      </div>); })}
+  </div>);
+}
+
+// ═══ PHASE 6: Client ═══
+function Phase6({ projectId }: { projectId: string }) {
+  const [reqs, setReqs] = useState<{id:string;title:string;description?:string;status:string;clientNote?:string;ownerNote?:string;createdAt:string}[]>([]);
+  const [showNew, setShowNew] = useState(false); const [nr, setNr] = useState({ title: "", desc: "", note: "" });
+  useEffect(() => { api.get("/api/web-projects/" + projectId + "/phase6/requests").then(r => setReqs(r.data ?? [])).catch(() => {}); }, [projectId]);
+  async function add() { if (!nr.title.trim()) return; await api.post("/api/web-projects/" + projectId + "/phase6/requests", { title: nr.title, description: nr.desc || undefined, clientNote: nr.note || undefined }).catch(() => {}); setNr({ title: "", desc: "", note: "" }); setShowNew(false); const { data } = await api.get("/api/web-projects/" + projectId + "/phase6/requests"); setReqs(data ?? []); }
+  async function updateStatus(rid: string, status: string) { await api.patch("/api/web-projects/" + projectId + "/phase6/requests/" + rid, { status }).catch(() => {}); setReqs(prev => prev.map(r => r.id === rid ? { ...r, status } : r)); }
+  const ST: Record<string,{label:string;color:string}> = { new:{label:"جديد",color:"#3B82F6"}, inReview:{label:"قيد المراجعة",color:"#F59E0B"}, inProgress:{label:"جاري",color:"#5E5495"}, done:{label:"مكتمل",color:"#3D8C5A"} };
+
+  return (<div className="space-y-4">
+    <div className="flex items-center justify-between"><span className="text-xs font-bold" style={{ color: "var(--text)" }}>💬 طلبات العميل ({reqs.length})</span><button onClick={() => setShowNew(true)} className="px-4 py-2.5 min-h-[40px] rounded-xl text-xs font-bold text-white" style={{ background: "#2D6B9E" }}>+ طلب</button></div>
+    {showNew && (<div className="rounded-xl border p-4 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+      <input value={nr.title} onChange={e => setNr({...nr, title: e.target.value})} placeholder="عنوان الطلب *" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
+      <textarea value={nr.desc} onChange={e => setNr({...nr, desc: e.target.value})} placeholder="الوصف" rows={3} className="w-full px-3 py-2 rounded-xl border text-sm resize-none focus:outline-none" style={is} />
+      <div className="flex gap-2"><button onClick={add} disabled={!nr.title.trim()} className="flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#2D6B9E" }}>إضافة</button><button onClick={() => setShowNew(false)} className="py-3 px-4 rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button></div>
+    </div>)}
+    {reqs.map(r => { const st = ST[r.status] ?? ST.new; return (
+      <div key={r.id} className="rounded-xl border p-4" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+        <div className="flex items-center gap-2 mb-2"><span className="text-sm font-bold flex-1" style={{ color: "var(--text)" }}>{r.title}</span><span className="text-[10px] px-2 py-1 rounded-full font-bold" style={{ background: st.color+"15", color: st.color }}>{st.label}</span></div>
+        {r.description && <p className="text-xs mb-2" style={{ color: "var(--muted)" }}>{r.description}</p>}
+        <div className="flex gap-1.5 flex-wrap">
+          {["new","inReview","inProgress","done"].map(s => <button key={s} onClick={() => updateStatus(r.id, s)} className="px-3 py-1.5 rounded-lg text-[10px] font-bold min-h-[36px]" style={{ background: r.status === s ? (ST[s]?.color ?? "#6B7280") : "var(--bg)", color: r.status === s ? "#fff" : "var(--muted)", border: `1px solid ${r.status === s ? ST[s]?.color : "var(--card-border)"}` }}>{ST[s]?.label ?? s}</button>)}
+        </div>
+      </div>); })}
+  </div>);
+}

@@ -34,6 +34,7 @@ const NAV_GROUPS = [
     { icon: "▣", label: "المشاريع",           href: "/projects",    badgeKey: null, fixed: false },
     { icon: "◈", label: "الأعمال",            href: "/works",       badgeKey: null, fixed: false },
     { icon: "🎖️", label: "غرفة القيادة",       href: "/war-room",    badgeKey: null, fixed: false },
+    { icon: "🌐", label: "إدارة المواقع",      href: "/web-projects", badgeKey: null, fixed: false },
     { icon: "📅", label: "الاجتماعات",         href: "/meetings",    badgeKey: null, fixed: false },
     { icon: "✦", label: "صندوق الوارد",      href: "/inbox",       badgeKey: "inbox" as const, fixed: false },
   ]},

@@ -444,6 +444,99 @@ using (var scope = app.Services.CreateScope())
     {
         Log.Warning(ex, "Phone addiction tables auto-create skipped");
     }
+
+    // ═══ Web Projects tables ═══
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS WebProjects (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                OwnerId CHAR(36) NOT NULL,
+                Title VARCHAR(300) NOT NULL,
+                ClientName VARCHAR(200) NULL,
+                Description TEXT NULL,
+                CurrentPhase INT NOT NULL DEFAULT 1,
+                `Status` VARCHAR(30) NOT NULL DEFAULT 'active',
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                UpdatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_WebProjects_Owner (OwnerId)
+            );
+            CREATE TABLE IF NOT EXISTS WebProjectMembers (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                ProjectId CHAR(36) NOT NULL,
+                `Name` VARCHAR(200) NOT NULL,
+                Email VARCHAR(200) NULL,
+                `Role` VARCHAR(30) NOT NULL DEFAULT 'employee',
+                AddedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_WebProjectMembers_Project (ProjectId)
+            );
+            CREATE TABLE IF NOT EXISTS WebPhase1Docs (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                ProjectId CHAR(36) NOT NULL,
+                Content LONGTEXT NULL,
+                UpdatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_WebPhase1Docs_Project (ProjectId)
+            );
+            CREATE TABLE IF NOT EXISTS WebPhase1Tasks (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                ProjectId CHAR(36) NOT NULL,
+                Title VARCHAR(500) NOT NULL,
+                AssignedTo VARCHAR(200) NULL,
+                `Status` VARCHAR(30) NOT NULL DEFAULT 'pending',
+                `Order` INT NOT NULL DEFAULT 0,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_WebPhase1Tasks_Project (ProjectId)
+            );
+            CREATE TABLE IF NOT EXISTS WebPhase3Commands (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                ProjectId CHAR(36) NOT NULL,
+                Title VARCHAR(500) NOT NULL,
+                Command LONGTEXT NULL,
+                `Order` INT NOT NULL DEFAULT 0,
+                `Status` VARCHAR(30) NOT NULL DEFAULT 'pending',
+                DoneAt DATETIME(6) NULL,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_WebPhase3Commands_Project (ProjectId)
+            );
+            CREATE TABLE IF NOT EXISTS WebPhase4Credentials (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                ProjectId CHAR(36) NOT NULL,
+                `Type` VARCHAR(50) NOT NULL DEFAULT 'other',
+                Label VARCHAR(200) NOT NULL,
+                Value VARCHAR(1000) NOT NULL,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_WebPhase4Credentials_Project (ProjectId)
+            );
+            CREATE TABLE IF NOT EXISTS WebPhase5Commands (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                ProjectId CHAR(36) NOT NULL,
+                Title VARCHAR(500) NOT NULL,
+                Command LONGTEXT NULL,
+                `Order` INT NOT NULL DEFAULT 0,
+                `Status` VARCHAR(30) NOT NULL DEFAULT 'pending',
+                AddedBy CHAR(36) NULL,
+                EmployeeDoneAt DATETIME(6) NULL,
+                OwnerApprovedAt DATETIME(6) NULL,
+                Notes TEXT NULL,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_WebPhase5Commands_Project (ProjectId)
+            );
+            CREATE TABLE IF NOT EXISTS WebPhase6Requests (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                ProjectId CHAR(36) NOT NULL,
+                Title VARCHAR(500) NOT NULL,
+                Description TEXT NULL,
+                `Status` VARCHAR(30) NOT NULL DEFAULT 'new',
+                ClientNote TEXT NULL,
+                OwnerNote TEXT NULL,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_WebPhase6Requests_Project (ProjectId)
+            );");
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Web projects tables auto-create skipped");
+    }
 }
 
 app.Run();
