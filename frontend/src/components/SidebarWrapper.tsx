@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from './Sidebar';
 
 const AUTH_PATHS = ['/login', '/register'];
-const EMPLOYEE_PATHS = ['/web-projects', '/settings'];
+const EMPLOYEE_PATHS = ['/web-projects'];
 
 export default function SidebarWrapper() {
   const pathname = usePathname();
@@ -68,10 +68,6 @@ export default function SidebarWrapper() {
                   className="w-full text-right px-4 py-3 rounded-xl text-sm font-bold text-white transition"
                   style={{ background: pathname.startsWith("/web-projects") ? "#2D6B9E" : "transparent" }}>
                   🌐 إدارة المواقع
-                </button>
-                <button onClick={() => { router.push("/settings"); setOpen(false); }}
-                  className="w-full text-right px-4 py-3 rounded-xl text-sm text-white/60 transition hover:bg-white/10">
-                  ⚙ الإعدادات
                 </button>
                 <button onClick={() => {
                   document.cookie = "madar_token=; path=/; max-age=0";
