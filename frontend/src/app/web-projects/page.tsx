@@ -160,7 +160,7 @@ export default function WebProjectsPage() {
                 ))}
                 <div className="flex-1" />
                 <Link href={"/web-projects/" + p.id} className="text-[10px] px-3 py-1.5 rounded-lg font-bold min-h-[32px] flex items-center" style={{ color: "#5E5495", background: "#5E549510" }}>✏️ تعديل</Link>
-                <button onClick={(e) => {
+                <button onClick={async (e) => {
                   e.stopPropagation();
                   if (!confirm("حذف \"" + p.title + "\"؟")) return;
                   try { await api.delete("/api/web-projects/" + p.id); } catch {}
