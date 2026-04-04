@@ -15,6 +15,7 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
   const [members, setMembers] = useState<Member[]>([]);
   const [phase, setPhase] = useState<Phase>(1);
   const [loading, setLoading] = useState(true);
+  const [showEdit, setShowEdit] = useState(false);
   const [completedPhases, setCompletedPhases] = useState<Set<number>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem("wp_completed_" + id) ?? "[]")); } catch { return new Set(); }
   });
@@ -55,6 +56,7 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
         <div className="flex items-center gap-3">
           <h2 className="font-bold text-base" style={{ color: "var(--text)" }}>🌐 {project.title}</h2>
           {project.clientName && <span className="text-xs" style={{ color: "var(--muted)" }}>👤 {project.clientName}</span>}
+          <button onClick={() => setShowEdit(!showEdit)} className="text-xs px-2.5 py-1.5 rounded-lg min-h-[36px]" style={{ color: "#5E5495", background: "#5E549510" }}>✏️</button>
         </div>
         {/* Phase tabs */}
         <div className="flex gap-1 mt-2 overflow-x-auto pb-0.5">
@@ -69,6 +71,18 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
       </header>
 
       <div className="px-4 sm:px-6 py-4 space-y-4 max-w-3xl mx-auto">
+        {/* Edit project panel */}
+        {showEdit && (<EditProjectPanel project={project} onSave={(updated) => {
+          setProject(updated); setShowEdit(false);
+          // Update in localStorage
+          try {
+            const all = JSON.parse(localStorage.getItem("madar_web_projects") ?? "[]");
+            const idx = all.findIndex((x: Project) => x.id === id);
+            if (idx >= 0) { all[idx] = { ...all[idx], ...updated }; localStorage.setItem("madar_web_projects", JSON.stringify(all)); }
+          } catch {}
+          api.put("/api/web-projects/" + id, updated).catch(() => {});
+        }} onClose={() => setShowEdit(false)} />)}
+
         {phase === 1 && <Phase1 projectId={id} />}
         {phase === 2 && <Phase2 />}
         {phase === 3 && <Phase7 projectId={id} />}
@@ -101,6 +115,57 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
         })()}
       </div>
     </main>
+  );
+}
+
+// ═══ Edit Project Panel ═══
+const EDIT_PRIORITIES: Record<string,{label:string;color:string;icon:string}> = { urgent:{label:"عاجل",color:"#DC2626",icon:"🔴"}, high:{label:"مرتفع",color:"#F59E0B",icon:"🟡"}, medium:{label:"متوسط",color:"#3B82F6",icon:"🔵"}, low:{label:"منخفض",color:"#6B7280",icon:"⚪"} };
+
+function EditProjectPanel({ project, onSave, onClose }: { project: Project; onSave: (p: Project) => void; onClose: () => void }) {
+  const [title, setTitle] = useState(project.title);
+  const [client, setClient] = useState(project.clientName ?? "");
+  const [desc, setDesc] = useState(project.description ?? "");
+  const [priority, setPriority] = useState(project.priority ?? "medium");
+  const [dueDate, setDueDate] = useState(project.dueDate ?? "");
+  const [status, setStatus] = useState(project.status);
+
+  return (
+    <div className="rounded-2xl border p-5 space-y-3" style={{ background: "var(--card)", borderColor: "#5E549530" }}>
+      <p className="text-xs font-bold" style={{ color: "#5E5495" }}>✏️ تعديل بيانات الموقع</p>
+      <input value={title} onChange={e => setTitle(e.target.value)} placeholder="اسم الموقع" className="w-full px-3 py-3 rounded-xl border text-sm font-bold focus:outline-none" style={is} />
+      <input value={client} onChange={e => setClient(e.target.value)} placeholder="اسم العميل" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
+      <textarea value={desc} onChange={e => setDesc(e.target.value)} placeholder="الوصف" rows={2} className="w-full px-3 py-2 rounded-xl border text-sm resize-none focus:outline-none" style={is} />
+      <div>
+        <label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>الأولوية</label>
+        <div className="flex gap-1.5">
+          {Object.entries(EDIT_PRIORITIES).map(([k, v]) => (
+            <button key={k} type="button" onClick={() => setPriority(k)} className="flex-1 py-2.5 rounded-xl text-xs font-bold transition min-h-[40px]"
+              style={{ background: priority === k ? v.color : "var(--bg)", color: priority === k ? "#fff" : v.color, border: `1px solid ${priority === k ? v.color : "var(--card-border)"}` }}>
+              {v.icon} {v.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>تاريخ التسليم</label>
+        <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
+      </div>
+      <div>
+        <label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>الحالة</label>
+        <div className="flex gap-1.5">
+          {(["active","onHold","completed"] as const).map(s => {
+            const sm: Record<string,{l:string;c:string}> = { active:{l:"نشط",c:"#3D8C5A"}, onHold:{l:"معلّق",c:"#F59E0B"}, completed:{l:"مكتمل",c:"#5E5495"} };
+            const v = sm[s]!;
+            return <button key={s} onClick={() => setStatus(s)} className="flex-1 py-2.5 rounded-xl text-xs font-bold min-h-[40px]" style={{ background: status === s ? v.c : "var(--bg)", color: status === s ? "#fff" : v.c, border: `1px solid ${status === s ? v.c : "var(--card-border)"}` }}>{v.l}</button>;
+          })}
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={() => onSave({ ...project, title: title.trim(), clientName: client.trim() || undefined, description: desc.trim() || undefined, priority, dueDate: dueDate || undefined, status })}
+          disabled={!title.trim()} className="flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>حفظ</button>
+        <button onClick={onClose} className="py-3 px-6 min-h-[44px] rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button>
+      </div>
+    </div>
   );
 }
 

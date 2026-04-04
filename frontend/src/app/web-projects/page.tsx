@@ -105,54 +105,71 @@ export default function WebProjectsPage() {
 
         {!loading && filtered.map(p => {
           const st = STATUS_MAP[p.status] ?? STATUS_MAP.active;
+          const pr = PRIORITIES[p.priority ?? "medium"] ?? PRIORITIES.medium;
           let completedSet: number[] = [];
           try { completedSet = JSON.parse(localStorage.getItem("wp_completed_" + p.id) ?? "[]"); } catch {}
           const completedCount = completedSet.length;
           const phasePct = Math.round((completedCount / 7) * 100);
-          // Find first uncompleted phase as "current"
           const currentPhaseNum = [1,2,3,4,5,6,7].find(n => !completedSet.includes(n)) ?? 7;
           const currentPhaseName = PHASES[currentPhaseNum - 1] ?? "";
           const currentPhaseIcon = PHASE_ICONS[currentPhaseNum - 1] ?? "📝";
+          // Counters from localStorage
+          let p1Tasks = 0, p3Cmds = 0, p5Cmds = 0, p6Reqs = 0, p7Users = 0;
+          try { p1Tasks = JSON.parse(localStorage.getItem("wp_p1tasks_" + p.id) ?? "[]").length; } catch {}
+          try { p3Cmds = JSON.parse(localStorage.getItem("wp_p3_" + p.id) ?? "[]").length; } catch {}
+          try { p5Cmds = JSON.parse(localStorage.getItem("wp_p5_" + p.id) ?? "[]").length; } catch {}
+          try { p6Reqs = JSON.parse(localStorage.getItem("wp_p6_" + p.id) ?? "[]").length; } catch {}
+          try { p7Users = JSON.parse(localStorage.getItem("wp_p7_" + p.id) ?? "[]").length; } catch {}
+          const isOverdue = p.dueDate && new Date(p.dueDate) < new Date() && completedCount < 7;
           return (
-            <div key={p.id} className="rounded-2xl border overflow-hidden transition-all hover:shadow-lg" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+            <div key={p.id} className="rounded-2xl border overflow-hidden transition-all hover:shadow-lg" style={{ background: "var(--card)", borderColor: isOverdue ? "#DC262640" : "var(--card-border)" }}>
               <Link href={"/web-projects/" + p.id} className="block p-4">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0" style={{ background: "#2D6B9E15" }}>🌐</div>
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0" style={{ background: pr.color + "15" }}>🌐</div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{p.title}</p>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {p.clientName && <span className="text-[10px]" style={{ color: "var(--muted)" }}>👤 {p.clientName}</span>}
-                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: st.color + "15", color: st.color }}>{st.label}</span>
-                      {(() => { const pr = PRIORITIES[p.priority ?? "medium"]; return pr ? <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: pr.color + "15", color: pr.color }}>{pr.icon} {pr.label}</span> : null; })()}
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: pr.color + "15", color: pr.color }}>{pr.icon} {pr.label}</span>
                       <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "#2D6B9E15", color: "#2D6B9E" }}>{currentPhaseIcon} {currentPhaseName}</span>
-                      {p.dueDate && <span className="text-[10px]" style={{ color: "var(--muted)" }}>📅 {new Date(p.dueDate).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>}
+                      {p.dueDate && <span className="text-[10px] font-bold" style={{ color: isOverdue ? "#DC2626" : "var(--muted)" }}>{isOverdue ? "⚠️ " : "📅 "}{new Date(p.dueDate).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>}
                     </div>
                   </div>
                   <span className="text-2xl">{completedCount === 7 ? "✅" : currentPhaseIcon}</span>
                 </div>
-                <div className="flex items-center gap-2 mb-2">
+                {/* Counters */}
+                <div className="flex gap-2 flex-wrap mb-2">
+                  {p1Tasks > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: "#2D6B9E10", color: "#2D6B9E" }}>📝 {p1Tasks} مهمة</span>}
+                  {p7Users > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: "#5E549510", color: "#5E5495" }}>👤 {p7Users} مستخدم</span>}
+                  {p3Cmds > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: "#F59E0B10", color: "#F59E0B" }}>⚡ {p3Cmds} أمر</span>}
+                  {p5Cmds > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: "#3D8C5A10", color: "#3D8C5A" }}>🚀 {p5Cmds} تطوير</span>}
+                  {p6Reqs > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: "#3B82F610", color: "#3B82F6" }}>💬 {p6Reqs} طلب</span>}
+                </div>
+                <div className="flex items-center gap-2">
                   <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "#E5E7EB" }}>
-                    <div className="h-full rounded-full transition-all" style={{ width: `${phasePct}%`, background: "#2D6B9E" }} />
+                    <div className="h-full rounded-full transition-all" style={{ width: `${phasePct}%`, background: completedCount === 7 ? "#3D8C5A" : "#2D6B9E" }} />
                   </div>
-                  <span className="text-[10px] font-bold" style={{ color: "#2D6B9E" }}>{completedCount}/7 مراحل</span>
+                  <span className="text-[10px] font-bold" style={{ color: "#2D6B9E" }}>{completedCount}/7</span>
                 </div>
               </Link>
-              <div className="flex justify-end px-4 pb-3 -mt-1">
-                <button onClick={async (e) => {
-                  e.preventDefault(); e.stopPropagation();
-                  if (!confirm("حذف الموقع \"" + p.title + "\" وكل بياناته؟")) return;
-                  // Remove from localStorage
-                  const updated = projects.filter(x => x.id !== p.id);
-                  setProjects(updated); lsSave(updated);
-                  localStorage.removeItem("wp_completed_" + p.id);
-                  localStorage.removeItem("wp_p1doc_" + p.id); localStorage.removeItem("wp_p1tasks_" + p.id);
-                  localStorage.removeItem("wp_p3_" + p.id); localStorage.removeItem("wp_p4_" + p.id);
-                  localStorage.removeItem("wp_p5_" + p.id); localStorage.removeItem("wp_p6_" + p.id);
-                  localStorage.removeItem("wp_p7_" + p.id);
+              {/* Actions: priority change + edit + delete */}
+              <div className="flex items-center gap-1.5 px-4 pb-3 -mt-1 flex-wrap">
+                {Object.entries(PRIORITIES).map(([k, v]) => (
+                  <button key={k} onClick={(e) => { e.stopPropagation(); const updated = projects.map(x => x.id === p.id ? { ...x, priority: k } : x); setProjects(updated); lsSave(updated); }}
+                    className="text-[10px] px-2 py-1.5 rounded-lg font-bold min-h-[32px] transition"
+                    style={{ background: p.priority === k ? v.color : "transparent", color: p.priority === k ? "#fff" : v.color, border: `1px solid ${p.priority === k ? v.color : v.color + "30"}` }}>
+                    {v.icon}
+                  </button>
+                ))}
+                <div className="flex-1" />
+                <Link href={"/web-projects/" + p.id} className="text-[10px] px-3 py-1.5 rounded-lg font-bold min-h-[32px] flex items-center" style={{ color: "#5E5495", background: "#5E549510" }}>✏️ تعديل</Link>
+                <button onClick={(e) => {
+                  e.stopPropagation();
+                  if (!confirm("حذف \"" + p.title + "\"؟")) return;
+                  const updated = projects.filter(x => x.id !== p.id); setProjects(updated); lsSave(updated);
+                  ["wp_completed_","wp_p1doc_","wp_p1tasks_","wp_p3_","wp_p4_","wp_p5_","wp_p6_","wp_p7_"].forEach(k => localStorage.removeItem(k + p.id));
                   api.delete("/api/web-projects/" + p.id).catch(() => {});
-                }}
-                  className="text-[10px] px-3 py-2 rounded-lg font-medium transition hover:bg-red-50 min-h-[36px]"
-                  style={{ color: "#ef4444", border: "1px solid #ef444430" }}>🗑️ حذف</button>
+                }} className="text-[10px] px-2 py-1.5 rounded-lg min-h-[32px] hover:bg-red-50" style={{ color: "#DC2626" }}>🗑️</button>
               </div>
             </div>
           );
