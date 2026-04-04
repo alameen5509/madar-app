@@ -22,7 +22,14 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
       const { data } = await api.get("/api/web-projects/" + id);
       setProject(data.project); setMembers(data.members ?? []);
       setPhase(data.project?.currentPhase ?? 1);
-    } catch {}
+    } catch {
+      // Fallback: load from localStorage
+      try {
+        const all = JSON.parse(localStorage.getItem("madar_web_projects") ?? "[]");
+        const p = all.find((x: Project) => x.id === id);
+        if (p) { setProject(p); setPhase(p.currentPhase ?? 1); }
+      } catch {}
+    }
     setLoading(false);
   }, [id]);
   useEffect(() => { load(); }, [load]);
@@ -63,12 +70,17 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
 
 // ═══ PHASE 1: Ideas ═══
 function Phase1({ projectId }: { projectId: string }) {
-  const [doc, setDoc] = useState(""); const [tasks, setTasks] = useState<{id:string;title:string;assignedTo?:string;status:string}[]>([]); const [newTask, setNewTask] = useState(""); const [saving, setSaving] = useState(false);
-  useEffect(() => { api.get("/api/web-projects/" + projectId + "/phase1/document").then(r => setDoc(r.data?.content ?? "")).catch(() => {}); api.get("/api/web-projects/" + projectId + "/phase1/tasks").then(r => setTasks(r.data ?? [])).catch(() => {}); }, [projectId]);
-  async function saveDoc() { setSaving(true); await api.put("/api/web-projects/" + projectId + "/phase1/document", { content: doc }).catch(() => {}); setSaving(false); }
-  async function addTask() { if (!newTask.trim()) return; await api.post("/api/web-projects/" + projectId + "/phase1/tasks", { title: newTask }).catch(() => {}); setNewTask(""); const { data } = await api.get("/api/web-projects/" + projectId + "/phase1/tasks"); setTasks(data ?? []); }
-  async function toggleTask(tid: string, cur: string) { await api.patch("/api/web-projects/" + projectId + "/phase1/tasks/" + tid, { status: cur === "done" ? "pending" : "done" }).catch(() => {}); setTasks(prev => prev.map(t => t.id === tid ? { ...t, status: cur === "done" ? "pending" : "done" } : t)); }
-  async function delTask(tid: string) { await api.delete("/api/web-projects/" + projectId + "/phase1/tasks/" + tid).catch(() => {}); setTasks(prev => prev.filter(t => t.id !== tid)); }
+  const lsDocKey = "wp_p1doc_" + projectId;
+  const lsTasksKey = "wp_p1tasks_" + projectId;
+  const [doc, setDoc] = useState(() => { try { return localStorage.getItem(lsDocKey) ?? ""; } catch { return ""; } });
+  const [tasks, setTasks] = useState<{id:string;title:string;assignedTo?:string;status:string}[]>(() => { try { return JSON.parse(localStorage.getItem(lsTasksKey) ?? "[]"); } catch { return []; } });
+  const [newTask, setNewTask] = useState(""); const [saving, setSaving] = useState(false);
+  useEffect(() => { api.get("/api/web-projects/" + projectId + "/phase1/document").then(r => { if (r.data?.content) setDoc(r.data.content); }).catch(() => {}); api.get("/api/web-projects/" + projectId + "/phase1/tasks").then(r => { if (r.data?.length) { setTasks(r.data); localStorage.setItem(lsTasksKey, JSON.stringify(r.data)); } }).catch(() => {}); }, [projectId]);
+  function saveTasks(t: {id:string;title:string;assignedTo?:string;status:string}[]) { setTasks(t); localStorage.setItem(lsTasksKey, JSON.stringify(t)); }
+  async function saveDoc() { setSaving(true); localStorage.setItem(lsDocKey, doc); await api.put("/api/web-projects/" + projectId + "/phase1/document", { content: doc }).catch(() => {}); setSaving(false); }
+  async function addTask() { if (!newTask.trim()) return; const nt = { id: "t_" + Date.now(), title: newTask.trim(), status: "pending" }; saveTasks([...tasks, nt]); setNewTask(""); api.post("/api/web-projects/" + projectId + "/phase1/tasks", { title: newTask }).catch(() => {}); }
+  async function toggleTask(tid: string, cur: string) { saveTasks(tasks.map(t => t.id === tid ? { ...t, status: cur === "done" ? "pending" : "done" } : t)); api.patch("/api/web-projects/" + projectId + "/phase1/tasks/" + tid, { status: cur === "done" ? "pending" : "done" }).catch(() => {}); }
+  async function delTask(tid: string) { saveTasks(tasks.filter(t => t.id !== tid)); api.delete("/api/web-projects/" + projectId + "/phase1/tasks/" + tid).catch(() => {}); }
 
   return (<div className="space-y-4">
     <div className="rounded-2xl border p-4" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
@@ -100,11 +112,13 @@ function Phase2() {
 
 // ═══ PHASE 3: Setup Commands ═══
 function Phase3({ projectId }: { projectId: string }) {
-  const [cmds, setCmds] = useState<{id:string;title:string;command?:string;status:string;order:number}[]>([]);
+  const lk = "wp_p3_" + projectId;
+  const [cmds, setCmds] = useState<{id:string;title:string;command?:string;status:string;order:number}[]>(() => { try { return JSON.parse(localStorage.getItem(lk) ?? "[]"); } catch { return []; } });
+  function save(c: typeof cmds) { setCmds(c); localStorage.setItem(lk, JSON.stringify(c)); }
   const [showNew, setShowNew] = useState(false); const [nc, setNc] = useState({ title: "", cmd: "" });
-  useEffect(() => { api.get("/api/web-projects/" + projectId + "/phase3/commands").then(r => setCmds(r.data ?? [])).catch(() => {}); }, [projectId]);
-  async function add() { if (!nc.title.trim()) return; await api.post("/api/web-projects/" + projectId + "/phase3/commands", { title: nc.title, command: nc.cmd || undefined }).catch(() => {}); setNc({ title: "", cmd: "" }); setShowNew(false); const { data } = await api.get("/api/web-projects/" + projectId + "/phase3/commands"); setCmds(data ?? []); }
-  async function markDone(cid: string) { await api.patch("/api/web-projects/" + projectId + "/phase3/commands/" + cid + "/done").catch(() => {}); setCmds(prev => prev.map(c => c.id === cid ? { ...c, status: "done" } : c)); }
+  useEffect(() => { api.get("/api/web-projects/" + projectId + "/phase3/commands").then(r => { if (r.data?.length) save(r.data); }).catch(() => {}); }, [projectId]);
+  async function add() { if (!nc.title.trim()) return; const nc2 = { id: "c3_" + Date.now(), title: nc.title, command: nc.cmd || undefined, status: "pending", order: cmds.length + 1 }; save([...cmds, nc2]); setNc({ title: "", cmd: "" }); setShowNew(false); api.post("/api/web-projects/" + projectId + "/phase3/commands", { title: nc.title, command: nc.cmd || undefined }).catch(() => {}); }
+  async function markDone(cid: string) { save(cmds.map(c => c.id === cid ? { ...c, status: "done" } : c)); api.patch("/api/web-projects/" + projectId + "/phase3/commands/" + cid + "/done").catch(() => {}); }
   const nextCmd = cmds.find(c => c.status === "pending");
   const [copied, setCopied] = useState<string|null>(null);
 
@@ -136,12 +150,14 @@ function Phase3({ projectId }: { projectId: string }) {
 
 // ═══ PHASE 4: Credentials ═══
 function Phase4({ projectId }: { projectId: string }) {
-  const [creds, setCreds] = useState<{id:string;type:string;label:string;value:string}[]>([]);
+  const lk4 = "wp_p4_" + projectId;
+  const [creds, setCreds] = useState<{id:string;type:string;label:string;value:string}[]>(() => { try { return JSON.parse(localStorage.getItem(lk4) ?? "[]"); } catch { return []; } });
+  function saveCreds(c: typeof creds) { setCreds(c); localStorage.setItem(lk4, JSON.stringify(c)); }
   const [showNew, setShowNew] = useState(false); const [nc, setNc] = useState({ type: "hosting", label: "", value: "" });
   const [visible, setVisible] = useState<Set<string>>(new Set());
-  useEffect(() => { api.get("/api/web-projects/" + projectId + "/phase4/credentials").then(r => setCreds(r.data ?? [])).catch(() => {}); }, [projectId]);
-  async function add() { if (!nc.label.trim() || !nc.value.trim()) return; await api.post("/api/web-projects/" + projectId + "/phase4/credentials", nc).catch(() => {}); setNc({ type: "hosting", label: "", value: "" }); setShowNew(false); const { data } = await api.get("/api/web-projects/" + projectId + "/phase4/credentials"); setCreds(data ?? []); }
-  async function del(cid: string) { if (!confirm("حذف؟")) return; await api.delete("/api/web-projects/" + projectId + "/phase4/credentials/" + cid).catch(() => {}); setCreds(prev => prev.filter(c => c.id !== cid)); }
+  useEffect(() => { api.get("/api/web-projects/" + projectId + "/phase4/credentials").then(r => { if (r.data?.length) saveCreds(r.data); }).catch(() => {}); }, [projectId]);
+  async function add() { if (!nc.label.trim() || !nc.value.trim()) return; const n = { id: "cr_" + Date.now(), ...nc }; saveCreds([...creds, n]); setNc({ type: "hosting", label: "", value: "" }); setShowNew(false); api.post("/api/web-projects/" + projectId + "/phase4/credentials", nc).catch(() => {}); }
+  async function del(cid: string) { if (!confirm("حذف؟")) return; saveCreds(creds.filter(c => c.id !== cid)); api.delete("/api/web-projects/" + projectId + "/phase4/credentials/" + cid).catch(() => {}); }
   const TYPES: Record<string,string> = { hosting: "🖥️ استضافة", domain: "🌐 دومين", database: "🗃️ قاعدة بيانات", other: "🔑 أخرى" };
 
   return (<div className="space-y-4">
@@ -166,13 +182,15 @@ function Phase4({ projectId }: { projectId: string }) {
 
 // ═══ PHASE 5: Development ═══
 function Phase5({ projectId }: { projectId: string }) {
-  const [cmds, setCmds] = useState<{id:string;title:string;command?:string;status:string;order:number;notes?:string}[]>([]);
+  const lk5 = "wp_p5_" + projectId;
+  const [cmds, setCmds] = useState<{id:string;title:string;command?:string;status:string;order:number;notes?:string}[]>(() => { try { return JSON.parse(localStorage.getItem(lk5) ?? "[]"); } catch { return []; } });
+  function save5(c: typeof cmds) { setCmds(c); localStorage.setItem(lk5, JSON.stringify(c)); }
   const [showNew, setShowNew] = useState(false); const [nc, setNc] = useState({ title: "", cmd: "" });
   const [copied, setCopied] = useState<string|null>(null);
-  useEffect(() => { api.get("/api/web-projects/" + projectId + "/phase5/commands").then(r => setCmds(r.data ?? [])).catch(() => {}); }, [projectId]);
-  async function add() { if (!nc.title.trim()) return; await api.post("/api/web-projects/" + projectId + "/phase5/commands", { title: nc.title, command: nc.cmd || undefined }).catch(() => {}); setNc({ title: "", cmd: "" }); setShowNew(false); const { data } = await api.get("/api/web-projects/" + projectId + "/phase5/commands"); setCmds(data ?? []); }
-  async function employeeDone(cid: string) { await api.patch("/api/web-projects/" + projectId + "/phase5/commands/" + cid + "/employee-done").catch(() => {}); setCmds(prev => prev.map(c => c.id === cid ? { ...c, status: "employeeDone" } : c)); }
-  async function ownerApprove(cid: string) { await api.patch("/api/web-projects/" + projectId + "/phase5/commands/" + cid + "/owner-approve").catch(() => {}); setCmds(prev => prev.map(c => c.id === cid ? { ...c, status: "closed" } : c)); }
+  useEffect(() => { api.get("/api/web-projects/" + projectId + "/phase5/commands").then(r => { if (r.data?.length) save5(r.data); }).catch(() => {}); }, [projectId]);
+  async function add() { if (!nc.title.trim()) return; const n = { id: "c5_" + Date.now(), title: nc.title, command: nc.cmd || undefined, status: "pending", order: cmds.length + 1 }; save5([...cmds, n]); setNc({ title: "", cmd: "" }); setShowNew(false); api.post("/api/web-projects/" + projectId + "/phase5/commands", { title: nc.title, command: nc.cmd || undefined }).catch(() => {}); }
+  async function employeeDone(cid: string) { save5(cmds.map(c => c.id === cid ? { ...c, status: "employeeDone" } : c)); api.patch("/api/web-projects/" + projectId + "/phase5/commands/" + cid + "/employee-done").catch(() => {}); }
+  async function ownerApprove(cid: string) { save5(cmds.map(c => c.id === cid ? { ...c, status: "closed" } : c)); api.patch("/api/web-projects/" + projectId + "/phase5/commands/" + cid + "/owner-approve").catch(() => {}); }
   const ST: Record<string,{label:string;color:string;icon:string}> = { pending:{label:"لم يُنفَّذ",color:"#6B7280",icon:"⏳"}, employeeDone:{label:"بانتظار المراجعة",color:"#F59E0B",icon:"🔄"}, closed:{label:"مُغلق",color:"#3D8C5A",icon:"✅"} };
 
   return (<div className="space-y-4">
@@ -197,11 +215,13 @@ function Phase5({ projectId }: { projectId: string }) {
 
 // ═══ PHASE 6: Client ═══
 function Phase6({ projectId }: { projectId: string }) {
-  const [reqs, setReqs] = useState<{id:string;title:string;description?:string;status:string;clientNote?:string;ownerNote?:string;createdAt:string}[]>([]);
+  const lk6 = "wp_p6_" + projectId;
+  const [reqs, setReqs] = useState<{id:string;title:string;description?:string;status:string;clientNote?:string;ownerNote?:string;createdAt:string}[]>(() => { try { return JSON.parse(localStorage.getItem(lk6) ?? "[]"); } catch { return []; } });
+  function save6(r: typeof reqs) { setReqs(r); localStorage.setItem(lk6, JSON.stringify(r)); }
   const [showNew, setShowNew] = useState(false); const [nr, setNr] = useState({ title: "", desc: "", note: "" });
-  useEffect(() => { api.get("/api/web-projects/" + projectId + "/phase6/requests").then(r => setReqs(r.data ?? [])).catch(() => {}); }, [projectId]);
-  async function add() { if (!nr.title.trim()) return; await api.post("/api/web-projects/" + projectId + "/phase6/requests", { title: nr.title, description: nr.desc || undefined, clientNote: nr.note || undefined }).catch(() => {}); setNr({ title: "", desc: "", note: "" }); setShowNew(false); const { data } = await api.get("/api/web-projects/" + projectId + "/phase6/requests"); setReqs(data ?? []); }
-  async function updateStatus(rid: string, status: string) { await api.patch("/api/web-projects/" + projectId + "/phase6/requests/" + rid, { status }).catch(() => {}); setReqs(prev => prev.map(r => r.id === rid ? { ...r, status } : r)); }
+  useEffect(() => { api.get("/api/web-projects/" + projectId + "/phase6/requests").then(r => { if (r.data?.length) save6(r.data); }).catch(() => {}); }, [projectId]);
+  async function add() { if (!nr.title.trim()) return; const n = { id: "r6_" + Date.now(), title: nr.title, description: nr.desc || undefined, status: "new", clientNote: nr.note || undefined, createdAt: new Date().toISOString() }; save6([n, ...reqs]); setNr({ title: "", desc: "", note: "" }); setShowNew(false); api.post("/api/web-projects/" + projectId + "/phase6/requests", { title: nr.title, description: nr.desc || undefined, clientNote: nr.note || undefined }).catch(() => {}); }
+  async function updateStatus(rid: string, status: string) { save6(reqs.map(r => r.id === rid ? { ...r, status } : r)); api.patch("/api/web-projects/" + projectId + "/phase6/requests/" + rid, { status }).catch(() => {}); }
   const ST: Record<string,{label:string;color:string}> = { new:{label:"جديد",color:"#3B82F6"}, inReview:{label:"قيد المراجعة",color:"#F59E0B"}, inProgress:{label:"جاري",color:"#5E5495"}, done:{label:"مكتمل",color:"#3D8C5A"} };
 
   return (<div className="space-y-4">

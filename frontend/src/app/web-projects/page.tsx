@@ -17,16 +17,31 @@ export default function WebProjectsPage() {
   const [np, setNp] = useState({ title: "", client: "", desc: "" });
   const [filter, setFilter] = useState<"all"|"active"|"completed"|"onHold">("all");
 
+  const LS_KEY = "madar_web_projects";
+  function lsGet(): Project[] { try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]"); } catch { return []; } }
+  function lsSave(p: Project[]) { localStorage.setItem(LS_KEY, JSON.stringify(p)); }
+
   const load = useCallback(async () => {
     setLoading(true);
-    try { const { data } = await api.get("/api/web-projects"); setProjects(data ?? []); } catch {}
+    try {
+      const { data } = await api.get("/api/web-projects");
+      if (data && data.length >= 0) { setProjects(data); lsSave(data); }
+      else { setProjects(lsGet()); }
+    } catch { setProjects(lsGet()); }
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
 
   async function create() {
     if (!np.title.trim()) return;
-    try { await api.post("/api/web-projects", { title: np.title, clientName: np.client || undefined, description: np.desc || undefined }); setNp({ title: "", client: "", desc: "" }); setShowNew(false); load(); } catch { alert("فشل الإنشاء"); }
+    const newP: Project = { id: "wp_" + Date.now(), title: np.title.trim(), clientName: np.client.trim() || undefined, description: np.desc.trim() || undefined, currentPhase: 1, status: "active", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    try {
+      const { data } = await api.post("/api/web-projects", { title: np.title, clientName: np.client || undefined, description: np.desc || undefined });
+      if (data?.id) newP.id = data.id;
+    } catch {}
+    const updated = [newP, ...projects];
+    setProjects(updated); lsSave(updated);
+    setNp({ title: "", client: "", desc: "" }); setShowNew(false);
   }
 
   const filtered = filter === "all" ? projects : projects.filter(p => p.status === filter);
