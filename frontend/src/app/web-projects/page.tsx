@@ -5,8 +5,8 @@ import { api } from "@/lib/api";
 
 interface Project { id:string; title:string; clientName?:string; description?:string; currentPhase:number; status:string; priority?:string; dueDate?:string; createdAt:string; updatedAt:string }
 
-const PHASES = ["بناء الفكرة","الوثيقة العامة","المستخدمين","التأسيس","الاستضافة","التطوير","العميل"];
-const PHASE_ICONS = ["📝","📁","👤","⚡","🔐","🚀","💬"];
+const PHASES = ["التحضير","التأسيس","الاستضافة","التطوير","العميل"];
+const PHASE_ICONS = ["📋","⚡","🔐","🚀","💬"];
 const STATUS_MAP: Record<string,{label:string;color:string}> = { active:{label:"نشط",color:"#3D8C5A"}, completed:{label:"مكتمل",color:"#5E5495"}, onHold:{label:"معلّق",color:"#F59E0B"} };
 const is = { background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" } as const;
 
@@ -16,7 +16,7 @@ export default function WebProjectsPage() {
   const [showNew, setShowNew] = useState(false);
   const [isOwner, setIsOwner] = useState(true);
   const [np, setNp] = useState({ title: "", client: "", desc: "", priority: "medium", dueDate: "" });
-  const [filter, setFilter] = useState<"all"|"active"|"completed"|"onHold">("all");
+  const [filter, setFilter] = useState<"all"|"1"|"2"|"3"|"4"|"5">("all");
   const [syncStatus, setSyncStatus] = useState("");
 
   const load = useCallback(async () => {
@@ -52,19 +52,27 @@ export default function WebProjectsPage() {
   };
 
   const priorityOrder: Record<string,number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-  const filtered = (filter === "all" ? projects : projects.filter(p => p.status === filter))
-    .sort((a, b) => (priorityOrder[a.priority ?? "medium"] ?? 2) - (priorityOrder[b.priority ?? "medium"] ?? 2));
+  const filtered = (filter === "all" ? projects : projects.filter(p => {
+    let completedSet: number[] = [];
+    try { completedSet = JSON.parse(localStorage.getItem("wp_completed_" + p.id) ?? "[]"); } catch {}
+    const currentPhaseNum = [1,2,3,4,5].find(n => !completedSet.includes(n)) ?? 5;
+    return String(currentPhaseNum) === filter;
+  })).sort((a, b) => (priorityOrder[a.priority ?? "medium"] ?? 2) - (priorityOrder[b.priority ?? "medium"] ?? 2));
 
   return (
     <main className="flex-1 overflow-y-auto" dir="rtl" style={{ background: "var(--bg)" }}>
       <header className="sticky top-0 z-20 backdrop-blur border-b px-4 sm:px-6 py-3 pr-14 md:pr-6" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
         <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>🌐 إدارة المواقع</h2>
         <p className="text-[10px]" style={{ color: "var(--muted)" }}>{projects.length} موقع</p>
-        <div className="flex gap-1.5 mt-2">
-          {(["all","active","completed","onHold"] as const).map(f => (
-            <button key={f} onClick={() => setFilter(f)} className="px-3 py-2 rounded-xl text-xs font-bold transition min-h-[40px]"
-              style={{ background: filter === f ? "#2D6B9E" : "var(--bg)", color: filter === f ? "#fff" : "var(--muted)", border: `1px solid ${filter === f ? "#2D6B9E" : "var(--card-border)"}` }}>
-              {f === "all" ? "الكل" : STATUS_MAP[f]?.label ?? f}
+        <div className="flex gap-1.5 mt-2 overflow-x-auto pb-0.5">
+          <button onClick={() => setFilter("all")} className="px-3 py-2 rounded-xl text-xs font-bold transition min-h-[40px] whitespace-nowrap"
+            style={{ background: filter === "all" ? "#2D6B9E" : "var(--bg)", color: filter === "all" ? "#fff" : "var(--muted)", border: `1px solid ${filter === "all" ? "#2D6B9E" : "var(--card-border)"}` }}>
+            الكل
+          </button>
+          {PHASES.map((p, i) => (
+            <button key={i} onClick={() => setFilter(String(i + 1) as typeof filter)} className="px-3 py-2 rounded-xl text-xs font-bold transition min-h-[40px] whitespace-nowrap"
+              style={{ background: filter === String(i + 1) ? "#2D6B9E" : "var(--bg)", color: filter === String(i + 1) ? "#fff" : "var(--muted)", border: `1px solid ${filter === String(i + 1) ? "#2D6B9E" : "var(--card-border)"}` }}>
+              {PHASE_ICONS[i]} {p}
             </button>
           ))}
         </div>
@@ -109,11 +117,11 @@ export default function WebProjectsPage() {
           const pr = PRIORITIES[p.priority ?? "medium"] ?? PRIORITIES.medium;
           let completedSet: number[] = [];
           try { completedSet = JSON.parse(localStorage.getItem("wp_completed_" + p.id) ?? "[]"); } catch {}
-          const completedCount = completedSet.length;
-          const phasePct = Math.round((completedCount / 7) * 100);
-          const currentPhaseNum = [1,2,3,4,5,6,7].find(n => !completedSet.includes(n)) ?? 7;
+          const completedCount = completedSet.filter(n => n >= 1 && n <= 5).length;
+          const phasePct = Math.round((completedCount / 5) * 100);
+          const currentPhaseNum = [1,2,3,4,5].find(n => !completedSet.includes(n)) ?? 5;
           const currentPhaseName = PHASES[currentPhaseNum - 1] ?? "";
-          const currentPhaseIcon = PHASE_ICONS[currentPhaseNum - 1] ?? "📝";
+          const currentPhaseIcon = PHASE_ICONS[currentPhaseNum - 1] ?? "📋";
           // Counters from localStorage
           let p1Tasks = 0, p3Cmds = 0, p5Cmds = 0, p6Reqs = 0, p7Users = 0;
           try { p1Tasks = JSON.parse(localStorage.getItem("wp_p1tasks_" + p.id) ?? "[]").length; } catch {}
@@ -150,7 +158,7 @@ export default function WebProjectsPage() {
                   <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "#E5E7EB" }}>
                     <div className="h-full rounded-full transition-all" style={{ width: `${phasePct}%`, background: completedCount === 7 ? "#3D8C5A" : "#2D6B9E" }} />
                   </div>
-                  <span className="text-[10px] font-bold" style={{ color: "#2D6B9E" }}>{completedCount}/7</span>
+                  <span className="text-[10px] font-bold" style={{ color: "#2D6B9E" }}>{completedCount}/5</span>
                 </div>
               </Link>
               {/* Actions: priority change + edit + delete (owner only) */}

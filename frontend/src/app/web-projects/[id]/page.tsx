@@ -3,10 +3,10 @@ import { use, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 
-type Phase = 1|2|3|4|5|6|7;
+type Phase = 1|2|3|4|5;
 interface Project { id:string; title:string; clientName?:string; description?:string; currentPhase:number; status:string; priority?:string; dueDate?:string; completedPhases?: number[] }
 interface Member { id:string; name:string; email?:string; role:string }
-const PHASES: {n:Phase;label:string;icon:string}[] = [{n:1,label:"بناء الفكرة",icon:"📝"},{n:2,label:"الوثيقة العامة",icon:"📁"},{n:3,label:"المستخدمين",icon:"👤"},{n:4,label:"التأسيس",icon:"⚡"},{n:5,label:"الاستضافة",icon:"🔐"},{n:6,label:"التطوير",icon:"🚀"},{n:7,label:"العميل",icon:"💬"}];
+const PHASES: {n:Phase;label:string;icon:string}[] = [{n:1,label:"التحضير",icon:"📋"},{n:2,label:"التأسيس",icon:"⚡"},{n:3,label:"الاستضافة",icon:"🔐"},{n:4,label:"التطوير",icon:"🚀"},{n:5,label:"العميل",icon:"💬"}];
 const is = { background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" } as const;
 
 export default function WebProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -111,18 +111,16 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
         {/* Members panel */}
         {showMembers && <MembersPanel projectId={id} members={members} onUpdate={load} />}
 
-        {phase === 1 && <Phase1 projectId={id} />}
-        {phase === 2 && <Phase2 />}
-        {phase === 3 && <Phase7 projectId={id} />}
-        {phase === 4 && <Phase3 projectId={id} />}
-        {phase === 5 && <Phase4 projectId={id} />}
-        {phase === 6 && <Phase5 projectId={id} />}
-        {phase === 7 && <Phase6 projectId={id} />}
+        {phase === 1 && <PreparationPhase projectId={id} />}
+        {phase === 2 && <Phase3 projectId={id} />}
+        {phase === 3 && <Phase4 projectId={id} />}
+        {phase === 4 && <Phase5 projectId={id} />}
+        {phase === 5 && <Phase6 projectId={id} />}
 
         {/* Complete phase button */}
         {(() => {
           // Block completion of phase 3 (users) if no accounts
-          const blocked = phase === 3 && (() => { try { return JSON.parse(localStorage.getItem("wp_p7_" + id) ?? "[]").length === 0; } catch { return true; } })();
+          const blocked = phase === 1 && (() => { try { return JSON.parse(localStorage.getItem("wp_p7_" + id) ?? "[]").length === 0; } catch { return true; } })();
           return (
             <div className="mt-6 flex flex-col sm:flex-row gap-2">
               {completedPhases.has(phase) ? (
@@ -302,6 +300,26 @@ function EditProjectPanel({ project, onSave, onClose }: { project: Project; onSa
           disabled={!title.trim()} className="flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>حفظ</button>
         <button onClick={onClose} className="py-3 px-6 min-h-[44px] rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button>
       </div>
+    </div>
+  );
+}
+
+// ═══ PREPARATION PHASE (combined: ideas + docs + users) ═══
+function PreparationPhase({ projectId }: { projectId: string }) {
+  const [subTab, setSubTab] = useState<"ideas"|"docs"|"users">("ideas");
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-1.5">
+        {([["ideas","📝 الأفكار"],["docs","📁 الوثائق"],["users","👤 المستخدمين"]] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setSubTab(k)} className="flex-1 py-2.5 rounded-xl text-xs font-bold min-h-[40px] transition"
+            style={{ background: subTab === k ? "#5E5495" : "var(--bg)", color: subTab === k ? "#fff" : "var(--muted)", border: `1px solid ${subTab === k ? "#5E5495" : "var(--card-border)"}` }}>
+            {l}
+          </button>
+        ))}
+      </div>
+      {subTab === "ideas" && <Phase1 projectId={projectId} />}
+      {subTab === "docs" && <Phase2 />}
+      {subTab === "users" && <Phase7 projectId={projectId} />}
     </div>
   );
 }
