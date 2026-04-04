@@ -123,6 +123,28 @@ export default function WebProjectsPage() {
       <div className="px-4 sm:px-6 py-4 space-y-3 max-w-3xl mx-auto">
         <button onClick={() => setShowNew(!showNew)} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #2D6B9E, #D4AF37)" }}>+ موقع جديد</button>
         {syncStatus && <p className="text-center text-[10px] py-1" style={{ color: "var(--muted)" }}>{syncStatus}</p>}
+        {projects.length > 0 && (
+          <button onClick={async () => {
+            setSyncStatus("⏳ جارٍ الرفع...");
+            try {
+              const { data: prefs } = await api.get("/api/users/me/preferences");
+              const current = (typeof prefs === "object" && prefs !== null) ? prefs : {};
+              const projectsData: Record<string, Record<string, string>> = {};
+              for (const proj of projects) {
+                const pd: Record<string, string> = {};
+                for (const k of LS_KEYS) { const v = localStorage.getItem(k + proj.id); if (v) pd[k] = v; }
+                projectsData[proj.id] = pd;
+              }
+              await api.put("/api/users/me/preferences", { ...current, webProjects: projects, webProjectsData: projectsData });
+              setSyncStatus("✅ تم الرفع — " + projects.length + " موقع");
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : String(err);
+              setSyncStatus("❌ فشل: " + msg);
+            }
+          }} className="w-full py-2.5 min-h-[40px] rounded-xl text-xs font-bold transition" style={{ background: "#5E549510", color: "#5E5495", border: "1px solid #5E549520" }}>
+            ☁️ رفع للسحابة يدوياً
+          </button>
+        )}
 
         {showNew && (
           <div className="rounded-2xl border p-5 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
