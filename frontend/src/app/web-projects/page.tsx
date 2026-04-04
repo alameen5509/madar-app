@@ -18,69 +18,14 @@ export default function WebProjectsPage() {
   const [filter, setFilter] = useState<"all"|"active"|"completed"|"onHold">("all");
   const [syncStatus, setSyncStatus] = useState("");
 
-  const LS_KEY = "madar_web_projects";
-  const LS_KEYS = ["wp_completed_","wp_p1doc_","wp_p1tasks_","wp_p3_","wp_p4_","wp_p5_","wp_p6_","wp_p7_"];
-
-  // ═══ CLOUD SYNC via DevContext API (already deployed) ═══
-  function getAllData(p: Project[]): string {
-    const bundle: { projects: Project[]; phases: Record<string, Record<string, string>> } = { projects: p, phases: {} };
-    for (const proj of p) {
-      bundle.phases[proj.id] = {};
-      for (const k of LS_KEYS) {
-        const v = localStorage.getItem(k + proj.id);
-        if (v) bundle.phases[proj.id][k] = v;
-      }
-    }
-    return JSON.stringify(bundle);
-  }
-
-  async function pushToCloud(p: Project[]) {
-    try {
-      await api.put("/api/dev-tickets/context", { content: "WP_DATA:" + getAllData(p) });
-    } catch {}
-  }
-
-  async function pullFromCloud(): Promise<{ projects: Project[]; phases: Record<string, Record<string, string>> } | null> {
-    try {
-      const { data } = await api.get("/api/dev-tickets/context");
-      const content = data?.content as string ?? "";
-      if (content.startsWith("WP_DATA:")) {
-        return JSON.parse(content.slice(8));
-      }
-    } catch {}
-    return null;
-  }
-
-  function lsGet(): Project[] { try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]"); } catch { return []; } }
-
-  function lsSave(p: Project[]) {
-    localStorage.setItem(LS_KEY, JSON.stringify(p));
-    pushToCloud(p);
-  }
-
   const load = useCallback(async () => {
-    setLoading(true); setSyncStatus("جارٍ التحميل...");
-    // 1. Try cloud (DevContext)
-    const cloud = await pullFromCloud();
-    if (cloud && cloud.projects.length > 0) {
-      setProjects(cloud.projects);
-      localStorage.setItem(LS_KEY, JSON.stringify(cloud.projects));
-      for (const [projId, pd] of Object.entries(cloud.phases)) {
-        for (const [key, val] of Object.entries(pd)) {
-          if (val) localStorage.setItem(key + projId, val);
-        }
-      }
-      setSyncStatus("☁️ " + cloud.projects.length + " موقع");
-      setLoading(false); return;
-    }
-    // 2. Fallback to localStorage
-    const local = lsGet();
-    if (local.length > 0) {
-      setProjects(local);
-      setSyncStatus("💾 محلي — " + local.length);
-      pushToCloud(local); // Push local to cloud for other devices
-    } else {
+    setLoading(true); setSyncStatus("");
+    try {
+      const { data } = await api.get("/api/web-projects");
+      setProjects(data ?? []);
       setSyncStatus("");
+    } catch {
+      setSyncStatus("⚠️ فشل التحميل");
     }
     setLoading(false);
   }, []);
@@ -88,14 +33,11 @@ export default function WebProjectsPage() {
 
   async function create() {
     if (!np.title.trim()) return;
-    const newP: Project = { id: "wp_" + Date.now(), title: np.title.trim(), clientName: np.client.trim() || undefined, description: np.desc.trim() || undefined, priority: np.priority, dueDate: np.dueDate || undefined, currentPhase: 1, status: "active", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     try {
-      const { data } = await api.post("/api/web-projects", { title: np.title, clientName: np.client || undefined, description: np.desc || undefined });
-      if (data?.id) newP.id = data.id;
-    } catch {}
-    const updated = [newP, ...projects];
-    setProjects(updated); lsSave(updated);
-    setNp({ title: "", client: "", desc: "", priority: "medium", dueDate: "" }); setShowNew(false);
+      await api.post("/api/web-projects", { title: np.title.trim(), clientName: np.client.trim() || undefined, description: np.desc.trim() || undefined });
+      setNp({ title: "", client: "", desc: "", priority: "medium", dueDate: "" }); setShowNew(false);
+      load();
+    } catch { alert("فشل الإنشاء"); }
   }
 
   const PRIORITIES: Record<string,{label:string;color:string;icon:string}> = {
@@ -210,7 +152,7 @@ export default function WebProjectsPage() {
               {/* Actions: priority change + edit + delete */}
               <div className="flex items-center gap-1.5 px-4 pb-3 -mt-1 flex-wrap">
                 {Object.entries(PRIORITIES).map(([k, v]) => (
-                  <button key={k} onClick={(e) => { e.stopPropagation(); const updated = projects.map(x => x.id === p.id ? { ...x, priority: k } : x); setProjects(updated); lsSave(updated); }}
+                  <button key={k} onClick={(e) => { e.stopPropagation(); setProjects(prev => prev.map(x => x.id === p.id ? { ...x, priority: k } : x)); api.put("/api/web-projects/" + p.id, { status: p.status }).catch(() => {}); }}
                     className="text-[10px] px-2 py-1.5 rounded-lg font-bold min-h-[32px] transition"
                     style={{ background: p.priority === k ? v.color : "transparent", color: p.priority === k ? "#fff" : v.color, border: `1px solid ${p.priority === k ? v.color : v.color + "30"}` }}>
                     {v.icon}
@@ -221,9 +163,8 @@ export default function WebProjectsPage() {
                 <button onClick={(e) => {
                   e.stopPropagation();
                   if (!confirm("حذف \"" + p.title + "\"؟")) return;
-                  const updated = projects.filter(x => x.id !== p.id); setProjects(updated); lsSave(updated);
-                  ["wp_completed_","wp_p1doc_","wp_p1tasks_","wp_p3_","wp_p4_","wp_p5_","wp_p6_","wp_p7_"].forEach(k => localStorage.removeItem(k + p.id));
-                  api.delete("/api/web-projects/" + p.id).catch(() => {});
+                  try { await api.delete("/api/web-projects/" + p.id); } catch {}
+                  setProjects(prev => prev.filter(x => x.id !== p.id));
                 }} className="text-[10px] px-2 py-1.5 rounded-lg min-h-[32px] hover:bg-red-50" style={{ color: "#DC2626" }}>🗑️</button>
               </div>
             </div>
