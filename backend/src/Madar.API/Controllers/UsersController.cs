@@ -169,6 +169,29 @@ public class UsersController : BaseController
         return Ok(new { message = $"تم حذف حساب {user.FullName}" });
     }
 
+    /// <summary>نوع المستخدم: owner أو web-employee</summary>
+    [HttpGet("me/type")]
+    public async Task<IActionResult> GetUserType(CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var user = await _db.Users.FindAsync(new object[] { userId }, ct);
+        if (user is null) return NotFound();
+        // Check if user owns any works
+        var ownsWorks = await _db.Works.AnyAsync(w => w.OwnerId == userId, ct);
+        if (ownsWorks) return Ok(new { type = "owner" });
+        // Check if member in web projects (via raw SQL since WebProjectMembers not in DbContext)
+        try {
+            var conn = _db.Database.GetDbConnection();
+            if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync(ct);
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM WebProjectMembers WHERE Email=@e";
+            var p = cmd.CreateParameter(); p.ParameterName = "@e"; p.Value = user.Email ?? ""; cmd.Parameters.Add(p);
+            var count = Convert.ToInt32(await cmd.ExecuteScalarAsync(ct));
+            if (count > 0) return Ok(new { type = "web-employee" });
+        } catch {}
+        return Ok(new { type = "owner" }); // default
+    }
+
     /// <summary>جلب إعدادات المستخدم الحالي</summary>
     [HttpGet("me/preferences")]
     public async Task<IActionResult> GetPreferences(CancellationToken ct)

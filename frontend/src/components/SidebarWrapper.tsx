@@ -16,32 +16,31 @@ export default function SidebarWrapper() {
   // Close sidebar on navigation
   useEffect(() => { setOpen(false); }, [pathname]);
 
-  // Check if user is a web-projects-only employee
+  // Check user type once on mount only
+  const [checked, setChecked] = useState(false);
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || checked) return;
+    const token = document.cookie.includes("madar_token=");
+    if (!token) return;
     const check = async () => {
       try {
         const { api } = await import("@/lib/api");
-        // Check if user owns any works/tasks (real user)
-        const [tasks, works] = await Promise.all([
-          api.get("/api/tasks").then(r => r.data?.length ?? 0).catch(() => 0),
-          api.get("/api/works").then(r => r.data?.length ?? 0).catch(() => 0),
-        ]);
-        if (tasks === 0 && works === 0) {
-          // Check if member in web projects
-          const wp = await api.get("/api/web-projects").then(r => r.data?.length ?? 0).catch(() => 0);
-          if (wp > 0) {
-            setIsWebEmployee(true);
-            // Redirect to web-projects if on wrong page
-            if (!EMPLOYEE_PATHS.some(p => pathname.startsWith(p))) {
-              router.replace("/web-projects");
-            }
-          }
+        const { data } = await api.get("/api/users/me/type");
+        if (data?.type === "web-employee") {
+          setIsWebEmployee(true);
         }
       } catch {}
+      setChecked(true);
     };
     check();
-  }, [pathname, router]);
+  }, [checked]);
+
+  // Redirect web employee away from non-allowed pages
+  useEffect(() => {
+    if (isWebEmployee && !EMPLOYEE_PATHS.some(p => pathname.startsWith(p))) {
+      router.replace("/web-projects");
+    }
+  }, [isWebEmployee, pathname, router]);
 
   if (AUTH_PATHS.some((p) => pathname.startsWith(p))) return null;
 
