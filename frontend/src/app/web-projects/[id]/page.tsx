@@ -4,7 +4,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 
 type Phase = 1|2|3|4|5|6|7;
-interface Project { id:string; title:string; clientName?:string; description?:string; currentPhase:number; status:string; completedPhases?: number[] }
+interface Project { id:string; title:string; clientName?:string; description?:string; currentPhase:number; status:string; priority?:string; dueDate?:string; completedPhases?: number[] }
 interface Member { id:string; name:string; email?:string; role:string }
 const PHASES: {n:Phase;label:string;icon:string}[] = [{n:1,label:"بناء الفكرة",icon:"📝"},{n:2,label:"الوثيقة العامة",icon:"📁"},{n:3,label:"المستخدمين",icon:"👤"},{n:4,label:"التأسيس",icon:"⚡"},{n:5,label:"الاستضافة",icon:"🔐"},{n:6,label:"التطوير",icon:"🚀"},{n:7,label:"العميل",icon:"💬"}];
 const is = { background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" } as const;
