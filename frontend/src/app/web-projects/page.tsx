@@ -80,22 +80,28 @@ export default function WebProjectsPage() {
 
         {!loading && filtered.map(p => {
           const st = STATUS_MAP[p.status] ?? STATUS_MAP.active;
-          let completedCount = 0;
-          try { completedCount = JSON.parse(localStorage.getItem("wp_completed_" + p.id) ?? "[]").length; } catch {}
+          let completedSet: number[] = [];
+          try { completedSet = JSON.parse(localStorage.getItem("wp_completed_" + p.id) ?? "[]"); } catch {}
+          const completedCount = completedSet.length;
           const phasePct = Math.round((completedCount / 7) * 100);
+          // Find first uncompleted phase as "current"
+          const currentPhaseNum = [1,2,3,4,5,6,7].find(n => !completedSet.includes(n)) ?? 7;
+          const currentPhaseName = PHASES[currentPhaseNum - 1] ?? "";
+          const currentPhaseIcon = PHASE_ICONS[currentPhaseNum - 1] ?? "📝";
           return (
-            <Link key={p.id} href={"/web-projects/" + p.id} className="block rounded-2xl border overflow-hidden transition-all hover:shadow-lg hover:border-[#2D6B9E]" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-              <div className="p-4">
+            <div key={p.id} className="rounded-2xl border overflow-hidden transition-all hover:shadow-lg" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+              <Link href={"/web-projects/" + p.id} className="block p-4">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0" style={{ background: "#2D6B9E15" }}>🌐</div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{p.title}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {p.clientName && <span className="text-[10px]" style={{ color: "var(--muted)" }}>👤 {p.clientName}</span>}
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: st.color + "15", color: st.color }}>{st.label}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "#2D6B9E15", color: "#2D6B9E" }}>{currentPhaseIcon} {currentPhaseName}</span>
                     </div>
                   </div>
-                  <span className="text-2xl">{PHASE_ICONS[p.currentPhase - 1] ?? "📝"}</span>
+                  <span className="text-2xl">{completedCount === 7 ? "✅" : currentPhaseIcon}</span>
                 </div>
                 <div className="flex items-center gap-2 mb-2">
                   <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "#E5E7EB" }}>
@@ -103,9 +109,26 @@ export default function WebProjectsPage() {
                   </div>
                   <span className="text-[10px] font-bold" style={{ color: "#2D6B9E" }}>{completedCount}/7 مراحل</span>
                 </div>
-                <p className="text-[10px]" style={{ color: "var(--muted)" }}>{PHASE_ICONS[p.currentPhase - 1]} {PHASES[p.currentPhase - 1]}</p>
               </div>
-            </Link>
+              </Link>
+              <div className="flex justify-end px-4 pb-3 -mt-1">
+                <button onClick={async (e) => {
+                  e.preventDefault(); e.stopPropagation();
+                  if (!confirm("حذف الموقع \"" + p.title + "\" وكل بياناته؟")) return;
+                  // Remove from localStorage
+                  const updated = projects.filter(x => x.id !== p.id);
+                  setProjects(updated); lsSave(updated);
+                  localStorage.removeItem("wp_completed_" + p.id);
+                  localStorage.removeItem("wp_p1doc_" + p.id); localStorage.removeItem("wp_p1tasks_" + p.id);
+                  localStorage.removeItem("wp_p3_" + p.id); localStorage.removeItem("wp_p4_" + p.id);
+                  localStorage.removeItem("wp_p5_" + p.id); localStorage.removeItem("wp_p6_" + p.id);
+                  localStorage.removeItem("wp_p7_" + p.id);
+                  api.delete("/api/web-projects/" + p.id).catch(() => {});
+                }}
+                  className="text-[10px] px-3 py-2 rounded-lg font-medium transition hover:bg-red-50 min-h-[36px]"
+                  style={{ color: "#ef4444", border: "1px solid #ef444430" }}>🗑️ حذف</button>
+              </div>
+            </div>
           );
         })}
 

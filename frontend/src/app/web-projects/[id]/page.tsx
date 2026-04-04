@@ -78,17 +78,27 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
         {phase === 7 && <Phase6 projectId={id} />}
 
         {/* Complete phase button */}
-        <div className="mt-6 flex flex-col sm:flex-row gap-2">
-          {completedPhases.has(phase) ? (
-            <button onClick={() => togglePhaseComplete(phase)} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold transition" style={{ background: "#3D8C5A15", color: "#3D8C5A", border: "1px solid #3D8C5A30" }}>
-              ✅ مرحلة مكتملة — اضغط لإلغاء الإكمال
-            </button>
-          ) : (
-            <button onClick={() => togglePhaseComplete(phase)} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white transition" style={{ background: "linear-gradient(135deg, #3D8C5A, #2D6B9E)" }}>
-              ✅ إكمال هذه المرحلة
-            </button>
-          )}
-        </div>
+        {(() => {
+          // Block completion of phase 3 (users) if no accounts
+          const blocked = phase === 3 && (() => { try { return JSON.parse(localStorage.getItem("wp_p7_" + id) ?? "[]").length === 0; } catch { return true; } })();
+          return (
+            <div className="mt-6 flex flex-col sm:flex-row gap-2">
+              {completedPhases.has(phase) ? (
+                <button onClick={() => togglePhaseComplete(phase)} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold transition" style={{ background: "#3D8C5A15", color: "#3D8C5A", border: "1px solid #3D8C5A30" }}>
+                  ✅ مرحلة مكتملة — اضغط لإلغاء الإكمال
+                </button>
+              ) : blocked ? (
+                <button disabled className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold opacity-40" style={{ background: "#6B7280", color: "#fff" }}>
+                  ⚠️ أضف مستخدم أولاً لإكمال المرحلة
+                </button>
+              ) : (
+                <button onClick={() => togglePhaseComplete(phase)} className="w-full py-3 min-h-[44px] rounded-xl text-sm font-bold text-white transition" style={{ background: "linear-gradient(135deg, #3D8C5A, #2D6B9E)" }}>
+                  ✅ إكمال هذه المرحلة
+                </button>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </main>
   );
@@ -271,33 +281,56 @@ function Phase6({ projectId }: { projectId: string }) {
 // ═══ PHASE 7: Users / Accounts ═══
 function Phase7({ projectId }: { projectId: string }) {
   const lk7 = "wp_p7_" + projectId;
-  interface UserAccount { id: string; label: string; email: string; password: string; notes?: string }
+  interface UserAccount { id: string; label: string; email: string; password: string; phone?: string; notes?: string }
   const [accounts, setAccounts] = useState<UserAccount[]>(() => { try { return JSON.parse(localStorage.getItem(lk7) ?? "[]"); } catch { return []; } });
   const [showNew, setShowNew] = useState(false);
-  const [na, setNa] = useState({ label: "", email: "", password: "", notes: "" });
+  const [na, setNa] = useState({ label: "", email: "", password: "", phone: "", notes: "" });
   const [visible, setVisible] = useState<Set<string>>(new Set());
   function save(a: UserAccount[]) { setAccounts(a); localStorage.setItem(lk7, JSON.stringify(a)); }
-  function add() { if (!na.email.trim()) return; save([...accounts, { id: "u_" + Date.now(), label: na.label.trim() || "مستخدم", email: na.email.trim(), password: na.password, notes: na.notes || undefined }]); setNa({ label: "", email: "", password: "", notes: "" }); setShowNew(false); }
+  function add() { if (!na.email.trim() || !na.password.trim()) return; save([...accounts, { id: "u_" + Date.now(), label: na.label.trim() || "مستخدم", email: na.email.trim(), password: na.password, phone: na.phone.trim() || undefined, notes: na.notes || undefined }]); setNa({ label: "", email: "", password: "", phone: "", notes: "" }); setShowNew(false); }
   function del(uid: string) { if (confirm("حذف؟")) save(accounts.filter(a => a.id !== uid)); }
 
   return (<div className="space-y-4">
-    <div className="rounded-xl p-4" style={{ background: "#5E549508", border: "1px solid #5E549520" }}><p className="text-xs font-bold mb-1" style={{ color: "#5E5495" }}>👤 حسابات المستخدمين</p><p className="text-[10px]" style={{ color: "var(--text)" }}>أنشئ حسابات المستخدمين لكل موقع مع الإيميل والرقم السري</p></div>
-    <div className="flex items-center justify-between"><span className="text-xs font-bold" style={{ color: "var(--text)" }}>الحسابات ({accounts.length})</span><button onClick={() => setShowNew(true)} className="px-4 py-2.5 min-h-[40px] rounded-xl text-xs font-bold text-white" style={{ background: "#5E5495" }}>+ حساب جديد</button></div>
+    <div className="rounded-xl p-4" style={{ background: "#5E549508", border: "1px solid #5E549520" }}>
+      <p className="text-xs font-bold mb-1" style={{ color: "#5E5495" }}>👤 حسابات الكمبيوتر للموقع</p>
+      <p className="text-[10px]" style={{ color: "var(--text)" }}>سجّل بيانات المستخدم الذي تفتحه على الكمبيوتر لكل موقع — الإيميل والرقم السري ورقم الجوال</p>
+    </div>
+
+    {/* تنبيه: يجب إضافة مستخدم قبل الانتقال */}
+    {accounts.length === 0 && (
+      <div className="rounded-xl p-3 flex items-center gap-3" style={{ background: "#DC262608", border: "1px solid #DC262620" }}>
+        <span className="text-lg">⚠️</span>
+        <p className="text-xs font-bold" style={{ color: "#DC2626" }}>يجب إضافة مستخدم واحد على الأقل قبل إكمال هذه المرحلة والانتقال للتالية</p>
+      </div>
+    )}
+
+    <div className="flex items-center justify-between">
+      <span className="text-xs font-bold" style={{ color: "var(--text)" }}>الحسابات ({accounts.length})</span>
+      <button onClick={() => setShowNew(true)} className="px-4 py-2.5 min-h-[40px] rounded-xl text-xs font-bold text-white" style={{ background: "#5E5495" }}>+ حساب جديد</button>
+    </div>
+
     {showNew && (<div className="rounded-xl border p-4 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-      <input value={na.label} onChange={e => setNa({...na, label: e.target.value})} placeholder="التسمية (مثل: مدير الموقع)" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
+      <input value={na.label} onChange={e => setNa({...na, label: e.target.value})} placeholder="التسمية (مثل: مستخدم ويندوز، حساب الموقع)" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
       <input value={na.email} onChange={e => setNa({...na, email: e.target.value})} placeholder="الإيميل *" type="email" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none font-mono" dir="ltr" style={is} />
       <input value={na.password} onChange={e => setNa({...na, password: e.target.value})} placeholder="الرقم السري *" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none font-mono" dir="ltr" style={is} />
+      <input value={na.phone} onChange={e => setNa({...na, phone: e.target.value})} placeholder="رقم الجوال (اختياري)" type="tel" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none font-mono" dir="ltr" style={is} />
       <input value={na.notes} onChange={e => setNa({...na, notes: e.target.value})} placeholder="ملاحظات (اختياري)" className="w-full px-3 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
-      <div className="flex gap-2"><button onClick={add} disabled={!na.email.trim()} className="flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>إضافة</button><button onClick={() => setShowNew(false)} className="py-3 px-4 rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button></div>
+      <div className="flex gap-2">
+        <button onClick={add} disabled={!na.email.trim() || !na.password.trim()} className="flex-1 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>إضافة</button>
+        <button onClick={() => setShowNew(false)} className="py-3 px-4 rounded-xl text-sm" style={{ color: "var(--muted)" }}>إلغاء</button>
+      </div>
     </div>)}
+
     {accounts.map(a => (<div key={a.id} className="rounded-xl border p-4" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
       <div className="flex items-center gap-2 mb-2"><span className="text-lg">👤</span><span className="text-sm font-bold flex-1" style={{ color: "var(--text)" }}>{a.label}</span><button onClick={() => del(a.id)} className="text-sm px-2 py-1.5 rounded-lg hover:bg-red-50" style={{ color: "#DC2626" }}>🗑️</button></div>
       <div className="space-y-2">
-        <div className="flex items-center gap-2"><span className="text-[10px] w-16 font-bold" style={{ color: "var(--muted)" }}>الإيميل:</span><span className="flex-1 text-sm font-mono" dir="ltr" style={{ color: "var(--text)" }}>{a.email}</span><button onClick={() => navigator.clipboard.writeText(a.email)} className="text-sm px-2 py-1 rounded-lg" style={{ color: "#D4AF37" }}>📋</button></div>
-        <div className="flex items-center gap-2"><span className="text-[10px] w-16 font-bold" style={{ color: "var(--muted)" }}>السري:</span><span className="flex-1 text-sm font-mono" dir="ltr" style={{ color: "var(--text)" }}>{visible.has(a.id) ? a.password : "••••••••"}</span><button onClick={() => setVisible(prev => { const s = new Set(prev); s.has(a.id) ? s.delete(a.id) : s.add(a.id); return s; })} className="text-sm px-2 py-1 rounded-lg" style={{ color: "#5E5495" }}>{visible.has(a.id) ? "🙈" : "👁️"}</button><button onClick={() => navigator.clipboard.writeText(a.password)} className="text-sm px-2 py-1 rounded-lg" style={{ color: "#D4AF37" }}>📋</button></div>
+        <div className="flex items-center gap-2"><span className="text-[10px] w-16 font-bold" style={{ color: "var(--muted)" }}>الإيميل:</span><span className="flex-1 text-sm font-mono" dir="ltr" style={{ color: "var(--text)" }}>{a.email}</span><button onClick={() => navigator.clipboard.writeText(a.email)} className="text-sm px-2 py-1 rounded-lg min-h-[36px]" style={{ color: "#D4AF37" }}>📋</button></div>
+        <div className="flex items-center gap-2"><span className="text-[10px] w-16 font-bold" style={{ color: "var(--muted)" }}>السري:</span><span className="flex-1 text-sm font-mono" dir="ltr" style={{ color: "var(--text)" }}>{visible.has(a.id) ? a.password : "••••••••"}</span><button onClick={() => setVisible(prev => { const s = new Set(prev); s.has(a.id) ? s.delete(a.id) : s.add(a.id); return s; })} className="text-sm px-2 py-1 rounded-lg min-h-[36px]" style={{ color: "#5E5495" }}>{visible.has(a.id) ? "🙈" : "👁️"}</button><button onClick={() => navigator.clipboard.writeText(a.password)} className="text-sm px-2 py-1 rounded-lg min-h-[36px]" style={{ color: "#D4AF37" }}>📋</button></div>
+        {a.phone && <div className="flex items-center gap-2"><span className="text-[10px] w-16 font-bold" style={{ color: "var(--muted)" }}>الجوال:</span><span className="flex-1 text-sm font-mono" dir="ltr" style={{ color: "var(--text)" }}>{a.phone}</span><a href={"tel:" + a.phone} className="text-sm px-2 py-1 rounded-lg min-h-[36px]" style={{ color: "#3D8C5A" }}>📞</a><button onClick={() => navigator.clipboard.writeText(a.phone!)} className="text-sm px-2 py-1 rounded-lg min-h-[36px]" style={{ color: "#D4AF37" }}>📋</button></div>}
         {a.notes && <p className="text-[10px] mt-1" style={{ color: "var(--muted)" }}>📝 {a.notes}</p>}
       </div>
     </div>))}
-    {accounts.length === 0 && !showNew && <div className="text-center py-8"><p className="text-3xl mb-2">👤</p><p className="text-sm" style={{ color: "var(--muted)" }}>أضف حسابات المستخدمين</p></div>}
+
+    {accounts.length === 0 && !showNew && <div className="text-center py-8"><p className="text-3xl mb-2">👤</p><p className="text-sm" style={{ color: "var(--muted)" }}>أضف حساب المستخدم الأول للموقع</p><button onClick={() => setShowNew(true)} className="mt-3 px-6 py-3 min-h-[44px] rounded-xl text-sm font-bold text-white" style={{ background: "#5E5495" }}>+ إضافة حساب</button></div>}
   </div>);
 }
