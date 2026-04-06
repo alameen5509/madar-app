@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 
-interface Project { id:string; title:string; clientName?:string; description?:string; currentPhase:number; status:string; priority?:string; dueDate?:string; createdAt:string; updatedAt:string }
+interface Project { id:string; title:string; clientName?:string; description?:string; currentPhase:number; status:string; priority?:string; dueDate?:string; projectType?:string; createdAt:string; updatedAt:string }
 
 const PHASES = ["التحضير","التأسيس","الاستضافة","التطوير","العميل"];
 const PHASE_ICONS = ["📋","⚡","🔐","🚀","💬"];
@@ -15,15 +15,18 @@ export default function WebProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [isOwner, setIsOwner] = useState(true);
-  const [np, setNp] = useState({ title: "", client: "", desc: "", priority: "medium", dueDate: "" });
+  const [np, setNp] = useState({ title: "", client: "", desc: "", priority: "medium", dueDate: "", type: "private" as "public"|"private" });
   const [filter, setFilter] = useState<"all"|"1"|"2"|"3"|"4"|"5">("all");
+  const [typeTab, setTypeTab] = useState<"all"|"public"|"private">("all");
   const [syncStatus, setSyncStatus] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true); setSyncStatus("");
     try {
       const { data } = await api.get("/api/web-projects");
-      setProjects(data ?? []);
+      // Merge projectType from localStorage
+      const withTypes = (data ?? []).map((p: Project) => ({ ...p, projectType: p.projectType || localStorage.getItem("wp_type_" + p.id) || "private" }));
+      setProjects(withTypes);
       // Check if any project is owned by this user (has ownerId matching)
       const works = await api.get("/api/works").then(r => r.data?.length ?? 0).catch(() => 0);
       setIsOwner(works > 0 || (data ?? []).some((p: Project & { ownerId?: string }) => p.ownerId));
@@ -38,8 +41,10 @@ export default function WebProjectsPage() {
   async function create() {
     if (!np.title.trim()) return;
     try {
-      await api.post("/api/web-projects", { title: np.title.trim(), clientName: np.client.trim() || undefined, description: np.desc.trim() || undefined, priority: np.priority, dueDate: np.dueDate || undefined });
-      setNp({ title: "", client: "", desc: "", priority: "medium", dueDate: "" }); setShowNew(false);
+      const { data } = await api.post("/api/web-projects", { title: np.title.trim(), clientName: np.client.trim() || undefined, description: np.desc.trim() || undefined, priority: np.priority, dueDate: np.dueDate || undefined });
+      // Save type locally
+      if (data?.id) { try { localStorage.setItem("wp_type_" + data.id, np.type); } catch {} }
+      setNp({ title: "", client: "", desc: "", priority: "medium", dueDate: "", type: "private" }); setShowNew(false);
       load();
     } catch { alert("فشل الإنشاء"); }
   }
@@ -52,19 +57,33 @@ export default function WebProjectsPage() {
   };
 
   const priorityOrder: Record<string,number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-  const filtered = (filter === "all" ? projects : projects.filter(p => {
-    let completedSet: number[] = [];
-    try { completedSet = JSON.parse(localStorage.getItem("wp_completed_" + p.id) ?? "[]"); } catch {}
-    const currentPhaseNum = [1,2,3,4,5].find(n => !completedSet.includes(n)) ?? 5;
-    return String(currentPhaseNum) === filter;
-  })).sort((a, b) => (priorityOrder[a.priority ?? "medium"] ?? 2) - (priorityOrder[b.priority ?? "medium"] ?? 2));
+  const filtered = projects
+    .filter(p => typeTab === "all" || (p.projectType ?? "private") === typeTab)
+    .filter(p => {
+      if (filter === "all") return true;
+      let completedSet: number[] = [];
+      try { completedSet = JSON.parse(localStorage.getItem("wp_completed_" + p.id) ?? "[]"); } catch {}
+      const currentPhaseNum = [1,2,3,4,5].find(n => !completedSet.includes(n)) ?? 5;
+      return String(currentPhaseNum) === filter;
+    })
+    .sort((a, b) => (priorityOrder[a.priority ?? "medium"] ?? 2) - (priorityOrder[b.priority ?? "medium"] ?? 2));
 
   return (
     <main className="flex-1 overflow-y-auto" dir="rtl" style={{ background: "var(--bg)" }}>
       <header className="sticky top-0 z-20 backdrop-blur border-b px-4 sm:px-6 py-3 pr-14 md:pr-6" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
         <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>🌐 إدارة المواقع</h2>
         <p className="text-[10px]" style={{ color: "var(--muted)" }}>{projects.length} موقع</p>
-        <div className="flex gap-1.5 mt-2 overflow-x-auto pb-0.5">
+        {/* Type tabs */}
+        <div className="flex gap-2 mt-2">
+          {([["all","الكل","#2D6B9E"],["public","🌍 عامة","#5E5495"],["private","🔒 خاصة","#D4AF37"]] as const).map(([k, l, c]) => (
+            <button key={k} onClick={() => setTypeTab(k)} className="flex-1 py-2.5 rounded-xl text-xs font-bold transition min-h-[40px]"
+              style={{ background: typeTab === k ? c : "var(--bg)", color: typeTab === k ? "#fff" : c, border: `1px solid ${typeTab === k ? c : "var(--card-border)"}` }}>
+              {l} ({(typeTab === "all" ? projects : projects.filter(p => (p.projectType ?? "private") === k)).length})
+            </button>
+          ))}
+        </div>
+        {/* Phase filters */}
+        <div className="flex gap-1.5 mt-1.5 overflow-x-auto pb-0.5">
           <button onClick={() => setFilter("all")} className="px-3 py-2 rounded-xl text-xs font-bold transition min-h-[40px] whitespace-nowrap"
             style={{ background: filter === "all" ? "#2D6B9E" : "var(--bg)", color: filter === "all" ? "#fff" : "var(--muted)", border: `1px solid ${filter === "all" ? "#2D6B9E" : "var(--card-border)"}` }}>
             الكل
@@ -85,7 +104,20 @@ export default function WebProjectsPage() {
         {showNew && (
           <div className="rounded-2xl border p-5 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
             <input value={np.title} onChange={e => setNp({...np, title: e.target.value})} placeholder="اسم الموقع *" className="w-full px-4 py-3 rounded-xl border text-sm font-bold focus:outline-none" style={is} />
-            <input value={np.client} onChange={e => setNp({...np, client: e.target.value})} placeholder="اسم العميل" className="w-full px-4 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
+            <div>
+              <label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>نوع المنصة</label>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setNp({...np, type: "public"})} className="flex-1 py-2.5 rounded-xl text-xs font-bold min-h-[40px] transition"
+                  style={{ background: np.type === "public" ? "#5E5495" : "var(--bg)", color: np.type === "public" ? "#fff" : "#5E5495", border: `1px solid ${np.type === "public" ? "#5E5495" : "var(--card-border)"}` }}>
+                  🌍 عامة
+                </button>
+                <button type="button" onClick={() => setNp({...np, type: "private"})} className="flex-1 py-2.5 rounded-xl text-xs font-bold min-h-[40px] transition"
+                  style={{ background: np.type === "private" ? "#D4AF37" : "var(--bg)", color: np.type === "private" ? "#fff" : "#D4AF37", border: `1px solid ${np.type === "private" ? "#D4AF37" : "var(--card-border)"}` }}>
+                  🔒 خاصة (عميل)
+                </button>
+              </div>
+            </div>
+            <input value={np.client} onChange={e => setNp({...np, client: e.target.value})} placeholder={np.type === "private" ? "اسم العميل *" : "اسم العميل (اختياري)"} className="w-full px-4 py-3 rounded-xl border text-sm focus:outline-none" style={is} />
             <textarea value={np.desc} onChange={e => setNp({...np, desc: e.target.value})} placeholder="وصف المشروع" rows={2} className="w-full px-4 py-2.5 rounded-xl border text-sm resize-none focus:outline-none" style={is} />
             <div>
               <label className="text-[10px] font-bold block mb-1" style={{ color: "var(--text)" }}>الأولوية</label>
@@ -141,6 +173,7 @@ export default function WebProjectsPage() {
                     <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{p.title}</p>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {p.clientName && <span className="text-[10px]" style={{ color: "var(--muted)" }}>👤 {p.clientName}</span>}
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: (p.projectType ?? "private") === "public" ? "#5E549515" : "#D4AF3715", color: (p.projectType ?? "private") === "public" ? "#5E5495" : "#D4AF37" }}>{(p.projectType ?? "private") === "public" ? "🌍 عامة" : "🔒 خاصة"}</span>
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: pr.color + "15", color: pr.color }}>{pr.icon} {pr.label}</span>
                       <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "#2D6B9E15", color: "#2D6B9E" }}>{currentPhaseIcon} {currentPhaseName}</span>
                       {p.dueDate && <span className="text-[10px] font-bold" style={{ color: isOverdue ? "#DC2626" : "var(--muted)" }}>{isOverdue ? "⚠️ " : "📅 "}{new Date(p.dueDate).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>}
