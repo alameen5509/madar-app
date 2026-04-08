@@ -29,38 +29,40 @@ export function useRoleData(slugOrId: string) {
     setRoleLoading(true);
     setRoleError("");
 
-    type RawCircle = { id: string; name: string; icon?: string; color?: string; slug?: string; groupId?: string };
-    const pickRole = (data: RawCircle) => setRole({
-      id: data.id,
-      name: data.name,
-      icon: data.icon,
-      color: data.color,
-      slug: data.slug,
-      groupId: data.groupId,
+    type RawCircle = { id?: string; Id?: string; name?: string; Name?: string;
+      icon?: string; Icon?: string; color?: string; Color?: string;
+      slug?: string; Slug?: string; groupId?: string; GroupId?: string };
+
+    const norm = (c: RawCircle): RoleInfo => ({
+      id: (c.id ?? c.Id ?? "").toString(),
+      name: (c.name ?? c.Name ?? "") as string,
+      icon: (c.icon ?? c.Icon) as string | undefined,
+      color: (c.color ?? c.Color) as string | undefined,
+      slug: (c.slug ?? c.Slug) as string | undefined,
+      groupId: (c.groupId ?? c.GroupId) as string | undefined,
     });
 
-    // 1) Try direct slug lookup
-    try {
-      const { data } = await api.get(`/api/circle-groups/circles/${encodeURIComponent(slugOrId)}`);
-      if (data?.id) {
-        pickRole(data as RawCircle);
-        setRoleLoading(false);
-        return;
-      }
-    } catch { /* fall through to fallback */ }
-
-    // 2) Fallback: fetch all groups and match by id or slug (handles legacy rows without slug)
+    // Fetch all groups once and match locally — case-insensitive on id/slug.
+    // Works regardless of whether the legacy circle has a Slug column value,
+    // and doesn't depend on the backend's per-slug lookup endpoint.
     try {
       const { data } = await api.get("/api/circle-groups");
-      type Group = { circles?: RawCircle[] };
-      const all: RawCircle[] = ((data ?? []) as Group[]).flatMap(g => g.circles ?? []);
-      const match = all.find(c => c.id === slugOrId || c.slug === slugOrId);
+      type Group = { circles?: RawCircle[]; Circles?: RawCircle[] };
+      const groups = (data ?? []) as Group[];
+      const all: RawCircle[] = groups.flatMap(g => g.circles ?? g.Circles ?? []);
+      const key = slugOrId.toLowerCase();
+      const match = all.find(c => {
+        const n = norm(c);
+        return n.id.toLowerCase() === key || (n.slug ?? "").toLowerCase() === key;
+      });
       if (match) {
-        pickRole(match);
+        setRole(norm(match));
       } else {
+        console.warn("[RolePageShell] role not found", { slugOrId, groupCount: groups.length, circleCount: all.length, sampleIds: all.slice(0, 3).map(c => norm(c).id), sampleSlugs: all.slice(0, 3).map(c => norm(c).slug) });
         setRoleError("لم يتم العثور على هذا الدور");
       }
-    } catch {
+    } catch (err) {
+      console.error("[RolePageShell] failed to load circles", err);
       setRoleError("فشل تحميل الدور");
     }
     setRoleLoading(false);
