@@ -115,11 +115,14 @@ public class CircleGroupsController : ControllerBase
         return rows > 0 ? NoContent() : NotFound();
     }
 
-    [HttpGet("circles/{slug}")]
-    public async Task<IActionResult> GetBySlug(string slug, CancellationToken ct)
+    [HttpGet("circles/{slugOrId}")]
+    public async Task<IActionResult> GetBySlugOrId(string slugOrId, CancellationToken ct)
     {
-        var rows = await Q("SELECT * FROM UserCircles WHERE Slug=@s AND UserId=@uid LIMIT 1",
-            [new("@s", slug), new("@uid", Uid)], ct);
+        // Match by Slug OR Id (legacy circles created before the Slug column existed
+        // have NULL slugs, so the frontend falls back to linking by Id).
+        var rows = await Q(
+            "SELECT * FROM UserCircles WHERE (Slug=@s OR Id=@s) AND UserId=@uid LIMIT 1",
+            [new("@s", slugOrId), new("@uid", Uid)], ct);
         return rows.Count > 0 ? Ok(rows[0]) : NotFound();
     }
 
