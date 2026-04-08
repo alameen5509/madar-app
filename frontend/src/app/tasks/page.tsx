@@ -3683,7 +3683,21 @@ export default function TasksPage() {
                             </div>
                           );
                         })()}
-                        {t.goalTitle && (
+                        {t.root ? (() => {
+                          const r = t.root;
+                          const base = r.kind === "job"
+                            ? `/jobs/${r.entityId}`
+                            : `/circles/${r.entitySlug ?? r.entityId}`;
+                          return (
+                            <p className="text-[10px] truncate" style={{ color: "#9CA3AF" }}>
+                              <Link href={`${base}/goals/${r.goalId}`} onClick={(e) => e.stopPropagation()} className="hover:underline hover:text-[#5E5495]">في هدف {r.goalTitle}</Link>
+                              <span> · </span>
+                              <Link href={`${base}/dimensions/${r.dimensionId}`} onClick={(e) => e.stopPropagation()} className="hover:underline hover:text-[#5E5495]">تحت جانب {r.dimensionName}</Link>
+                              <span> · </span>
+                              <Link href={base} onClick={(e) => e.stopPropagation()} className="hover:underline hover:text-[#5E5495]">{r.entityName}</Link>
+                            </p>
+                          );
+                        })() : t.goalTitle && (
                           <p className="text-[10px] truncate" style={{ color: "#D4AF37" }}>
                             📁 {t.goalTitle}
                           </p>
