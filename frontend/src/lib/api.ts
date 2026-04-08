@@ -94,6 +94,16 @@ export interface SmartTask {
   assignedTo?: { id: string; fullName: string };
   projectId?: string;
   project?: { id: string; title: string };
+  root?: {
+    kind: 'job' | 'role';
+    entityId: string;
+    entityName: string;
+    entitySlug?: string | null;
+    dimensionId: string;
+    dimensionName: string;
+    goalId: string;
+    goalTitle: string;
+  } | null;
 }
 
 export interface Goal {

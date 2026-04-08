@@ -6,6 +6,7 @@ using Madar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MySqlConnector;
 
 namespace Madar.API.Controllers;
 
@@ -64,7 +65,112 @@ public class TasksController : BaseController
             })
             .ToListAsync(ct);
 
-        return Ok(tasks);
+        // ═══ Build root breadcrumb (goal → dimension → job/role) per task ═══
+        var taskIds = tasks.Select(t => t.id).ToList();
+        var roots = new Dictionary<Guid, object>();
+
+        if (taskIds.Count > 0)
+        {
+            // Job side: JobGoalTasks → JobGoals → JobDimensions → Work (JobId = Work.Id)
+            var jobRoots = await (
+                from jgt in _db.JobGoalTasks
+                join jg in _db.JobGoals on jgt.GoalId equals jg.Id
+                join jd in _db.JobDimensions on jg.DimensionId equals jd.Id
+                join w in _db.Works on jd.JobId equals w.Id
+                where taskIds.Contains(jgt.TaskId) && w.OwnerId == userId
+                select new
+                {
+                    taskId = jgt.TaskId,
+                    kind = "job",
+                    entityId = w.Id,
+                    entityName = (w.Name ?? w.Title ?? "عمل") + "",
+                    entitySlug = (string?)null,
+                    dimensionId = jd.Id,
+                    dimensionName = jd.Name,
+                    goalId = jg.Id,
+                    goalTitle = jg.Title
+                }
+            ).ToListAsync(ct);
+            foreach (var r in jobRoots)
+                if (!roots.ContainsKey(r.taskId)) roots[r.taskId] = r;
+
+            // Role side: RoleGoalTasks → RoleGoals → RoleDimensions → UserCircles (raw SQL)
+            var roleRows = await (
+                from rgt in _db.RoleGoalTasks
+                join rg in _db.RoleGoals on rgt.GoalId equals rg.Id
+                join rd in _db.RoleDimensions on rg.DimensionId equals rd.Id
+                where taskIds.Contains(rgt.TaskId)
+                select new
+                {
+                    taskId = rgt.TaskId,
+                    roleId = rd.RoleId,
+                    dimensionId = rd.Id,
+                    dimensionName = rd.Name,
+                    goalId = rg.Id,
+                    goalTitle = rg.Title
+                }
+            ).ToListAsync(ct);
+
+            // Look up role name/slug from the raw UserCircles table
+            var roleIds = roleRows.Select(r => r.roleId.ToString()).Distinct().ToList();
+            var roleMeta = new Dictionary<string, (string name, string? slug)>();
+            if (roleIds.Count > 0)
+            {
+                var conn = _db.Database.GetDbConnection();
+                var wasOpen = conn.State == System.Data.ConnectionState.Open;
+                if (!wasOpen) await conn.OpenAsync(ct);
+                try
+                {
+                    using var cmd = conn.CreateCommand();
+                    var paramNames = roleIds.Select((_, i) => $"@r{i}").ToList();
+                    cmd.CommandText = $"SELECT Id, Name, Slug FROM UserCircles WHERE UserId=@uid AND Id IN ({string.Join(",", paramNames)})";
+                    cmd.Parameters.Add(new MySqlParameter("@uid", userId.ToString()));
+                    for (int i = 0; i < roleIds.Count; i++)
+                        cmd.Parameters.Add(new MySqlParameter(paramNames[i], roleIds[i]));
+                    using var r = await cmd.ExecuteReaderAsync(ct);
+                    while (await r.ReadAsync(ct))
+                    {
+                        var id = r.GetString(0);
+                        var name = r.IsDBNull(1) ? "دور" : r.GetString(1);
+                        var slug = r.IsDBNull(2) ? null : r.GetString(2);
+                        roleMeta[id] = (name, slug);
+                    }
+                }
+                finally { if (!wasOpen) await conn.CloseAsync(); }
+            }
+
+            foreach (var r in roleRows)
+            {
+                if (roots.ContainsKey(r.taskId)) continue; // job root takes precedence
+                var key = r.roleId.ToString();
+                if (!roleMeta.TryGetValue(key, out var meta)) continue;
+                roots[r.taskId] = new
+                {
+                    taskId = r.taskId,
+                    kind = "role",
+                    entityId = r.roleId,
+                    entityName = meta.name,
+                    entitySlug = meta.slug,
+                    dimensionId = r.dimensionId,
+                    dimensionName = r.dimensionName,
+                    goalId = r.goalId,
+                    goalTitle = r.goalTitle
+                };
+            }
+        }
+
+        // Merge root into each task response
+        var withRoots = tasks.Select(t => new
+        {
+            t.id, t.title, t.description, t.status, t.userPriority, t.aiPriorityScore,
+            t.cognitiveLoad, t.dueDate, t.isRecurring, t.recurrenceRule, t.contextNote,
+            t.estimatedDurationMinutes, t.actualDurationMinutes, t.completedAt, t.createdAt,
+            t.wasCompletedOnTime, t.cost, t.costCurrency, t.parentTaskId, t.assignedToId,
+            t.projectId, t.goal, t.assignedTo, t.lifeCircle,
+            root = roots.TryGetValue(t.id, out var r) ? r : null
+        });
+
+        return Ok(withRoots);
     }
 
     /// <summary>إنشاء مهمة جديدة</summary>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import { GeometricDivider } from "@/components/IslamicPattern";
 import {
   getTasks, createTask, getSalahToday, getGoals, acceptRejectTask, api,
@@ -132,6 +133,16 @@ interface TaskRow {
   createdAt?: string;
   goalId?: string;
   goalTitle?: string;
+  root?: {
+    kind: "job" | "role";
+    entityId: string;
+    entityName: string;
+    entitySlug?: string | null;
+    dimensionId: string;
+    dimensionName: string;
+    goalId: string;
+    goalTitle: string;
+  } | null;
   // Reminder
   reminder?: { frequency: string; personName?: string; personRelation?: string; nextAt?: string; lastAt?: string; status?: string; logCount?: number; };
 }
@@ -159,6 +170,7 @@ function toRow(t: SmartTask, circleOrderMap?: Map<string, number>): TaskRow {
     createdAt: t.createdAt,
     goalId: t.goal?.id,
     goalTitle: t.goal?.title,
+    root: t.root ?? null,
   };
 }
 
@@ -1782,7 +1794,23 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onTog
                   )}
                   <div className="flex-1 min-w-0 cursor-pointer" onClick={(e) => { e.stopPropagation(); if (t.context === "habit") return; setPlanExpanded(planExpanded === t.id ? null : t.id); if (!parentSubTasks?.[t.id] && onRefreshSubs) onRefreshSubs(t.id); }}>
                     <span className={`text-sm truncate block hover:underline ${t.done ? "line-through opacity-50" : ""}`} style={{ color: "var(--text)" }}>{t.title}</span>
-                    {t.goalTitle && <span className="text-[9px] truncate block" style={{ color: "#D4AF37" }}>📁 {t.goalTitle}</span>}
+                    {t.root ? (() => {
+                      const r = t.root;
+                      const base = r.kind === "job"
+                        ? `/jobs/${r.entityId}`
+                        : `/circles/${r.entitySlug ?? r.entityId}`;
+                      return (
+                        <span className="text-[9px] truncate block" style={{ color: "#9CA3AF" }}>
+                          <Link href={`${base}/goals/${r.goalId}`} onClick={(e) => e.stopPropagation()} className="hover:underline hover:text-[#5E5495]">في هدف {r.goalTitle}</Link>
+                          <span> · </span>
+                          <Link href={`${base}/dimensions/${r.dimensionId}`} onClick={(e) => e.stopPropagation()} className="hover:underline hover:text-[#5E5495]">تحت جانب {r.dimensionName}</Link>
+                          <span> · </span>
+                          <Link href={base} onClick={(e) => e.stopPropagation()} className="hover:underline hover:text-[#5E5495]">{r.entityName}</Link>
+                        </span>
+                      );
+                    })() : t.goalTitle && (
+                      <span className="text-[9px] truncate block" style={{ color: "#D4AF37" }}>📁 {t.goalTitle}</span>
+                    )}
                     {parentSubTasks?.[t.id] && parentSubTasks[t.id].length > 0 && (() => {
                       const total = parentSubTasks[t.id].length; const done = parentSubTasks[t.id].filter(s => s.status === "Completed").length;
                       return <div className="flex items-center gap-1.5 mt-0.5"><div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "#E5E7EB" }}><div className="h-full rounded-full" style={{ width: `${Math.round(done/total*100)}%`, background: done === total ? "#3D8C5A" : "#D4AF37" }} /></div><span className="text-[8px] font-bold" style={{ color: done === total ? "#3D8C5A" : "#6B7280" }}>{done}/{total}</span></div>;
