@@ -24,9 +24,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Has token and on public page → redirect to home
+  // Has token and on public page → redirect to root, which will route by user type
   if (token && isPublic) {
-    return NextResponse.redirect(new URL('/habits', request.url));
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   // Root path → let client-side decide (owner→habits, employee→web-projects)

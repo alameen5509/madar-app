@@ -339,6 +339,47 @@ using (var scope = app.Services.CreateScope())
                 UNIQUE INDEX IX_JobGoalTasks_GoalId_TaskId (GoalId, TaskId)
             );");
 
+        // ═══ Role Dimensions & Goals (mirrors Job system, RoleId = UserCircles.Id) ═══
+        await db.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS RoleDimensions (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                RoleId CHAR(36) NOT NULL,
+                ParentDimensionId CHAR(36) NULL,
+                Name VARCHAR(200) NOT NULL,
+                Icon VARCHAR(10) NULL,
+                Color VARCHAR(20) NULL,
+                Priority INT NOT NULL DEFAULT 0,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_RoleDimensions_RoleId (RoleId)
+            );
+            CREATE TABLE IF NOT EXISTS RoleGoals (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                RoleId CHAR(36) NOT NULL,
+                DimensionId CHAR(36) NOT NULL,
+                ParentGoalId CHAR(36) NULL,
+                Title VARCHAR(400) NOT NULL,
+                Description VARCHAR(1000) NULL,
+                DueDate DATETIME(6) NULL,
+                Progress INT NOT NULL DEFAULT 0,
+                Status VARCHAR(30) NOT NULL DEFAULT 'Active',
+                Priority INT NOT NULL DEFAULT 0,
+                Timeframe VARCHAR(50) NULL,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_RoleGoals_DimensionId (DimensionId)
+            );
+            CREATE TABLE IF NOT EXISTS RoleGoalProjects (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                GoalId CHAR(36) NOT NULL,
+                ProjectId CHAR(36) NOT NULL,
+                UNIQUE INDEX IX_RoleGoalProjects_GoalId_ProjectId (GoalId, ProjectId)
+            );
+            CREATE TABLE IF NOT EXISTS RoleGoalTasks (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                GoalId CHAR(36) NOT NULL,
+                TaskId CHAR(36) NOT NULL,
+                UNIQUE INDEX IX_RoleGoalTasks_GoalId_TaskId (GoalId, TaskId)
+            );");
+
         await db.Database.ExecuteSqlRawAsync(@"
             CREATE TABLE IF NOT EXISTS PrayerLogs (
                 Id CHAR(36) NOT NULL PRIMARY KEY,
@@ -468,11 +509,25 @@ using (var scope = app.Services.CreateScope())
             CREATE TABLE IF NOT EXISTS WebProjectMembers (
                 Id CHAR(36) NOT NULL PRIMARY KEY,
                 ProjectId CHAR(36) NOT NULL,
+                UserId CHAR(36) NULL,
                 `Name` VARCHAR(200) NOT NULL,
                 Email VARCHAR(200) NULL,
                 `Role` VARCHAR(30) NOT NULL DEFAULT 'employee',
                 AddedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-                INDEX IX_WebProjectMembers_Project (ProjectId)
+                INDEX IX_WebProjectMembers_Project (ProjectId),
+                INDEX IX_WebProjectMembers_User (UserId)
+            );
+            CREATE TABLE IF NOT EXISTS WebProjectTeams (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                OwnerId CHAR(36) NOT NULL,
+                UserId CHAR(36) NULL,
+                `Name` VARCHAR(200) NOT NULL,
+                Email VARCHAR(200) NULL,
+                `Role` VARCHAR(30) NOT NULL DEFAULT 'employee',
+                AddedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_WebProjectTeams_Owner (OwnerId),
+                INDEX IX_WebProjectTeams_User (UserId),
+                INDEX IX_WebProjectTeams_Email (Email)
             );
             CREATE TABLE IF NOT EXISTS WebPhase1Docs (
                 Id CHAR(36) NOT NULL PRIMARY KEY,
@@ -536,6 +591,66 @@ using (var scope = app.Services.CreateScope())
                 CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
                 INDEX IX_WebPhase6Requests_Project (ProjectId)
             );");
+
+        // Idempotent migration: add UserId column to existing WebProjectMembers tables
+        // and backfill from AspNetUsers using case-insensitive email match.
+        var conn = db.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync();
+        try
+        {
+            using var check = conn.CreateCommand();
+            check.CommandText = @"SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='WebProjectMembers' AND COLUMN_NAME='UserId'";
+            var hasCol = Convert.ToInt32(await check.ExecuteScalarAsync()) > 0;
+            if (!hasCol)
+            {
+                using var alter = conn.CreateCommand();
+                alter.CommandText = "ALTER TABLE WebProjectMembers ADD COLUMN UserId CHAR(36) NULL, ADD INDEX IX_WebProjectMembers_User (UserId)";
+                await alter.ExecuteNonQueryAsync();
+                Log.Information("Added UserId column to WebProjectMembers");
+            }
+            // Backfill UserId for any WebProjectMembers rows missing it
+            using var fill = conn.CreateCommand();
+            fill.CommandText = @"UPDATE WebProjectMembers wm
+                JOIN AspNetUsers u ON LOWER(TRIM(u.Email)) = LOWER(TRIM(wm.Email))
+                SET wm.UserId = u.Id
+                WHERE wm.UserId IS NULL AND wm.Email IS NOT NULL AND wm.Email <> ''";
+            var filled = await fill.ExecuteNonQueryAsync();
+            if (filled > 0) Log.Information("Backfilled UserId for {Count} WebProjectMembers rows", filled);
+
+            // Backfill WebProjectTeams from existing per-project members:
+            // each (owner, member-email/userId) pair becomes a team row, deduped.
+            using var seedTeams = conn.CreateCommand();
+            seedTeams.CommandText = @"
+                INSERT INTO WebProjectTeams (Id, OwnerId, UserId, `Name`, Email, `Role`, AddedAt)
+                SELECT UUID(), wp.OwnerId, wm.UserId, wm.`Name`, wm.Email, wm.`Role`, NOW()
+                FROM WebProjectMembers wm
+                JOIN WebProjects wp ON wp.Id = wm.ProjectId
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM WebProjectTeams wt
+                    WHERE wt.OwnerId = wp.OwnerId
+                      AND (
+                          (wm.UserId IS NOT NULL AND wt.UserId = wm.UserId)
+                          OR (wm.UserId IS NULL AND wm.Email IS NOT NULL
+                              AND LOWER(TRIM(wt.Email)) = LOWER(TRIM(wm.Email)))
+                      )
+                )";
+            var seeded = await seedTeams.ExecuteNonQueryAsync();
+            if (seeded > 0) Log.Information("Seeded {Count} WebProjectTeams rows from per-project members", seeded);
+
+            // Backfill UserId on WebProjectTeams from AspNetUsers via email
+            using var fillTeams = conn.CreateCommand();
+            fillTeams.CommandText = @"UPDATE WebProjectTeams wt
+                JOIN AspNetUsers u ON LOWER(TRIM(u.Email)) = LOWER(TRIM(wt.Email))
+                SET wt.UserId = u.Id
+                WHERE wt.UserId IS NULL AND wt.Email IS NOT NULL AND wt.Email <> ''";
+            var filledT = await fillTeams.ExecuteNonQueryAsync();
+            if (filledT > 0) Log.Information("Backfilled UserId for {Count} WebProjectTeams rows", filledT);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "WebProjectMembers UserId migration skipped");
+        }
     }
     catch (Exception ex)
     {

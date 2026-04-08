@@ -63,6 +63,7 @@ export default function JobOverview({ params }: { params: Promise<{ id: string }
 
   const SECTIONS = [
     { key: "dimensions",   label: "الجوانب والأهداف", icon: "📁", stat: `${dims.length} جانب · ${goals.length} هدف` },
+    { key: "mindmap",      label: "الخريطة الذهنية",  icon: "🧠", stat: "تفرّع الأفكار" },
     { key: "team",         label: "الفريق والعلاقات", icon: "👥", stat: `${meta.team.length} شخص` },
     { key: "kpis",         label: "مؤشرات الأداء",   icon: "📊", stat: `${meta.kpis.length} مؤشر` },
     { key: "achievements", label: "الإنجازات",       icon: "🏆", stat: `${meta.achievements.length} إنجاز` },

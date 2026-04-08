@@ -53,6 +53,12 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
     public DbSet<JobGoalProject> JobGoalProjects => Set<JobGoalProject>();
     public DbSet<JobGoalTask> JobGoalTasks => Set<JobGoalTask>();
 
+    // Life-role dimensions & goals (mirrors job system; RoleId → UserCircles.Id raw-SQL table)
+    public DbSet<RoleDimension> RoleDimensions => Set<RoleDimension>();
+    public DbSet<RoleGoal> RoleGoals => Set<RoleGoal>();
+    public DbSet<RoleGoalProject> RoleGoalProjects => Set<RoleGoalProject>();
+    public DbSet<RoleGoalTask> RoleGoalTasks => Set<RoleGoalTask>();
+
     // Prayer tracking
     public DbSet<PrayerLog> PrayerLogs => Set<PrayerLog>();
     public DbSet<PrayerPenalty> PrayerPenalties => Set<PrayerPenalty>();
@@ -365,6 +371,41 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
             jt.HasOne(x => x.Goal).WithMany(x => x.Tasks).HasForeignKey(x => x.GoalId).OnDelete(DeleteBehavior.Cascade);
             jt.HasOne(x => x.Task).WithMany().HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.Cascade);
             jt.HasIndex(x => new { x.GoalId, x.TaskId }).IsUnique();
+        });
+
+        // ═══ Role Dimensions & Goals (mirrors Job system) ═══
+        builder.Entity<RoleDimension>(rd => {
+            rd.HasKey(x => x.Id);
+            rd.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            rd.Property(x => x.Icon).HasMaxLength(10);
+            rd.Property(x => x.Color).HasMaxLength(20);
+            rd.HasOne(x => x.ParentDimension).WithMany(x => x.SubDimensions).HasForeignKey(x => x.ParentDimensionId).OnDelete(DeleteBehavior.Restrict);
+            rd.HasIndex(x => x.RoleId);
+        });
+
+        builder.Entity<RoleGoal>(rg => {
+            rg.HasKey(x => x.Id);
+            rg.Property(x => x.Title).HasMaxLength(400).IsRequired();
+            rg.Property(x => x.Description).HasMaxLength(1000);
+            rg.Property(x => x.Status).HasMaxLength(30);
+            rg.Property(x => x.Timeframe).HasMaxLength(50);
+            rg.HasOne(x => x.Dimension).WithMany(x => x.Goals).HasForeignKey(x => x.DimensionId).OnDelete(DeleteBehavior.Restrict);
+            rg.HasOne(x => x.ParentGoal).WithMany(x => x.SubGoals).HasForeignKey(x => x.ParentGoalId).OnDelete(DeleteBehavior.Restrict);
+            rg.HasIndex(x => x.DimensionId);
+        });
+
+        builder.Entity<RoleGoalProject>(rp => {
+            rp.HasKey(x => x.Id);
+            rp.HasOne(x => x.Goal).WithMany(x => x.Projects).HasForeignKey(x => x.GoalId).OnDelete(DeleteBehavior.Cascade);
+            rp.HasOne(x => x.Project).WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            rp.HasIndex(x => new { x.GoalId, x.ProjectId }).IsUnique();
+        });
+
+        builder.Entity<RoleGoalTask>(rt => {
+            rt.HasKey(x => x.Id);
+            rt.HasOne(x => x.Goal).WithMany(x => x.Tasks).HasForeignKey(x => x.GoalId).OnDelete(DeleteBehavior.Cascade);
+            rt.HasOne(x => x.Task).WithMany().HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.Cascade);
+            rt.HasIndex(x => new { x.GoalId, x.TaskId }).IsUnique();
         });
 
         // ═══ Prayer Tracking ═══

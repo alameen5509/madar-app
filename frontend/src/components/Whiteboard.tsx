@@ -106,7 +106,7 @@ const SHAPE_COLOR = "#5E5495";
 /* ─── Whiteboard Component ───────────────────────────────────────────────── */
 
 interface WhiteboardProps {
-  entityType: "job" | "project" | "personal";
+  entityType: "job" | "project" | "personal" | "role";
   entityId: string;
   entityName: string;
 }

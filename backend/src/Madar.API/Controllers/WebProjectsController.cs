@@ -13,34 +13,54 @@ public class WebProjectsController : ControllerBase
     private readonly MadarDbContext _db;
     public WebProjectsController(MadarDbContext db) => _db = db;
     private string Uid => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    private string UEmail => (User.FindFirstValue(ClaimTypes.Email)
+        ?? User.FindFirstValue("email")
+        ?? User.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Email)
+        ?? "").Trim().ToLowerInvariant();
 
     // ═══ PROJECTS CRUD ═══
+    // Access model:
+    //   1. The owner sees all projects they created.
+    //   2. Anyone in the owner's "team" (WebProjectTeams) sees ALL projects of that owner.
+    //   3. Legacy: anyone listed in WebProjectMembers (per-project) by UserId or email.
+    //
+    // Team membership is the authoritative path; per-project membership is kept only for
+    // backward compatibility and auto-promotes to team membership on every AddMember call.
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
         Ok(await Q(@"SELECT DISTINCT wp.* FROM WebProjects wp
             LEFT JOIN WebProjectMembers wm ON wm.ProjectId = wp.Id
-            WHERE wp.OwnerId=@uid OR wm.Email=(SELECT Email FROM AspNetUsers WHERE Id=@uid LIMIT 1)
-            ORDER BY wp.CreatedAt DESC", Ps("@uid", Uid), ct));
+            LEFT JOIN WebProjectTeams wt ON wt.OwnerId = wp.OwnerId
+            WHERE wp.OwnerId=@uid
+               OR wt.UserId=@uid
+               OR (@email <> '' AND LOWER(TRIM(wt.Email))=@email)
+               OR wm.UserId=@uid
+               OR (@email <> '' AND LOWER(TRIM(wm.Email))=@email)
+            ORDER BY wp.CreatedAt DESC", [P("@uid", Uid), P("@email", UEmail)], ct));
 
     [HttpGet("{id}")]
     public async Task<IActionResult> Get(string id, CancellationToken ct)
     {
         var p = await Q(@"SELECT DISTINCT wp.* FROM WebProjects wp
             LEFT JOIN WebProjectMembers wm ON wm.ProjectId = wp.Id
-            WHERE wp.Id=@id AND (wp.OwnerId=@uid OR wm.Email=(SELECT Email FROM AspNetUsers WHERE Id=@uid LIMIT 1))",
-            [P("@id",id),P("@uid",Uid)], ct);
+            LEFT JOIN WebProjectTeams wt ON wt.OwnerId = wp.OwnerId
+            WHERE wp.Id=@id AND (
+                wp.OwnerId=@uid
+                OR wt.UserId=@uid
+                OR (@email <> '' AND LOWER(TRIM(wt.Email))=@email)
+                OR wm.UserId=@uid
+                OR (@email <> '' AND LOWER(TRIM(wm.Email))=@email)
+            )",
+            [P("@id",id),P("@uid",Uid),P("@email",UEmail)], ct);
         if (p.Count == 0) return NotFound();
         var members = await Q("SELECT * FROM WebProjectMembers WHERE ProjectId=@id", Ps("@id",id), ct);
-        // Determine user role: owner or member role
+        // Determine user role: owner first, otherwise match by UserId then email
         var isOwner = p[0]["ownerId"]?.ToString() == Uid;
         var memberRole = isOwner ? "owner" : "employee";
         if (!isOwner) {
-            var myEmail = await Q("SELECT Email FROM AspNetUsers WHERE Id=@uid LIMIT 1", Ps("@uid", Uid), ct);
-            if (myEmail.Count > 0) {
-                var email = myEmail[0]["email"]?.ToString();
-                var myMember = members.FirstOrDefault(m => m["email"]?.ToString() == email);
-                if (myMember != null) memberRole = myMember["role"]?.ToString() ?? "employee";
-            }
+            var myMember = members.FirstOrDefault(m => m["userId"]?.ToString() == Uid)
+                ?? members.FirstOrDefault(m => string.Equals((m["email"]?.ToString() ?? "").Trim(), UEmail, StringComparison.OrdinalIgnoreCase));
+            if (myMember != null) memberRole = myMember["role"]?.ToString() ?? "employee";
         }
         return Ok(new { project = p[0], members, userRole = memberRole });
     }
@@ -73,14 +93,103 @@ public class WebProjectsController : ControllerBase
         return NoContent();
     }
 
+    // ═══ DIAGNOSTICS ═══
+    [HttpGet("whoami")]
+    public async Task<IActionResult> WhoAmI(CancellationToken ct)
+    {
+        var memberships = await Q(
+            @"SELECT wm.Id, wm.ProjectId, wm.UserId, wm.Email, wm.Role, wp.Title
+              FROM WebProjectMembers wm
+              JOIN WebProjects wp ON wp.Id = wm.ProjectId
+              WHERE wm.UserId=@uid OR (@email <> '' AND LOWER(TRIM(wm.Email))=@email)",
+            [P("@uid", Uid), P("@email", UEmail)], ct);
+        var teamRows = await Q(
+            @"SELECT wt.Id, wt.OwnerId, wt.UserId, wt.Email, wt.Role,
+                     (SELECT COUNT(*) FROM WebProjects wp WHERE wp.OwnerId = wt.OwnerId) AS ownerProjectCount
+              FROM WebProjectTeams wt
+              WHERE wt.UserId=@uid OR (@email <> '' AND LOWER(TRIM(wt.Email))=@email)",
+            [P("@uid", Uid), P("@email", UEmail)], ct);
+        var owned = await Q("SELECT COUNT(*) AS c FROM WebProjects WHERE OwnerId=@uid",
+            Ps("@uid", Uid), ct);
+        var visibleProjects = await Q(
+            @"SELECT DISTINCT wp.Id, wp.Title, wp.OwnerId FROM WebProjects wp
+              LEFT JOIN WebProjectMembers wm ON wm.ProjectId = wp.Id
+              LEFT JOIN WebProjectTeams wt ON wt.OwnerId = wp.OwnerId
+              WHERE wp.OwnerId=@uid
+                 OR wt.UserId=@uid
+                 OR (@email <> '' AND LOWER(TRIM(wt.Email))=@email)
+                 OR wm.UserId=@uid
+                 OR (@email <> '' AND LOWER(TRIM(wm.Email))=@email)",
+            [P("@uid", Uid), P("@email", UEmail)], ct);
+        return Ok(new {
+            userId = Uid,
+            email = UEmail,
+            ownedCount = owned[0]["c"],
+            membershipCount = memberships.Count,
+            teamCount = teamRows.Count,
+            visibleProjectCount = visibleProjects.Count,
+            memberships,
+            team = teamRows,
+            visibleProjects
+        });
+    }
+
     // ═══ MEMBERS ═══
     [HttpPost("{id}/members")]
     public async Task<IActionResult> AddMember(string id, [FromBody] WpMemberReq req, CancellationToken ct)
     {
         var mid = NewId();
-        await E("INSERT INTO WebProjectMembers (Id,ProjectId,Name,Email,`Role`,AddedAt) VALUES(@mid,@pid,@n,@e,@r,NOW())",
-            [P("@mid",mid),P("@pid",id),P("@n",req.Name),P("@e",req.Email),P("@r",req.Role??"employee")], ct);
-        return Ok(new { id = mid });
+        var email = (req.Email ?? "").Trim();
+        // Resolve UserId from AspNetUsers by email so lookups don't depend on email matching
+        string? userId = null;
+        if (email.Length > 0)
+        {
+            var rows = await Q("SELECT Id FROM AspNetUsers WHERE LOWER(TRIM(Email))=@e LIMIT 1",
+                Ps("@e", email.ToLowerInvariant()), ct);
+            if (rows.Count > 0) userId = rows[0]["id"]?.ToString();
+        }
+        // Per-project membership (legacy)
+        await E("INSERT INTO WebProjectMembers (Id,ProjectId,UserId,Name,Email,`Role`,AddedAt) VALUES(@mid,@pid,@uid,@n,@e,@r,NOW())",
+            [P("@mid",mid),P("@pid",id),P("@uid",userId),P("@n",req.Name),P("@e",email),P("@r",req.Role??"employee")], ct);
+
+        // Promote to owner-team membership so this user sees ALL my projects (the source of truth).
+        // Look up the project's owner; this also enforces that only the owner of the project added it.
+        var ownerRows = await Q("SELECT OwnerId FROM WebProjects WHERE Id=@pid LIMIT 1", Ps("@pid", id), ct);
+        if (ownerRows.Count > 0)
+        {
+            var ownerId = ownerRows[0]["ownerId"]?.ToString();
+            if (ownerId == Uid) // only the project owner may grant team access
+            {
+                // Dedupe: if a row with this owner+email/userId exists, do nothing
+                var existing = await Q(
+                    @"SELECT Id FROM WebProjectTeams
+                      WHERE OwnerId=@oid
+                        AND ((@uid IS NOT NULL AND UserId=@uid)
+                             OR (@e <> '' AND LOWER(TRIM(Email))=@e))
+                      LIMIT 1",
+                    [P("@oid", ownerId), P("@uid", userId), P("@e", email.ToLowerInvariant())], ct);
+                if (existing.Count == 0)
+                {
+                    await E(@"INSERT INTO WebProjectTeams (Id,OwnerId,UserId,Name,Email,`Role`,AddedAt)
+                              VALUES(@tid,@oid,@uid,@n,@e,@r,NOW())",
+                        [P("@tid", NewId()), P("@oid", ownerId), P("@uid", userId),
+                         P("@n", req.Name), P("@e", email), P("@r", req.Role ?? "employee")], ct);
+                }
+            }
+        }
+        return Ok(new { id = mid, userId, resolved = userId != null });
+    }
+
+    // ═══ OWNER TEAM (root of access — see all my projects) ═══
+    [HttpGet("team")]
+    public async Task<IActionResult> GetTeam(CancellationToken ct) =>
+        Ok(await Q("SELECT * FROM WebProjectTeams WHERE OwnerId=@uid ORDER BY AddedAt DESC", Ps("@uid", Uid), ct));
+
+    [HttpDelete("team/{tid}")]
+    public async Task<IActionResult> RemoveTeamMember(string tid, CancellationToken ct)
+    {
+        await E("DELETE FROM WebProjectTeams WHERE Id=@tid AND OwnerId=@uid", [P("@tid", tid), P("@uid", Uid)], ct);
+        return NoContent();
     }
 
     [HttpDelete("{id}/members/{mid}")]

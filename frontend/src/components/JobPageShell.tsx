@@ -21,6 +21,7 @@ const NAV = [
   { key: "/meetings",     label: "الاجتماعات",      icon: "📅" },
   { key: "/lessons",      label: "الدروس المستفادة", icon: "📝" },
   { key: "/board",        label: "السبورة",         icon: "🎨" },
+  { key: "/mindmap",      label: "خريطة ذهنية",     icon: "🧠" },
 ];
 
 export function useJobData(jobId: string) {

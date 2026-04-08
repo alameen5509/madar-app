@@ -169,27 +169,35 @@ public class UsersController : BaseController
         return Ok(new { message = $"تم حذف حساب {user.FullName}" });
     }
 
-    /// <summary>نوع المستخدم: owner أو web-employee</summary>
+    /// <summary>نوع المستخدم: owner أو web-employee.
+    /// عضو الفريق (WebProjectTeams) أو عضو مشروع (WebProjectMembers) يُعتبر دائماً web-employee
+    /// حتى لو كان لديه Works خاصة، ليرى فقط واجهة "إدارة المواقع".</summary>
     [HttpGet("me/type")]
     public async Task<IActionResult> GetUserType(CancellationToken ct)
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var user = await _db.Users.FindAsync(new object[] { userId }, ct);
         if (user is null) return NotFound();
-        // Check if user owns any works
-        var ownsWorks = await _db.Works.AnyAsync(w => w.OwnerId == userId, ct);
-        if (ownsWorks) return Ok(new { type = "owner" });
-        // Check if member in web projects (via raw SQL since WebProjectMembers not in DbContext)
+        var emailLower = (user.Email ?? "").Trim().ToLowerInvariant();
+
+        // Team / member membership takes precedence over Works ownership.
         try {
             var conn = _db.Database.GetDbConnection();
             if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync(ct);
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT COUNT(*) FROM WebProjectMembers WHERE Email=@e";
-            var p = cmd.CreateParameter(); p.ParameterName = "@e"; p.Value = user.Email ?? ""; cmd.Parameters.Add(p);
+            cmd.CommandText = @"SELECT
+                (SELECT COUNT(*) FROM WebProjectTeams
+                   WHERE UserId=@uid OR (@e <> '' AND LOWER(TRIM(Email))=@e))
+              + (SELECT COUNT(*) FROM WebProjectMembers
+                   WHERE UserId=@uid OR (@e <> '' AND LOWER(TRIM(Email))=@e))";
+            var pUid = cmd.CreateParameter(); pUid.ParameterName = "@uid"; pUid.Value = userId.ToString(); cmd.Parameters.Add(pUid);
+            var p = cmd.CreateParameter(); p.ParameterName = "@e"; p.Value = emailLower; cmd.Parameters.Add(p);
             var count = Convert.ToInt32(await cmd.ExecuteScalarAsync(ct));
             if (count > 0) return Ok(new { type = "web-employee" });
         } catch {}
-        return Ok(new { type = "owner" }); // default
+
+        // Not a team member → treat as owner.
+        return Ok(new { type = "owner" });
     }
 
     /// <summary>جلب إعدادات المستخدم الحالي</summary>

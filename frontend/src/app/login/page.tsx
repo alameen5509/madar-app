@@ -130,7 +130,14 @@ export default function LoginPage() {
 
       // Small delay to ensure cookie is set before redirect
       await new Promise(r => setTimeout(r, 100));
-      window.location.href = "/habits";
+      // Type-aware redirect: web-employees go straight to /web-projects so they
+      // never see any other part of the app (not even momentarily).
+      let dest = "/habits";
+      try {
+        const { data: t } = await api.get("/api/users/me/type");
+        if (t?.type === "web-employee") dest = "/web-projects";
+      } catch {}
+      window.location.href = dest;
     } catch {
       setError("تعذّر الاتصال بالخادم، يرجى المحاولة لاحقاً");
     } finally {
