@@ -78,3 +78,28 @@ backend/deploy-*.zip
 backend/deploy-*.tar.gz
 backend/package-lock.json
 
+## IDE / tooling
+.idea/
+.next/
+
+## Node
+node_modules/
+backend/node_modules/
+backend/package.json
+
+## Root-level binaries, installers, logs, docs — not part of the repo
+*.exe
+*.zip
+*.pdf
+*.docx
+/app_logs*/
+/latest_logs*/
+/azure_logs*/
+/wear/
+
+## Ad-hoc scripts & one-off SQL not meant for version control
+backend/add-ahmed-to-all.js
+backend/fix-ahmed-team.sql
+backend/migrations.sql
+copy_frontend.ps1
+
