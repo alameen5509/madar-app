@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { GeometricDivider } from "@/components/IslamicPattern";
@@ -73,7 +73,11 @@ const DEFAULT_PREFS: ProjectPrefs = { pinned: [], tags: {}, progressMode: {}, ma
    MAIN PAGE
    ═══════════════════════════════════════════════════════════════════════ */
 
-export default function ProjectsPage() {
+export default function ProjectsPageWrapper() {
+  return <Suspense><ProjectsPageInner /></Suspense>;
+}
+
+function ProjectsPageInner() {
   const searchParams = useSearchParams();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [circles, setCircles] = useState<LifeCircle[]>([]);
