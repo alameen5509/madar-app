@@ -23,12 +23,145 @@ const PULSE: Record<string, { label: string; color: string; bg: string }> = {
 
 type Tab = "works" | "manual";
 
+interface SessionItem { id: string; name: string; icon: string; color: string; roleId?: string; pulse: string; pulseNote?: string; notes: { id: string; content: string; createdAt: string }[]; devReqs: { id: string; title: string; status: string }[] }
+
+function LeadershipSession({ items, onClose, onUpdate }: { items: SessionItem[]; onClose: () => void; onUpdate: () => void }) {
+  const [idx, setIdx] = useState(0);
+  const [review, setReview] = useState({ status: "green", note: "", accomplishments: "" });
+  const [saving, setSaving] = useState(false);
+  const [newNote, setNewNote] = useState("");
+
+  const item = items[idx];
+  if (!item) return null;
+  const p = PULSE[item.pulse] ?? PULSE.green;
+
+  useEffect(() => { setReview({ status: item.pulse || "green", note: "", accomplishments: "" }); setNewNote(""); }, [idx, item.pulse]);
+
+  async function saveReview() {
+    if (!item.roleId) { next(); return; }
+    setSaving(true);
+    try {
+      await api.patch(`/api/war-room/roles/${item.roleId}/pulse`, {
+        status: review.status,
+        note: [review.note, review.accomplishments ? `الإنجازات: ${review.accomplishments}` : ""].filter(Boolean).join(" | ") || undefined,
+      });
+      if (review.note || review.accomplishments) {
+        await api.post(`/api/war-room/roles/${item.roleId}/notes`, {
+          content: `📊 مراجعة: ${PULSE[review.status]?.label ?? review.status}${review.note ? ` — ${review.note}` : ""}${review.accomplishments ? ` | الإنجازات: ${review.accomplishments}` : ""}`,
+        });
+      }
+    } catch {}
+    setSaving(false);
+    next();
+  }
+
+  async function addSessionNote() {
+    if (!newNote.trim() || !item.roleId) return;
+    try { await api.post(`/api/war-room/roles/${item.roleId}/notes`, { content: newNote }); setNewNote(""); } catch {}
+  }
+
+  function next() { if (idx < items.length - 1) setIdx(idx + 1); else { onUpdate(); onClose(); } }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }}>
+      <div className="w-full max-w-lg mx-4 rounded-2xl overflow-hidden shadow-2xl" dir="rtl" style={{ background: "var(--card, #fff)", maxHeight: "90vh" }}>
+        {/* Progress */}
+        <div className="flex gap-0.5 p-3">
+          {items.map((_, i) => <div key={i} className="flex-1 h-1.5 rounded-full transition-all" style={{ background: i < idx ? "#3D8C5A" : i === idx ? "#D4AF37" : "#E5E7EB" }} />)}
+        </div>
+
+        <div className="px-5 pb-5 overflow-y-auto" style={{ maxHeight: "calc(90vh - 60px)" }}>
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0" style={{ background: item.color + "15" }}>{item.icon}</div>
+            <div className="flex-1">
+              <p className="font-black text-base" style={{ color: "var(--text)" }}>{item.name}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: p.bg, color: p.color }}>{p.label}</span>
+                <span className="text-[10px]" style={{ color: "var(--muted)" }}>{idx + 1} من {items.length}</span>
+              </div>
+            </div>
+            <button onClick={onClose} className="text-lg" style={{ color: "var(--muted)" }}>✕</button>
+          </div>
+
+          {item.pulseNote && <p className="text-[10px] px-3 py-2 rounded-lg mb-3" style={{ background: p.bg, color: p.color }}>💬 {item.pulseNote}</p>}
+
+          {/* Current notes */}
+          {item.notes.length > 0 && (
+            <div className="mb-3">
+              <p className="text-[10px] font-bold mb-1" style={{ color: "var(--muted)" }}>📝 آخر الملاحظات</p>
+              <div className="space-y-1">
+                {item.notes.slice(0, 3).map(n => (
+                  <p key={n.id} className="text-[10px] px-2 py-1.5 rounded-lg" style={{ background: "var(--bg)", color: "var(--text)" }}>{n.content}</p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Pending dev reqs */}
+          {item.devReqs.filter(d => d.status !== "done").length > 0 && (
+            <div className="mb-3">
+              <p className="text-[10px] font-bold mb-1" style={{ color: "#D4AF37" }}>🔧 طلبات تطوير معلقة</p>
+              {item.devReqs.filter(d => d.status !== "done").map(d => (
+                <p key={d.id} className="text-[10px] px-2 py-1.5 rounded-lg mb-1" style={{ background: "#D4AF3708", color: "#D4AF37" }}>• {d.title}</p>
+              ))}
+            </div>
+          )}
+
+          {/* Quick note */}
+          {item.roleId && (
+            <div className="flex gap-2 mb-4">
+              <input value={newNote} onChange={e => setNewNote(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addSessionNote(); }}
+                placeholder="ملاحظة سريعة..." className="flex-1 px-3 py-2 rounded-lg border text-xs focus:outline-none"
+                style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
+              <button onClick={addSessionNote} disabled={!newNote.trim()} className="px-3 py-2 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>+</button>
+            </div>
+          )}
+
+          {/* Review */}
+          <div className="p-3 rounded-xl space-y-2" style={{ background: "var(--bg)", border: "1px solid #5E549520" }}>
+            <p className="text-xs font-bold" style={{ color: "var(--text)" }}>تحديث النبض</p>
+            <div className="flex gap-1.5">
+              {(["green", "yellow", "red"] as const).map(s => (
+                <button key={s} onClick={() => setReview({ ...review, status: s })}
+                  className="flex-1 py-2 rounded-lg text-[10px] font-bold transition"
+                  style={{ background: review.status === s ? PULSE[s].color : "var(--card)", color: review.status === s ? "#fff" : PULSE[s].color, border: `1px solid ${PULSE[s].color}40` }}>
+                  {PULSE[s].label}
+                </button>
+              ))}
+            </div>
+            <input value={review.accomplishments} onChange={e => setReview({ ...review, accomplishments: e.target.value })}
+              placeholder="ما تم إنجازه؟" className="w-full px-3 py-2 rounded-lg border text-xs focus:outline-none"
+              style={{ background: "var(--card)", borderColor: "var(--card-border)", color: "var(--text)" }} />
+            <input value={review.note} onChange={e => setReview({ ...review, note: e.target.value })}
+              placeholder="تحديات أو ملاحظات..." className="w-full px-3 py-2 rounded-lg border text-xs focus:outline-none"
+              style={{ background: "var(--card)", borderColor: "var(--card-border)", color: "var(--text)" }} />
+          </div>
+
+          {/* Navigation */}
+          <div className="flex gap-2 mt-4">
+            <button onClick={saveReview} disabled={saving}
+              className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition disabled:opacity-50"
+              style={{ background: `linear-gradient(135deg, ${PULSE[review.status].color}, #5E5495)` }}>
+              {saving ? "جارٍ الحفظ..." : idx < items.length - 1 ? "حفظ والتالي →" : "حفظ وإنهاء ✓"}
+            </button>
+            {idx < items.length - 1 && (
+              <button onClick={next} className="px-4 py-3 rounded-xl text-sm font-medium" style={{ color: "var(--muted)" }}>تخطي →</button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function WarRoomIndexPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [works, setWorks] = useState<Work[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("works");
   const [pulseFilter, setPulseFilter] = useState<"all" | "red" | "yellow" | "green">("all");
+  const [sessionItems, setSessionItems] = useState<SessionItem[] | null>(null);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try { return new Set(JSON.parse(localStorage.getItem("madar_warroom_hidden") ?? "[]")); } catch { return new Set(); }
@@ -47,6 +180,25 @@ export default function WarRoomIndexPage() {
   async function deleteManualRole(id: string, title: string) {
     if (!confirm(`حذف غرفة القيادة "${title}"؟ سيتم حذف جميع الملاحظات وطلبات التطوير المرتبطة.`)) return;
     try { await api.delete(`/api/war-room/roles/${id}`); load(); } catch { alert("فشل الحذف"); }
+  }
+
+  async function startSession() {
+    // Build session items from visible work items + manual roles
+    const items: SessionItem[] = [];
+    for (const wi of workItems.filter(i => !hiddenIds.has(i.id))) {
+      const notes = wi.role ? await api.get(`/api/war-room/roles/${wi.role.id}/notes`).then(r => r.data ?? []).catch(() => []) : [];
+      const devReqs = wi.role ? await api.get(`/api/war-room/roles/${wi.role.id}/dev-requests`).then(r => r.data ?? []).catch(() => []) : [];
+      items.push({ id: wi.id, name: wi.name, icon: wi.icon, color: wi.color, roleId: wi.role?.id, pulse: wi.role?.pulseStatus ?? "green", pulseNote: wi.role?.pulseNote, notes, devReqs });
+    }
+    for (const r of manualRoles) {
+      const notes = await api.get(`/api/war-room/roles/${r.id}/notes`).then(res => res.data ?? []).catch(() => []);
+      const devReqs = await api.get(`/api/war-room/roles/${r.id}/dev-requests`).then(res => res.data ?? []).catch(() => []);
+      items.push({ id: r.id, name: r.title, icon: r.icon || "🎯", color: r.color || "#5E5495", roleId: r.id, pulse: r.pulseStatus, pulseNote: r.pulseNote, notes, devReqs });
+    }
+    // Sort: red first, then yellow, then green
+    const order = { red: 0, yellow: 1, green: 2 };
+    items.sort((a, b) => (order[a.pulse as keyof typeof order] ?? 2) - (order[b.pulse as keyof typeof order] ?? 2));
+    setSessionItems(items);
   }
 
   const load = useCallback(async () => {
@@ -136,7 +288,14 @@ export default function WarRoomIndexPage() {
   return (
     <main className="flex-1 overflow-y-auto" dir="rtl" style={{ background: "var(--bg)" }}>
       <header className="sticky top-0 z-20 backdrop-blur border-b px-4 sm:px-6 py-3 pr-14 md:pr-6" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-        <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>🎖️ غرفة القيادة</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>🎖️ غرفة القيادة</h2>
+          <button onClick={startSession}
+            className="px-4 py-2 rounded-xl text-xs font-bold text-white transition hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>
+            📋 جلسة قيادة
+          </button>
+        </div>
         <div className="flex items-center gap-3 mt-1">
           <span className="text-xs" style={{ color: "var(--muted)" }}>{workItems.length + manualRoles.length} غرفة</span>
           {redCount > 0 && <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: "#DC262615", color: "#DC2626" }}>🔴 {redCount} حرج</span>}
@@ -240,6 +399,10 @@ export default function WarRoomIndexPage() {
           })}
         </>)}
       </div>
+
+      {sessionItems && (
+        <LeadershipSession items={sessionItems} onClose={() => setSessionItems(null)} onUpdate={load} />
+      )}
     </main>
   );
 }
