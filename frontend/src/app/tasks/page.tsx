@@ -3,6 +3,15 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { GeometricDivider } from "@/components/IslamicPattern";
+
+/** Local date string YYYY-MM-DD (avoids UTC timezone shift) */
+function localDateStr(d?: Date): string {
+  const dt = d ?? new Date();
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+function localDateOffset(days: number): string {
+  const d = new Date(); d.setDate(d.getDate() + days); return localDateStr(d);
+}
 import {
   getTasks, createTask, getSalahToday, getGoals, acceptRejectTask, api,
   type SmartTask, type CreateTaskPayload, type SalahTimesResponse, type Goal,
@@ -282,7 +291,7 @@ export function NewTaskDialog({
   const [cognitiveLoad, setLoad]    = useState<CreateTaskPayload["cognitiveLoad"]>("Medium");
   const [taskContext, setTaskContext] = useState("Anywhere");
   const [suitablePeriod, setSuitablePeriod] = useState("all");
-  const [dueDate, setDueDate]       = useState(() => new Date().toISOString().slice(0, 10));
+  const [dueDate, setDueDate]       = useState(() => localDateStr());
   const [goalId, setGoalId]         = useState(defaultGoalId ?? "");
   const [linkType, setLinkType]     = useState<"none" | "circle" | "job">("none");
   const [workId, setWorkId]         = useState("");
@@ -393,9 +402,9 @@ export function NewTaskDialog({
             <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">تاريخ الاستحقاق <span className="text-[#7C7A8E] font-normal">(اختياري)</span></label>
             <div className="flex gap-1.5 mb-2">
               {[
-                { label: "اليوم", val: new Date().toISOString().slice(0, 10) },
-                { label: "غداً", val: new Date(Date.now() + 86400000).toISOString().slice(0, 10) },
-                { label: "الأسبوع القادم", val: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10) },
+                { label: "اليوم", val: localDateStr() },
+                { label: "غداً", val: localDateOffset(1) },
+                { label: "الأسبوع القادم", val: localDateOffset(7) },
               ].map(o => (
                 <button key={o.label} type="button" onClick={() => setDueDate(o.val)}
                   className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition"
@@ -405,7 +414,7 @@ export function NewTaskDialog({
               ))}
               <button type="button" onClick={() => { const el = document.getElementById("dueDatePickerTop") as HTMLInputElement; el?.showPicker?.(); }}
                 className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition"
-                style={{ background: dueDate && ![0,1,7].map(d => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10)).includes(dueDate) ? "#5E5495" : "#F8F6F0", color: dueDate && ![0,1,7].map(d => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10)).includes(dueDate) ? "#fff" : "#5E5495", border: "1px solid #E2D5B0" }}>
+                style={{ background: dueDate && ![0,1,7].map(d => localDateOffset(d)).includes(dueDate) ? "#5E5495" : "#F8F6F0", color: dueDate && ![0,1,7].map(d => localDateOffset(d)).includes(dueDate) ? "#fff" : "#5E5495", border: "1px solid #E2D5B0" }}>
                 📅 تاريخ آخر
               </button>
               {dueDate && (
@@ -700,7 +709,7 @@ function QuickFinanceDialog({ onClose }: { onClose: () => void }) {
         a.post("/api/finance/transactions", {
           title: desc.trim() || (type === "expense" ? "مصروف" : "دخل"),
           amount: Number(amount), type: type === "income" ? "Income" : "Expense",
-          category: "أخرى", date: new Date().toISOString().slice(0, 10),
+          category: "أخرى", date: localDateStr(),
         })
       );
     } catch {}
@@ -1353,9 +1362,9 @@ function EditTaskDialog({ task, onClose, onSaved }: {
             <label className="block text-sm font-semibold mb-1.5" style={{ color: "var(--text)" }}>تاريخ الاستحقاق</label>
             <div className="flex gap-1.5 mb-2">
               {[
-                { label: "اليوم", val: new Date().toISOString().slice(0, 10) },
-                { label: "غداً", val: new Date(Date.now() + 86400000).toISOString().slice(0, 10) },
-                { label: "+7", val: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10) },
+                { label: "اليوم", val: localDateStr() },
+                { label: "غداً", val: localDateOffset(1) },
+                { label: "+7", val: localDateOffset(7) },
               ].map(o => (
                 <button key={o.label} type="button" onClick={() => setDueDate(o.val)}
                   className="px-3 py-1.5 rounded-lg text-[10px] font-semibold transition"
@@ -2518,7 +2527,7 @@ export default function TasksPage() {
         setTimeLeft(long ? LONG_SEC : SHORT_SEC);
         // Track session duration for reports
         try {
-          const today = new Date().toISOString().slice(0, 10);
+          const today = localDateStr();
           const log = JSON.parse(localStorage.getItem("madar_focus_log") ?? "[]");
           log.push({ date: today, taskId: focusTaskId ?? null, durationMin: mood === "low" ? 15 : 25, ts: Date.now() });
           // Keep last 90 days
@@ -3540,9 +3549,9 @@ export default function TasksPage() {
             )}
 
             {!loading && !error && visibleTasks.length > 0 && (() => {
-              const todayStr = new Date().toISOString().slice(0, 10);
-              const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-              const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+              const todayStr = localDateStr();
+              const tomorrowStr = localDateOffset(1);
+              const yesterdayStr = localDateOffset(-1);
 
               // تصنيف المهام حسب اليوم — فصل السابقة عن اليوم عن المستقبلية
               function getTaskDay(t: TaskRow): string {

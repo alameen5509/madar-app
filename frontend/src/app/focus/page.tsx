@@ -4,6 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { api, type SmartTask } from "@/lib/api";
 
+function localDateStr(d?: Date): string {
+  const dt = d ?? new Date();
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+
 export default function FocusPage() {
   const [tasks, setTasks] = useState<SmartTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,8 +25,7 @@ export default function FocusPage() {
       // Filter: pending only, no inbox, no cancelled
       const pending = all.filter(t => t.status !== "Completed" && t.status !== "Inbox" && t.status !== "Cancelled");
       // Sort: overdue first → today → tomorrow → future → no date last
-      const now = new Date(); now.setHours(0, 0, 0, 0);
-      const todayStr = now.toISOString().slice(0, 10);
+      const todayStr = localDateStr();
       pending.sort((a, b) => {
         const da = a.dueDate?.slice(0, 10) ?? "9999";
         const db = b.dueDate?.slice(0, 10) ?? "9999";
@@ -99,9 +103,21 @@ export default function FocusPage() {
     else setIdx(0);
   }
 
+  function skipToAfterNext() {
+    // Move current task to position idx+2 (after the next one)
+    if (tasks.length <= 1) return;
+    setTasks(prev => {
+      const current = prev[idx];
+      const without = prev.filter((_, i) => i !== idx);
+      const insertAt = Math.min(idx + 1, without.length);
+      return [...without.slice(0, insertAt), current, ...without.slice(insertAt)];
+    });
+    // idx stays same, which now points to what was the next task
+  }
+
   const task = tasks[idx];
   const now = new Date(); now.setHours(0, 0, 0, 0);
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const todayStr = localDateStr();
 
   function dateLabel(d?: string): { text: string; color: string } {
     if (!d) return { text: "بلا تاريخ", color: "#9CA3AF" };
@@ -247,7 +263,10 @@ export default function FocusPage() {
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <button onClick={() => postponeTo(7)} className="py-2.5 rounded-xl text-[11px] font-bold transition active:scale-95" style={{ background: "#8B5CF615", color: "#8B5CF6", border: "1px solid #8B5CF630" }}>الأسبوع القادم</button>
+                <button onClick={skipToAfterNext} className="py-2.5 rounded-xl text-[11px] font-bold transition active:scale-95" style={{ background: "#D4AF3710", color: "#D4AF37", border: "1px solid #D4AF3730" }}>بعد التالية</button>
                 <button onClick={skip} className="py-2.5 rounded-xl text-[11px] font-bold transition active:scale-95" style={{ background: "var(--bg)", color: "var(--muted)", border: "1px solid var(--card-border)" }}>تخطي →</button>
+              </div>
+              <div className="grid grid-cols-1">
                 <button onClick={deleteTask} className="py-2.5 rounded-xl text-[11px] font-bold transition active:scale-95" style={{ background: "#DC262610", color: "#DC2626", border: "1px solid #DC262630" }}>حذف 🗑️</button>
               </div>
             </div>
