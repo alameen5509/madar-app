@@ -177,6 +177,8 @@ export default function FocusPage() {
   );
 
   if (!task) return null;
+  // Debug: log task data to find missing root
+  useEffect(() => { if (task) console.log("[Focus] task:", task.title, "| root:", task.root, "| goal:", task.goal, "| circle:", task.lifeCircle); }, [task]);
   const dl = dateLabel(task.dueDate);
   const circle = task.lifeCircle;
   const priorityLabel = task.userPriority >= 4 ? "عالية" : task.userPriority >= 3 ? "متوسطة" : "منخفضة";
