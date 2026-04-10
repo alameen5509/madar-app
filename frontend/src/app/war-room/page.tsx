@@ -543,12 +543,12 @@ export default function WarRoomIndexPage() {
             <button onClick={startSession}
               className="px-3 py-2 rounded-xl text-[10px] font-bold text-white transition hover:opacity-90"
               style={{ background: "#5E5495" }}>
-              📊 مراجعة
+              📊 استطلاع
             </button>
             <button onClick={() => startSession("work")}
               className="px-3 py-2 rounded-xl text-[10px] font-bold text-white transition hover:opacity-90"
               style={{ background: "linear-gradient(135deg, #D4AF37, #5E5495)" }}>
-              ⏱ جلسة أعمال
+              ⏱ قيادة
             </button>
           </div>
         </div>
