@@ -34,7 +34,8 @@ function WorkSession({ items, onClose, onUpdate }: { items: SessionItem[]; onClo
     const saved: Record<string, number> = {};
     try { Object.assign(saved, JSON.parse(localStorage.getItem("madar_session_durations") ?? "{}")); } catch {}
     const defaultByPulse: Record<string, number> = { red: 15, blue: 15, yellow: 7, green: 3 };
-    for (const it of items) if (!saved[it.id]) saved[it.id] = defaultByPulse[it.pulse] ?? 10;
+    // Always apply pulse-based default; keep user's custom value only if they changed it from a previous pulse-default
+    for (const it of items) saved[it.id] = defaultByPulse[it.pulse] ?? 10;
     return saved;
   });
   const [idx, setIdx] = useState(0);
