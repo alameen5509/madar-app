@@ -37,24 +37,28 @@ const DEFAULT_HABITS: Habit[] = [
 
 /* ─── Hygiene Habits (النظافة الشخصية) ───────────────────────────── */
 
-interface HygieneHabit { id: string; title: string; icon: string; enabled: boolean; todayDone: boolean; streak: number }
+type HygieneFreq = "daily" | "weekly" | "biweekly" | "monthly";
+interface HygieneHabit { id: string; title: string; icon: string; enabled: boolean; todayDone: boolean; streak: number; frequency: HygieneFreq; lastDoneDate?: string }
+
+const FREQ_LABELS: Record<HygieneFreq, string> = { daily: "يومي", weekly: "أسبوعي", biweekly: "كل أسبوعين", monthly: "شهري" };
+const FREQ_DAYS: Record<HygieneFreq, number> = { daily: 1, weekly: 7, biweekly: 14, monthly: 30 };
 
 const DEFAULT_HYGIENE: HygieneHabit[] = [
-  { id: "h1", title: "الاستحمام", icon: "🚿", enabled: true, todayDone: false, streak: 0 },
-  { id: "h2", title: "السواك / تنظيف الأسنان", icon: "🪥", enabled: true, todayDone: false, streak: 0 },
-  { id: "h3", title: "غسل الوجه", icon: "🧴", enabled: true, todayDone: false, streak: 0 },
-  { id: "h4", title: "تقليم الأظافر", icon: "💅", enabled: false, todayDone: false, streak: 0 },
-  { id: "h5", title: "تسريح الشعر", icon: "💇", enabled: true, todayDone: false, streak: 0 },
-  { id: "h6", title: "التطيّب / العطر", icon: "🌸", enabled: true, todayDone: false, streak: 0 },
-  { id: "h7", title: "غسل اليدين", icon: "🧼", enabled: true, todayDone: false, streak: 0 },
-  { id: "h8", title: "تنظيف الأذن", icon: "👂", enabled: false, todayDone: false, streak: 0 },
-  { id: "h9", title: "ارتداء ملابس نظيفة", icon: "👕", enabled: true, todayDone: false, streak: 0 },
-  { id: "h10", title: "ترتيب الفراش", icon: "🛏️", enabled: true, todayDone: false, streak: 0 },
-  { id: "h11", title: "الاستنشاق والاستنثار", icon: "💨", enabled: false, todayDone: false, streak: 0 },
-  { id: "h12", title: "غسل القدمين", icon: "🦶", enabled: false, todayDone: false, streak: 0 },
-  { id: "h13", title: "إزالة شعر الإبط والعانة", icon: "✂️", enabled: false, todayDone: false, streak: 0 },
-  { id: "h14", title: "وضع مزيل العرق", icon: "🧴", enabled: true, todayDone: false, streak: 0 },
-  { id: "h15", title: "ترطيب البشرة", icon: "💧", enabled: false, todayDone: false, streak: 0 },
+  { id: "h1", title: "الاستحمام", icon: "🚿", enabled: true, todayDone: false, streak: 0, frequency: "daily" },
+  { id: "h2", title: "السواك / تنظيف الأسنان", icon: "🪥", enabled: true, todayDone: false, streak: 0, frequency: "daily" },
+  { id: "h3", title: "غسل الوجه", icon: "🧴", enabled: true, todayDone: false, streak: 0, frequency: "daily" },
+  { id: "h4", title: "تقليم الأظافر", icon: "💅", enabled: false, todayDone: false, streak: 0, frequency: "weekly" },
+  { id: "h5", title: "تسريح الشعر", icon: "💇", enabled: true, todayDone: false, streak: 0, frequency: "daily" },
+  { id: "h6", title: "التطيّب / العطر", icon: "🌸", enabled: true, todayDone: false, streak: 0, frequency: "daily" },
+  { id: "h7", title: "غسل اليدين", icon: "🧼", enabled: true, todayDone: false, streak: 0, frequency: "daily" },
+  { id: "h8", title: "تنظيف الأذن", icon: "👂", enabled: false, todayDone: false, streak: 0, frequency: "weekly" },
+  { id: "h9", title: "ارتداء ملابس نظيفة", icon: "👕", enabled: true, todayDone: false, streak: 0, frequency: "daily" },
+  { id: "h10", title: "ترتيب الفراش", icon: "🛏️", enabled: true, todayDone: false, streak: 0, frequency: "daily" },
+  { id: "h11", title: "الاستنشاق والاستنثار", icon: "💨", enabled: false, todayDone: false, streak: 0, frequency: "daily" },
+  { id: "h12", title: "غسل القدمين", icon: "🦶", enabled: false, todayDone: false, streak: 0, frequency: "daily" },
+  { id: "h13", title: "إزالة شعر الإبط والعانة", icon: "✂️", enabled: false, todayDone: false, streak: 0, frequency: "biweekly" },
+  { id: "h14", title: "وضع مزيل العرق", icon: "🧴", enabled: true, todayDone: false, streak: 0, frequency: "daily" },
+  { id: "h15", title: "ترطيب البشرة", icon: "💧", enabled: false, todayDone: false, streak: 0, frequency: "daily" },
 ];
 
 function HygieneSection() {
@@ -76,13 +80,22 @@ function HygieneSection() {
   const [showAddCustom, setShowAddCustom] = useState(false);
   const [customTitle, setCustomTitle] = useState("");
 
-  // Reset todayDone at start of new day
+  // Reset todayDone based on each habit's frequency
   useEffect(() => {
     const today = new Date().toDateString();
-    const lastDate = localStorage.getItem(DATE_KEY);
-    if (lastDate !== today) {
+    const lastCheck = localStorage.getItem(DATE_KEY);
+    if (lastCheck !== today) {
+      const now = new Date(); now.setHours(0, 0, 0, 0);
       setHabits(prev => {
-        const reset = prev.map(h => ({ ...h, todayDone: false }));
+        const reset = prev.map(h => {
+          if (!h.todayDone) return h; // already not done
+          if (!h.lastDoneDate) return { ...h, todayDone: false };
+          const last = new Date(h.lastDoneDate); last.setHours(0, 0, 0, 0);
+          const daysPassed = Math.floor((now.getTime() - last.getTime()) / 86400000);
+          const interval = FREQ_DAYS[h.frequency] ?? 1;
+          if (daysPassed >= interval) return { ...h, todayDone: false };
+          return h; // still within the period
+        });
         localStorage.setItem(STORAGE_KEY, JSON.stringify(reset));
         localStorage.setItem(DATE_KEY, today);
         return reset;
@@ -99,7 +112,7 @@ function HygieneSection() {
     save(habits.map(h => {
       if (h.id !== id) return h;
       const done = !h.todayDone;
-      return { ...h, todayDone: done, streak: done ? h.streak + 1 : Math.max(0, h.streak - 1) };
+      return { ...h, todayDone: done, streak: done ? h.streak + 1 : Math.max(0, h.streak - 1), lastDoneDate: done ? new Date().toISOString() : h.lastDoneDate };
     }));
   }
 
@@ -109,9 +122,13 @@ function HygieneSection() {
 
   function addCustom() {
     if (!customTitle.trim()) return;
-    const newH: HygieneHabit = { id: "hc_" + Date.now(), title: customTitle.trim(), icon: "✨", enabled: true, todayDone: false, streak: 0 };
+    const newH: HygieneHabit = { id: "hc_" + Date.now(), title: customTitle.trim(), icon: "✨", enabled: true, todayDone: false, streak: 0, frequency: "daily" };
     save([...habits, newH]);
     setCustomTitle(""); setShowAddCustom(false);
+  }
+
+  function setFrequency(id: string, freq: HygieneFreq) {
+    save(habits.map(h => h.id === id ? { ...h, frequency: freq } : h));
   }
 
   function removeCustom(id: string) {
@@ -119,7 +136,16 @@ function HygieneSection() {
     save(habits.filter(h => h.id !== id));
   }
 
-  const active = habits.filter(h => h.enabled);
+  // Show only habits that are due (not yet done within their frequency period)
+  const active = habits.filter(h => {
+    if (!h.enabled) return false;
+    if (h.todayDone) return true; // show done ones so user can see them checked
+    if (!h.lastDoneDate || h.frequency === "daily") return true;
+    const last = new Date(h.lastDoneDate); last.setHours(0, 0, 0, 0);
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const daysPassed = Math.floor((now.getTime() - last.getTime()) / 86400000);
+    return daysPassed >= (FREQ_DAYS[h.frequency] ?? 1);
+  });
   const doneCount = active.filter(h => h.todayDone).length;
   const pct = active.length === 0 ? 0 : Math.round((doneCount / active.length) * 100);
 
@@ -147,7 +173,7 @@ function HygieneSection() {
         <div className="rounded-xl border p-3 space-y-1" style={{ background: "var(--bg, #FDFAF6)", borderColor: "#0F346020" }}>
           <p className="text-[10px] font-bold mb-2" style={{ color: "var(--muted, #6B7280)" }}>فعّل أو أخفِ العادات:</p>
           {habits.map(h => (
-            <div key={h.id} className="flex items-center gap-2 py-1">
+            <div key={h.id} className="flex items-center gap-2 py-1.5">
               <button onClick={() => toggleEnabled(h.id)}
                 className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition"
                 style={{ background: h.enabled ? "#0F3460" : "#E5E7EB" }}>
@@ -155,6 +181,14 @@ function HygieneSection() {
               </button>
               <span className="text-sm">{h.icon}</span>
               <span className="flex-1 text-xs" style={{ color: h.enabled ? "var(--text, #16213E)" : "var(--muted, #9CA3AF)" }}>{h.title}</span>
+              <select value={h.frequency ?? "daily"} onChange={e => setFrequency(h.id, e.target.value as HygieneFreq)}
+                onClick={e => e.stopPropagation()}
+                className="text-[9px] px-1.5 py-1 rounded-lg border focus:outline-none"
+                style={{ background: "var(--card, #fff)", borderColor: "var(--card-border, #E5E7EB)", color: "var(--muted, #6B7280)" }}>
+                {(Object.keys(FREQ_LABELS) as HygieneFreq[]).map(f => (
+                  <option key={f} value={f}>{FREQ_LABELS[f]}</option>
+                ))}
+              </select>
               {h.id.startsWith("hc_") && (
                 <button onClick={() => { if (confirm("حذف؟")) removeCustom(h.id); }} className="text-[9px]" style={{ color: "#DC2626" }}>🗑️</button>
               )}
@@ -189,8 +223,11 @@ function HygieneSection() {
                 {h.todayDone && <span className="text-white text-[10px]">✓</span>}
               </div>
               <span className="text-lg">{h.icon}</span>
-              <span className={`flex-1 text-sm font-medium ${h.todayDone ? "line-through" : ""}`} style={{ color: h.todayDone ? "var(--muted, #9CA3AF)" : "var(--text, #16213E)" }}>{h.title}</span>
-              {h.streak > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "#0F346012", color: "#0F3460" }}>🔥 {h.streak}</span>}
+              <div className="flex-1 min-w-0">
+                <span className={`text-sm font-medium block truncate ${h.todayDone ? "line-through" : ""}`} style={{ color: h.todayDone ? "var(--muted, #9CA3AF)" : "var(--text, #16213E)" }}>{h.title}</span>
+                {h.frequency !== "daily" && <span className="text-[8px]" style={{ color: "var(--muted, #9CA3AF)" }}>{FREQ_LABELS[h.frequency]}</span>}
+              </div>
+              {h.streak > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold flex-shrink-0" style={{ background: "#0F346012", color: "#0F3460" }}>🔥 {h.streak}</span>}
             </div>
           ))}
         </div>
