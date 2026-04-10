@@ -19,6 +19,7 @@ const PULSE: Record<string, { label: string; color: string; bg: string }> = {
   green: { label: "مستقر", color: "#3D8C5A", bg: "#3D8C5A15" },
   yellow: { label: "يحتاج متابعة", color: "#F59E0B", bg: "#F59E0B15" },
   red: { label: "حرج", color: "#DC2626", bg: "#DC262615" },
+  blue: { label: "بناء", color: "#3B82F6", bg: "#3B82F615" },
 };
 
 type Tab = "works" | "manual";
@@ -122,7 +123,7 @@ function LeadershipSession({ items, onClose, onUpdate }: { items: SessionItem[];
           <div className="p-3 rounded-xl space-y-2" style={{ background: "var(--bg)", border: "1px solid #5E549520" }}>
             <p className="text-xs font-bold" style={{ color: "var(--text)" }}>تحديث النبض</p>
             <div className="flex gap-1.5">
-              {(["green", "yellow", "red"] as const).map(s => (
+              {(["green", "yellow", "red", "blue"] as const).map(s => (
                 <button key={s} onClick={() => setReview({ ...review, status: s })}
                   className="flex-1 py-2 rounded-lg text-[10px] font-bold transition"
                   style={{ background: review.status === s ? PULSE[s].color : "var(--card)", color: review.status === s ? "#fff" : PULSE[s].color, border: `1px solid ${PULSE[s].color}40` }}>
@@ -160,7 +161,7 @@ export default function WarRoomIndexPage() {
   const [works, setWorks] = useState<Work[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("works");
-  const [pulseFilter, setPulseFilter] = useState<"all" | "red" | "yellow" | "green">("all");
+  const [pulseFilter, setPulseFilter] = useState<"all" | "red" | "yellow" | "green" | "blue">("all");
   const [sessionItems, setSessionItems] = useState<SessionItem[] | null>(null);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
@@ -195,8 +196,8 @@ export default function WarRoomIndexPage() {
       const devReqs = await api.get(`/api/war-room/roles/${r.id}/dev-requests`).then(res => res.data ?? []).catch(() => []);
       items.push({ id: r.id, name: r.title, icon: r.icon || "🎯", color: r.color || "#5E5495", roleId: r.id, pulse: r.pulseStatus, pulseNote: r.pulseNote, notes, devReqs });
     }
-    // Sort: red first, then yellow, then green
-    const order = { red: 0, yellow: 1, green: 2 };
+    // Sort: red first, then yellow, then blue (building), then green
+    const order = { red: 0, yellow: 1, blue: 2, green: 3 };
     items.sort((a, b) => (order[a.pulse as keyof typeof order] ?? 2) - (order[b.pulse as keyof typeof order] ?? 2));
     setSessionItems(items);
   }
@@ -236,10 +237,12 @@ export default function WarRoomIndexPage() {
   // Pulse counts — exclude hidden items
   const visibleWorkItems = allItems.filter(i => !hiddenIds.has(i.id));
   const visibleManual = manualRoles;
-  const getPulse = (s?: string) => s === "red" || s === "yellow" || s === "green" ? s : "green";
-  const redCount = visibleWorkItems.filter(i => getPulse(i.role?.pulseStatus) === "red").length + visibleManual.filter(r => getPulse(r.pulseStatus) === "red").length;
-  const yellowCount = visibleWorkItems.filter(i => getPulse(i.role?.pulseStatus) === "yellow").length + visibleManual.filter(r => getPulse(r.pulseStatus) === "yellow").length;
-  const greenCount = visibleWorkItems.filter(i => getPulse(i.role?.pulseStatus) === "green").length + visibleManual.filter(r => getPulse(r.pulseStatus) === "green").length;
+  const getPulse = (s?: string) => s === "red" || s === "yellow" || s === "green" || s === "blue" ? s : "green";
+  const countPulse = (p: string) => visibleWorkItems.filter(i => getPulse(i.role?.pulseStatus) === p).length + visibleManual.filter(r => getPulse(r.pulseStatus) === p).length;
+  const redCount = countPulse("red");
+  const yellowCount = countPulse("yellow");
+  const greenCount = countPulse("green");
+  const blueCount = countPulse("blue");
 
   function renderCard(item: { id: string; name: string; type: string; icon: string; color: string; role?: Role; href: string }, idx: number) {
     const pulse = PULSE[item.role?.pulseStatus ?? "green"] ?? PULSE.green;
@@ -301,6 +304,7 @@ export default function WarRoomIndexPage() {
           {redCount > 0 && <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: "#DC262615", color: "#DC2626" }}>🔴 {redCount} حرج</span>}
           {yellowCount > 0 && <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: "#F59E0B15", color: "#F59E0B" }}>🟡 {yellowCount} متابعة</span>}
           {greenCount > 0 && <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>🟢 {greenCount} مستقر</span>}
+          {blueCount > 0 && <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: "#3B82F615", color: "#3B82F6" }}>🔵 {blueCount} بناء</span>}
           {hiddenIds.size > 0 && (
             <button onClick={() => setShowHidden(!showHidden)} className="text-xs font-bold px-2 py-1 rounded-full transition"
               style={{ background: showHidden ? "#5E549515" : "var(--bg)", color: showHidden ? "#5E5495" : "var(--muted)", border: `1px solid ${showHidden ? "#5E549530" : "var(--card-border)"}` }}>
@@ -324,6 +328,7 @@ export default function WarRoomIndexPage() {
             { key: "red", label: "🔴 حرج", color: "#DC2626" },
             { key: "yellow", label: "🟡 متابعة", color: "#F59E0B" },
             { key: "green", label: "🟢 مستقر", color: "#3D8C5A" },
+            { key: "blue", label: "🔵 بناء", color: "#3B82F6" },
           ] as const).map(f => (
             <button key={f.key} onClick={() => setPulseFilter(f.key)}
               className="px-3 py-1.5 rounded-lg text-[10px] font-bold transition"

@@ -12,6 +12,7 @@ const PULSE: Record<string, { label: string; color: string; bg: string }> = {
   green: { label: "مستقر", color: "#3D8C5A", bg: "#3D8C5A15" },
   yellow: { label: "يحتاج متابعة", color: "#F59E0B", bg: "#F59E0B15" },
   red: { label: "حرج", color: "#DC2626", bg: "#DC262615" },
+  blue: { label: "بناء", color: "#3B82F6", bg: "#3B82F615" },
 };
 const is = { background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" } as const;
 
@@ -153,7 +154,7 @@ export default function LeadershipSection({ workId, workName, workColor = "#5E54
       {showReview && (
         <div className="p-3 rounded-xl space-y-2" style={{ background: "var(--bg)", border: "1px solid #5E549520" }}>
           <div className="flex gap-1.5">
-            {(["green", "yellow", "red"] as const).map(s => (
+            {(["green", "yellow", "red", "blue"] as const).map(s => (
               <button key={s} onClick={() => setReviewForm({ ...reviewForm, status: s })}
                 className="flex-1 py-1.5 rounded-lg text-[10px] font-bold transition"
                 style={{ background: reviewForm.status === s ? PULSE[s].color : "var(--card)", color: reviewForm.status === s ? "#fff" : PULSE[s].color, border: `1px solid ${PULSE[s].color}40` }}>
