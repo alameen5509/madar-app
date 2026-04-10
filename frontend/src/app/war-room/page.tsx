@@ -25,7 +25,198 @@ const PULSE: Record<string, { label: string; color: string; bg: string }> = {
 type Tab = "works" | "roles" | "manual";
 interface Circle { id: string; name: string; icon?: string; color?: string; slug?: string; groupId?: string }
 
-interface SessionItem { id: string; name: string; icon: string; color: string; roleId?: string; pulse: string; pulseNote?: string; notes: { id: string; content: string; createdAt: string }[]; devReqs: { id: string; title: string; status: string }[] }
+interface SessionItem { id: string; name: string; icon: string; color: string; roleId?: string; pulse: string; pulseNote?: string; notes: { id: string; content: string; createdAt: string }[]; devReqs: { id: string; title: string; status: string }[]; duration?: number }
+
+// ═══ Work Session (with timer) ═══
+function WorkSession({ items, onClose, onUpdate }: { items: SessionItem[]; onClose: () => void; onUpdate: () => void }) {
+  const [phase, setPhase] = useState<"setup" | "running" | "done">("setup");
+  const [durations, setDurations] = useState<Record<string, number>>(() => {
+    const saved: Record<string, number> = {};
+    try { Object.assign(saved, JSON.parse(localStorage.getItem("madar_session_durations") ?? "{}")); } catch {}
+    for (const it of items) if (!saved[it.id]) saved[it.id] = it.duration ?? 10;
+    return saved;
+  });
+  const [idx, setIdx] = useState(0);
+  const [remaining, setRemaining] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [newNote, setNewNote] = useState("");
+
+  const totalMins = items.reduce((s, it) => s + (durations[it.id] ?? 10), 0);
+
+  function saveDurations(d: Record<string, number>) {
+    setDurations(d);
+    localStorage.setItem("madar_session_durations", JSON.stringify(d));
+  }
+
+  function startSession() {
+    saveDurations(durations);
+    setIdx(0);
+    setRemaining((durations[items[0]?.id] ?? 10) * 60);
+    setPhase("running");
+  }
+
+  // Timer
+  useEffect(() => {
+    if (phase !== "running" || paused) return;
+    if (remaining <= 0) return;
+    const t = setInterval(() => setRemaining(r => Math.max(0, r - 1)), 1000);
+    return () => clearInterval(t);
+  }, [phase, paused, remaining]);
+
+  function nextItem() {
+    if (idx < items.length - 1) {
+      const ni = idx + 1;
+      setIdx(ni);
+      setRemaining((durations[items[ni]?.id] ?? 10) * 60);
+      setNewNote("");
+    } else {
+      setPhase("done");
+      onUpdate();
+    }
+  }
+
+  async function addNote() {
+    const item = items[idx];
+    if (!newNote.trim() || !item?.roleId) return;
+    try { await api.post(`/api/war-room/roles/${item.roleId}/notes`, { content: newNote }); setNewNote(""); } catch {}
+  }
+
+  const fmtTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
+  const item = items[idx];
+  const pct = item ? Math.max(0, 100 - (remaining / ((durations[item.id] ?? 10) * 60)) * 100) : 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.7)" }}>
+      <div className="w-full max-w-lg mx-4 rounded-2xl overflow-hidden shadow-2xl" dir="rtl" style={{ background: "var(--card, #fff)", maxHeight: "90vh" }}>
+
+        {/* ═══ Setup phase ═══ */}
+        {phase === "setup" && (
+          <div className="p-5 overflow-y-auto" style={{ maxHeight: "90vh" }}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="font-black text-base" style={{ color: "var(--text)" }}>⚙️ إعداد جلسة الأعمال</p>
+                <p className="text-[10px] mt-1" style={{ color: "var(--muted)" }}>{items.length} عنصر · إجمالي {totalMins} دقيقة ({Math.floor(totalMins / 60) > 0 ? `${Math.floor(totalMins / 60)} ساعة و ${totalMins % 60} دقيقة` : `${totalMins} دقيقة`})</p>
+              </div>
+              <button onClick={onClose} className="text-lg" style={{ color: "var(--muted)" }}>✕</button>
+            </div>
+
+            <div className="space-y-2 mb-4">
+              {items.map(it => {
+                const ip = PULSE[it.pulse] ?? PULSE.green;
+                return (
+                  <div key={it.id} className="flex items-center gap-3 p-3 rounded-xl border" style={{ background: "var(--bg)", borderColor: "var(--card-border)" }}>
+                    <span className="text-lg">{it.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold truncate" style={{ color: "var(--text)" }}>{it.name}</p>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: ip.bg, color: ip.color }}>{ip.label}</span>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button onClick={() => saveDurations({ ...durations, [it.id]: Math.max(1, (durations[it.id] ?? 10) - 5) })}
+                        className="w-7 h-7 rounded-lg text-xs font-bold" style={{ background: "var(--card)", color: "var(--muted)", border: "1px solid var(--card-border)" }}>−</button>
+                      <span className="text-sm font-black w-10 text-center" style={{ color: "#5E5495" }}>{durations[it.id] ?? 10}</span>
+                      <button onClick={() => saveDurations({ ...durations, [it.id]: (durations[it.id] ?? 10) + 5 })}
+                        className="w-7 h-7 rounded-lg text-xs font-bold" style={{ background: "var(--card)", color: "var(--muted)", border: "1px solid var(--card-border)" }}>+</button>
+                      <span className="text-[9px]" style={{ color: "var(--muted)" }}>د</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="rounded-xl p-4 mb-4 text-center" style={{ background: "#5E549508", border: "1px solid #5E549520" }}>
+              <p className="text-2xl font-black" style={{ color: "#5E5495" }}>⏱ {totalMins} دقيقة</p>
+              <p className="text-[10px]" style={{ color: "var(--muted)" }}>الوقت المقدّر للجلسة الكاملة</p>
+            </div>
+
+            <button onClick={startSession} className="w-full py-3 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>
+              ابدأ الجلسة ({totalMins} دقيقة) →
+            </button>
+          </div>
+        )}
+
+        {/* ═══ Running phase ═══ */}
+        {phase === "running" && item && (() => {
+          const ip = PULSE[item.pulse] ?? PULSE.green;
+          return (
+            <div className="p-5 overflow-y-auto" style={{ maxHeight: "90vh" }}>
+              {/* Progress */}
+              <div className="flex gap-0.5 mb-3">
+                {items.map((_, i) => <div key={i} className="flex-1 h-1.5 rounded-full" style={{ background: i < idx ? "#3D8C5A" : i === idx ? "#D4AF37" : "#E5E7EB" }} />)}
+              </div>
+
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" style={{ background: item.color + "15" }}>{item.icon}</div>
+                <div className="flex-1">
+                  <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{item.name}</p>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: ip.bg, color: ip.color }}>{ip.label}</span>
+                </div>
+                <span className="text-[10px]" style={{ color: "var(--muted)" }}>{idx + 1}/{items.length}</span>
+                <button onClick={onClose} className="text-lg" style={{ color: "var(--muted)" }}>✕</button>
+              </div>
+
+              {/* Timer */}
+              <div className="rounded-2xl p-5 text-center mb-4" style={{ background: remaining === 0 ? "#DC262610" : "#5E549508", border: `2px solid ${remaining === 0 ? "#DC262640" : "#5E549520"}` }}>
+                <p className={`text-4xl font-black font-mono ${remaining === 0 ? "text-red-500 animate-pulse" : ""}`} style={remaining > 0 ? { color: "#5E5495" } : {}}>
+                  {fmtTime(remaining)}
+                </p>
+                <div className="h-2 rounded-full overflow-hidden mt-3 mb-2" style={{ background: "#E5E7EB" }}>
+                  <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: remaining === 0 ? "#DC2626" : "linear-gradient(90deg, #5E5495, #D4AF37)" }} />
+                </div>
+                <div className="flex justify-center gap-3 mt-2">
+                  <button onClick={() => setPaused(!paused)} className="text-xs px-4 py-2 rounded-lg font-bold" style={{ background: "var(--bg)", color: "var(--muted)", border: "1px solid var(--card-border)" }}>
+                    {paused ? "▶ استمرار" : "⏸ إيقاف مؤقت"}
+                  </button>
+                  <button onClick={() => setRemaining(r => r + 300)} className="text-xs px-4 py-2 rounded-lg font-bold" style={{ background: "var(--bg)", color: "#D4AF37", border: "1px solid #D4AF3730" }}>
+                    +5 دقائق
+                  </button>
+                </div>
+                {remaining === 0 && <p className="text-xs font-bold mt-2" style={{ color: "#DC2626" }}>⏰ انتهى الوقت!</p>}
+              </div>
+
+              {/* Notes & dev reqs */}
+              {item.notes.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-[10px] font-bold mb-1" style={{ color: "var(--muted)" }}>📝 ملاحظات</p>
+                  {item.notes.slice(0, 3).map(n => <p key={n.id} className="text-[10px] px-2 py-1 rounded-lg mb-0.5" style={{ background: "var(--bg)", color: "var(--text)" }}>{n.content}</p>)}
+                </div>
+              )}
+              {item.devReqs.filter(d => d.status !== "done").length > 0 && (
+                <div className="mb-3">
+                  <p className="text-[10px] font-bold mb-1" style={{ color: "#D4AF37" }}>🔧 معلقة</p>
+                  {item.devReqs.filter(d => d.status !== "done").map(d => <p key={d.id} className="text-[10px] px-2 py-1 rounded-lg mb-0.5" style={{ background: "#D4AF3708", color: "#D4AF37" }}>• {d.title}</p>)}
+                </div>
+              )}
+
+              {item.roleId && (
+                <div className="flex gap-2 mb-3">
+                  <input value={newNote} onChange={e => setNewNote(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addNote(); }}
+                    placeholder="ملاحظة..." className="flex-1 px-3 py-2 rounded-lg border text-xs focus:outline-none"
+                    style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
+                  <button onClick={addNote} disabled={!newNote.trim()} className="px-3 py-2 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>+</button>
+                </div>
+              )}
+
+              <button onClick={nextItem} className="w-full py-3 rounded-xl text-sm font-bold text-white"
+                style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>
+                {idx < items.length - 1 ? "التالي →" : "إنهاء الجلسة ✓"}
+              </button>
+            </div>
+          );
+        })()}
+
+        {/* ═══ Done phase ═══ */}
+        {phase === "done" && (
+          <div className="p-8 text-center">
+            <p className="text-5xl mb-4">✅</p>
+            <p className="font-black text-lg mb-2" style={{ color: "var(--text)" }}>اكتملت الجلسة</p>
+            <p className="text-xs mb-6" style={{ color: "var(--muted)" }}>راجعت {items.length} عنصر</p>
+            <button onClick={onClose} className="px-8 py-3 rounded-xl text-sm font-bold text-white" style={{ background: "#3D8C5A" }}>إغلاق</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function LeadershipSession({ items, onClose, onUpdate }: { items: SessionItem[]; onClose: () => void; onUpdate: () => void }) {
   const [idx, setIdx] = useState(0);
@@ -167,6 +358,7 @@ export default function WarRoomIndexPage() {
   const [newManual, setNewManual] = useState({ title: "", org: "" });
   const [pulseFilter, setPulseFilter] = useState<"all" | "red" | "yellow" | "green" | "blue">("all");
   const [sessionItems, setSessionItems] = useState<SessionItem[] | null>(null);
+  const [workSessionItems, setWorkSessionItems] = useState<SessionItem[] | null>(null);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try { return new Set(JSON.parse(localStorage.getItem("madar_warroom_hidden") ?? "[]")); } catch { return new Set(); }
@@ -187,7 +379,7 @@ export default function WarRoomIndexPage() {
     try { await api.delete(`/api/war-room/roles/${id}`); load(); } catch { alert("فشل الحذف"); }
   }
 
-  async function startSession() {
+  async function startSession(mode: "review" | "work" = "review") {
     // Build session items from visible work items + manual roles
     const items: SessionItem[] = [];
     for (const wi of workItems.filter(i => !hiddenIds.has(i.id))) {
@@ -208,7 +400,8 @@ export default function WarRoomIndexPage() {
     // Sort: red first, then yellow, then blue (building), then green
     const order = { red: 0, yellow: 1, blue: 2, green: 3 };
     items.sort((a, b) => (order[a.pulse as keyof typeof order] ?? 2) - (order[b.pulse as keyof typeof order] ?? 2));
-    setSessionItems(items);
+    if (mode === "work") setWorkSessionItems(items);
+    else setSessionItems(items);
   }
 
   const load = useCallback(async () => {
@@ -332,11 +525,18 @@ export default function WarRoomIndexPage() {
       <header className="sticky top-0 z-20 backdrop-blur border-b px-4 sm:px-6 py-3 pr-14 md:pr-6" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
         <div className="flex items-center justify-between">
           <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>🎖️ غرفة القيادة</h2>
-          <button onClick={startSession}
-            className="px-4 py-2 rounded-xl text-xs font-bold text-white transition hover:opacity-90"
-            style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>
-            📋 جلسة قيادة
-          </button>
+          <div className="flex gap-2">
+            <button onClick={startSession}
+              className="px-3 py-2 rounded-xl text-[10px] font-bold text-white transition hover:opacity-90"
+              style={{ background: "#5E5495" }}>
+              📊 مراجعة
+            </button>
+            <button onClick={() => startSession("work")}
+              className="px-3 py-2 rounded-xl text-[10px] font-bold text-white transition hover:opacity-90"
+              style={{ background: "linear-gradient(135deg, #D4AF37, #5E5495)" }}>
+              ⏱ جلسة أعمال
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-3 mt-1">
           <span className="text-xs" style={{ color: "var(--muted)" }}>{workItems.length + roleItems.length + manualRoles.length} غرفة</span>
@@ -487,6 +687,9 @@ export default function WarRoomIndexPage() {
 
       {sessionItems && (
         <LeadershipSession items={sessionItems} onClose={() => setSessionItems(null)} onUpdate={load} />
+      )}
+      {workSessionItems && (
+        <WorkSession items={workSessionItems} onClose={() => setWorkSessionItems(null)} onUpdate={load} />
       )}
     </main>
   );
