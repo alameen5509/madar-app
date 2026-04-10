@@ -18,6 +18,13 @@ export default function PhoneReminder() {
     const token = document.cookie.includes("madar_token") || !!localStorage.getItem("accessToken");
     if (!token) return;
 
+    // Only show for owner (not web-employees or other users)
+    api.get("/api/users/me/type").then(({ data }) => {
+      if (data?.type === "web-employee") return; // skip for employees
+      checkYesterday();
+    }).catch(() => {});
+
+    function checkYesterday() {
     // Check if yesterday's log exists
     const y = new Date();
     y.setDate(y.getDate() - 1);
@@ -28,6 +35,7 @@ export default function PhoneReminder() {
       const hasYesterday = logs.some((l: { date?: string }) => l.date?.startsWith(yesterday));
       if (!hasYesterday) setShow(true);
     }).catch(() => {});
+    } // end checkYesterday
   }, []);
 
   async function save() {
