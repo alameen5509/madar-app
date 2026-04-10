@@ -40,8 +40,6 @@ const NAV_GROUPS = [
   ]},
   { group: "الحياة", items: [
     { icon: "◎", label: "أدوار الحياة",       href: "/circles",     badgeKey: null, fixed: false },
-    { icon: "🤲", label: "التوبة",             href: "/tawbah",      badgeKey: null, fixed: false },
-    { icon: "🚫", label: "ترك العادات",       href: "/quit-habits", badgeKey: null, fixed: false },
     { icon: "📵", label: "إدمان الجوال",      href: "/phone-addiction", badgeKey: null, fixed: false },
   ]},
   { group: "الإدارة", items: [

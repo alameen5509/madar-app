@@ -103,3 +103,4 @@ backend/fix-ahmed-team.sql
 backend/migrations.sql
 copy_frontend.ps1
 
+chromeremotedesktophost.msi

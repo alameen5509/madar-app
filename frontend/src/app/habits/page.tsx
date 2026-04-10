@@ -867,6 +867,118 @@ function PrayerSection() {
   );
 }
 
+/* ─── Sin / Bad Habit Penalty Section ──────────────────────────────────── */
+
+function SinPenaltySection() {
+  const [penalties, setPenalties] = useState<{ id: string; type: "bad_habit" | "sin"; createdAt: string }[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(localStorage.getItem("madar_sin_penalties") ?? "[]"); } catch { return []; }
+  });
+  const [tasbih, setTasbih] = useState<{ penaltyIdx: number } | null>(null);
+
+  function addPenalty(type: "bad_habit" | "sin") {
+    const pen = { id: "sp_" + Date.now(), type, createdAt: new Date().toISOString() };
+    const updated = [pen, ...penalties];
+    setPenalties(updated);
+    localStorage.setItem("madar_sin_penalties", JSON.stringify(updated));
+  }
+
+  function fulfillPenalty(id: string) {
+    const updated = penalties.filter(p => p.id !== id);
+    setPenalties(updated);
+    localStorage.setItem("madar_sin_penalties", JSON.stringify(updated));
+  }
+
+  const KAFFARA = [
+    { key: "istighfar", label: "استغفار ١٠٠ مرة", icon: "📿", tasbih: true },
+    { key: "sadaqa", label: "صدقة", icon: "💰", tasbih: false },
+    { key: "quran", label: "ورد من القرآن", icon: "📖", tasbih: false },
+    { key: "nafila", label: "صلاة ركعتين", icon: "🕌", tasbih: false },
+    { key: "siyam", label: "صيام يوم", icon: "🌙", tasbih: false },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 px-1">
+        <span className="text-sm">⚖️</span>
+        <span className="text-sm font-bold" style={{ color: "var(--text)" }}>المحاسبة</span>
+        {penalties.length > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: "#DC262615", color: "#DC2626" }}>{penalties.length} عقوبة</span>}
+      </div>
+
+      {/* Buttons */}
+      <div className="flex gap-3">
+        <button onClick={() => addPenalty("bad_habit")}
+          className="flex-1 py-4 rounded-2xl text-sm font-bold transition-all active:scale-95 border-2"
+          style={{ background: "linear-gradient(135deg, #F59E0B10, #F59E0B05)", borderColor: "#F59E0B40", color: "#F59E0B" }}>
+          <span className="text-2xl block mb-1">🚫</span>
+          عادة سيئة
+        </button>
+        <button onClick={() => addPenalty("sin")}
+          className="flex-1 py-4 rounded-2xl text-sm font-bold transition-all active:scale-95 border-2"
+          style={{ background: "linear-gradient(135deg, #DC262610, #DC262605)", borderColor: "#DC262640", color: "#DC2626" }}>
+          <span className="text-2xl block mb-1">⚠️</span>
+          معصية
+        </button>
+      </div>
+
+      {/* Pending penalties */}
+      {penalties.length > 0 && (
+        <div className="space-y-3">
+          {penalties.map((pen, idx) => {
+            const isSin = pen.type === "sin";
+            const borderColor = isSin ? "#DC262640" : "#F59E0B40";
+            const label = isSin ? "معصية" : "عادة سيئة";
+            const icon = isSin ? "⚠️" : "🚫";
+            const time = new Date(pen.createdAt).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
+            return (
+              <div key={pen.id} className="rounded-xl p-4 border-2 shadow-sm" style={{ background: "#fff", borderColor }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-2xl">{icon}</span>
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: "#16213E" }}>{label}</p>
+                    <p className="text-[10px]" style={{ color: "#9CA3AF" }}>{time}</p>
+                  </div>
+                </div>
+                <p className="text-[10px] font-semibold mb-2" style={{ color: "#6B7280" }}>اختر كفارتك وأدِّها:</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {KAFFARA.slice(0, 3).map(k => (
+                    <button key={k.key} onClick={() => {
+                      if (k.tasbih) { setTasbih({ penaltyIdx: idx }); }
+                      else { fulfillPenalty(pen.id); }
+                    }}
+                      className="py-3 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 border-2"
+                      style={{ background: "linear-gradient(135deg, #2C2C54, #5E5495)", color: "white", borderColor: "#2C2C54" }}>
+                      {k.icon}<br /><span className="text-[9px] font-medium opacity-90">{k.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  {KAFFARA.slice(3).map(k => (
+                    <button key={k.key} onClick={() => fulfillPenalty(pen.id)}
+                      className="py-3 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 border-2"
+                      style={{ background: "linear-gradient(135deg, #2C2C54, #5E5495)", color: "white", borderColor: "#2C2C54" }}>
+                      {k.icon}<br /><span className="text-[9px] font-medium opacity-90">{k.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tasbih != null && penalties[tasbih.penaltyIdx] && (
+        <TasbihCounter
+          target={100}
+          label="استغفر الله ١٠٠ مرة"
+          onComplete={() => { fulfillPenalty(penalties[tasbih.penaltyIdx].id); setTasbih(null); }}
+          onClose={() => setTasbih(null)}
+        />
+      )}
+    </div>
+  );
+}
+
 /* ─── Page ─────────────────────────────────────────────────────────────── */
 
 export default function HabitsPage() {
@@ -1094,6 +1206,10 @@ export default function HabitsPage() {
         {/* ═══ Hygiene Section ═══ */}
         <GeometricDivider label="النظافة الشخصية" />
         <HygieneSection />
+
+        {/* ═══ Sin / Bad Habit Penalty ═══ */}
+        <GeometricDivider label="المحاسبة" />
+        <SinPenaltySection />
 
         {/* ═══ Habits ═══ */}
         <GeometricDivider label="العادات" />
