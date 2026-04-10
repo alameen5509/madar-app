@@ -381,6 +381,7 @@ function PrayerSection() {
   const [showSettings, setShowSettings] = useState(false);
   const [tasbih, setTasbih] = useState<{ penaltyId: string } | null>(null);
   const [sunnahDone, setSunnahDone] = useState<Record<string, boolean>>({});
+  const [sunnahWaiting, setSunnahWaiting] = useState<Record<string, boolean>>({});
   const [penaltyConfig, setPenaltyConfig] = useState<Record<string, string>>({});
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [showStats, setShowStats] = useState(false);
@@ -702,31 +703,60 @@ function PrayerSection() {
           </>);
       })()}
 
-      {/* ═══ Sunnah Tracking ═══ */}
-      <div className="mt-4 space-y-2">
-        <div className="flex items-center gap-2 px-1">
-          <span className="text-sm">📿</span>
-          <span className="text-xs font-bold" style={{ color: "var(--text)" }}>النوافل والسنن</span>
-          <span className="text-[9px]" style={{ color: "var(--muted)" }}>{SUNNAH_PRAYERS.filter(s => sunnahDone[s.key]).length}/{SUNNAH_PRAYERS.length}</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {SUNNAH_PRAYERS.map(s => {
-            const done = !!sunnahDone[s.key];
-            return (
-              <button key={s.key} onClick={() => toggleSunnah(s.key, !done)}
-                className="rounded-xl p-3 border-2 transition-all text-right"
-                style={{ background: done ? "#3D8C5A10" : "var(--card)", borderColor: done ? "#3D8C5A40" : "var(--card-border)" }}>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-lg">{s.icon}</span>
-                  <span className="text-xs font-bold flex-1" style={{ color: done ? "#3D8C5A" : "var(--text)" }}>{s.label}</span>
-                  {done && <span className="text-sm">✓</span>}
-                </div>
-                <p className="text-[9px]" style={{ color: "var(--muted)" }}>{s.desc}</p>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* ═══ Sunnah Tracking — card-based like prayers ═══ */}
+      {(() => {
+        const pending = SUNNAH_PRAYERS.filter(s => !sunnahDone[s.key]);
+        const doneCount = SUNNAH_PRAYERS.length - pending.length;
+        return pending.length > 0 || doneCount > 0 ? (
+          <div className="mt-4 space-y-2">
+            {doneCount > 0 && (
+              <div className="flex items-center gap-2 px-1">
+                <span className="text-sm">📿</span>
+                <p className="text-xs font-semibold" style={{ color: "#3D8C5A" }}>
+                  {doneCount === SUNNAH_PRAYERS.length ? "بارك الله فيك — أتممت جميع النوافل" : `${doneCount} من ${SUNNAH_PRAYERS.length} نوافل مكتملة`}
+                </p>
+              </div>
+            )}
+            {pending.length > 0 && (
+              <div className="space-y-3">
+                {pending.map(s => {
+                  const isWaiting = sunnahWaiting[s.key] ?? false;
+                  return (
+                    <div key={s.key} className="rounded-xl p-4 border-2 shadow-sm space-y-3" style={{ borderColor: "#D4AF3780", background: "var(--card, #fff)" }}>
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{s.icon}</span>
+                        <div className="flex-1">
+                          <p className="text-sm font-bold" style={{ color: "#16213E" }}>{s.label}</p>
+                          <p className="text-[10px]" style={{ color: "#6B7280" }}>{s.desc}</p>
+                        </div>
+                      </div>
+                      <p className="text-sm font-bold text-center" style={{ color: "#16213E" }}>هل أديت {s.label}؟</p>
+                      {isWaiting ? (<>
+                        <button onClick={() => { setSunnahWaiting(prev => ({ ...prev, [s.key]: false })); toggleSunnah(s.key, true); }}
+                          className="w-full py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)", color: "#fff" }}>
+                          أديتها ✅
+                        </button>
+                        <p className="text-xs text-center animate-pulse" style={{ color: "#D4AF37" }}>بانتظارك...</p>
+                      </>) : (
+                        <div className="flex gap-2">
+                          <button onClick={() => toggleSunnah(s.key, true)}
+                            className="flex-1 py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)", color: "#fff" }}>
+                            نعم ✅
+                          </button>
+                          <button onClick={() => setSunnahWaiting(prev => ({ ...prev, [s.key]: true }))}
+                            className="flex-1 py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #5E5495, #2C2C54)", color: "#fff" }}>
+                            سأؤديها الآن
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : null;
+      })()}
 
       {/* ═══ Penalties — all shown, sorted oldest first ═══ */}
       {penalties.length > 0 && (
