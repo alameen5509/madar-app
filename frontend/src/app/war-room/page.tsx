@@ -540,7 +540,7 @@ export default function WarRoomIndexPage() {
         <div className="flex items-center justify-between">
           <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>🎖️ غرفة القيادة</h2>
           <div className="flex gap-2">
-            <button onClick={startSession}
+            <button onClick={() => startSession("review")}
               className="px-3 py-2 rounded-xl text-[10px] font-bold text-white transition hover:opacity-90"
               style={{ background: "#5E5495" }}>
               📊 استطلاع
