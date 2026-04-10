@@ -9,9 +9,14 @@ export default function PhoneReminder() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // Don't show if already dismissed this session
     if (typeof window === "undefined") return;
     if (sessionStorage.getItem("madar_phone_reminded")) return;
+
+    // Don't run on login/register pages or if no token
+    const path = window.location.pathname;
+    if (path.startsWith("/login") || path.startsWith("/register")) return;
+    const token = document.cookie.includes("madar_token") || !!localStorage.getItem("accessToken");
+    if (!token) return;
 
     // Check if yesterday's log exists
     const y = new Date();
