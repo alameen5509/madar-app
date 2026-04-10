@@ -2,9 +2,12 @@
 
 import { use, useState, useEffect } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
 import RolePageShell, { useRoleData, useRoleMeta } from "@/components/RolePageShell";
 import { calcDimProgress } from "@/components/RoleTree";
+
+const LeadershipSection = dynamic(() => import("@/components/LeadershipSection"), { ssr: false });
 
 export default function RoleOverview({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
@@ -125,6 +128,17 @@ export default function RoleOverview({ params }: { params: Promise<{ slug: strin
           </Link>
         ))}
       </div>
+
+      {/* ═══ Leadership Section ═══ */}
+      {role?.id && (
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-bold" style={{ color: "var(--text)" }}>🎖️ القيادة</p>
+            <Link href="/war-room" className="text-[10px] hover:underline" style={{ color }}>صفحة القيادة المستقلة ←</Link>
+          </div>
+          <LeadershipSection workId={role.id} workName={role.name} workColor={color} workIcon={role.icon ?? "◎"} />
+        </div>
+      )}
     </RolePageShell>
   );
 }
