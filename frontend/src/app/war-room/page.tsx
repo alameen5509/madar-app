@@ -379,18 +379,32 @@ export default function WarRoomIndexPage() {
     try { await api.delete(`/api/war-room/roles/${id}`); load(); } catch { alert("فشل الحذف"); }
   }
 
+  // Ensure a leadership role exists for an item, creating one if needed
+  async function ensureRoleId(item: { id: string; name: string; icon: string; color: string; role?: Role }): Promise<string | undefined> {
+    if (item.role?.id && !item.role.id.startsWith("auto-")) return item.role.id;
+    // Create a real leadership role
+    try {
+      const { data } = await api.post("/api/war-room/roles", {
+        title: item.name, workId: item.id, reviewFrequency: "weekly", color: item.color, icon: item.icon,
+      });
+      return data.id;
+    } catch { return undefined; }
+  }
+
   async function startSession(mode: "review" | "work" = "review") {
-    // Build session items from visible work items + manual roles
+    // Build session items from visible work items + roles + manual
     const items: SessionItem[] = [];
     for (const wi of workItems.filter(i => !hiddenIds.has(i.id))) {
-      const notes = wi.role ? await api.get(`/api/war-room/roles/${wi.role.id}/notes`).then(r => r.data ?? []).catch(() => []) : [];
-      const devReqs = wi.role ? await api.get(`/api/war-room/roles/${wi.role.id}/dev-requests`).then(r => r.data ?? []).catch(() => []) : [];
-      items.push({ id: wi.id, name: wi.name, icon: wi.icon, color: wi.color, roleId: wi.role?.id, pulse: wi.role?.pulseStatus ?? "green", pulseNote: wi.role?.pulseNote, notes, devReqs });
+      const rid = await ensureRoleId(wi);
+      const notes = rid ? await api.get(`/api/war-room/roles/${rid}/notes`).then(r => r.data ?? []).catch(() => []) : [];
+      const devReqs = rid ? await api.get(`/api/war-room/roles/${rid}/dev-requests`).then(r => r.data ?? []).catch(() => []) : [];
+      items.push({ id: wi.id, name: wi.name, icon: wi.icon, color: wi.color, roleId: rid, pulse: wi.role?.pulseStatus ?? "green", pulseNote: wi.role?.pulseNote, notes, devReqs });
     }
     for (const ri of roleItems.filter(i => !hiddenIds.has(i.id))) {
-      const notes = ri.role ? await api.get(`/api/war-room/roles/${ri.role.id}/notes`).then(r => r.data ?? []).catch(() => []) : [];
-      const devReqs = ri.role ? await api.get(`/api/war-room/roles/${ri.role.id}/dev-requests`).then(r => r.data ?? []).catch(() => []) : [];
-      items.push({ id: ri.id, name: ri.name, icon: ri.icon, color: ri.color, roleId: ri.role?.id, pulse: ri.role?.pulseStatus ?? "green", pulseNote: ri.role?.pulseNote, notes, devReqs });
+      const rid = await ensureRoleId(ri);
+      const notes = rid ? await api.get(`/api/war-room/roles/${rid}/notes`).then(r => r.data ?? []).catch(() => []) : [];
+      const devReqs = rid ? await api.get(`/api/war-room/roles/${rid}/dev-requests`).then(r => r.data ?? []).catch(() => []) : [];
+      items.push({ id: ri.id, name: ri.name, icon: ri.icon, color: ri.color, roleId: rid, pulse: ri.role?.pulseStatus ?? "green", pulseNote: ri.role?.pulseNote, notes, devReqs });
     }
     for (const r of manualRoles) {
       const notes = await api.get(`/api/war-room/roles/${r.id}/notes`).then(res => res.data ?? []).catch(() => []);
