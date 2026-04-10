@@ -34,6 +34,8 @@ export default function WorkJobPage({ params }: { params: Promise<{ id: string; 
     { href: `/jobs/${jobId}/skills`, label: "المهارات", icon: "💡" },
     { href: `/jobs/${jobId}/meetings`, label: "الاجتماعات", icon: "📅" },
     { href: `/jobs/${jobId}/lessons`, label: "الدروس", icon: "📝" },
+    { href: `/jobs/${jobId}/board`, label: "السبورة", icon: "🎨" },
+    { href: `/jobs/${jobId}/mindmap`, label: "خريطة ذهنية", icon: "🧠" },
   ];
 
   return (
