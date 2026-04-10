@@ -42,6 +42,8 @@ function WorkSession({ items, onClose, onUpdate }: { items: SessionItem[]; onClo
   const [remaining, setRemaining] = useState(0);
   const [paused, setPaused] = useState(false);
   const [newNote, setNewNote] = useState("");
+  const [pulseEdit, setPulseEdit] = useState<string | null>(null);
+  const [savingPulse, setSavingPulse] = useState(false);
 
   const totalMins = items.reduce((s, it) => s + (durations[it.id] ?? 10), 0);
   const totalH = Math.floor(totalMins / 60);
@@ -73,7 +75,7 @@ function WorkSession({ items, onClose, onUpdate }: { items: SessionItem[]; onClo
       const ni = idx + 1;
       setIdx(ni);
       setRemaining((durations[items[ni]?.id] ?? 10) * 60);
-      setNewNote("");
+      setNewNote(""); setPulseEdit(null);
     } else {
       setPhase("done");
       onUpdate();
@@ -84,6 +86,19 @@ function WorkSession({ items, onClose, onUpdate }: { items: SessionItem[]; onClo
     const item = items[idx];
     if (!newNote.trim() || !item?.roleId) return;
     try { await api.post(`/api/war-room/roles/${item.roleId}/notes`, { content: newNote }); setNewNote(""); } catch {}
+  }
+
+  async function updatePulse(status: string) {
+    const item = items[idx];
+    if (!item?.roleId) return;
+    setSavingPulse(true);
+    try {
+      await api.patch(`/api/war-room/roles/${item.roleId}/pulse`, { status });
+      setPulseEdit(status);
+      // Update item locally
+      (item as { pulse: string }).pulse = status;
+    } catch {}
+    setSavingPulse(false);
   }
 
   const fmtTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
@@ -198,6 +213,25 @@ function WorkSession({ items, onClose, onUpdate }: { items: SessionItem[]; onClo
                     placeholder="ملاحظة..." className="flex-1 px-3 py-2 rounded-lg border text-xs focus:outline-none"
                     style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
                   <button onClick={addNote} disabled={!newNote.trim()} className="px-3 py-2 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>+</button>
+                </div>
+              )}
+
+              {/* Pulse update */}
+              {item.roleId && (
+                <div className="mb-3">
+                  <p className="text-[10px] font-bold mb-1.5" style={{ color: "var(--muted)" }}>تحديث النبض:</p>
+                  <div className="flex gap-1.5">
+                    {(["green", "yellow", "red", "blue"] as const).map(s => {
+                      const current = pulseEdit ?? item.pulse;
+                      return (
+                        <button key={s} onClick={() => updatePulse(s)} disabled={savingPulse}
+                          className="flex-1 py-2 rounded-lg text-[10px] font-bold transition disabled:opacity-50"
+                          style={{ background: current === s ? PULSE[s].color : "var(--bg)", color: current === s ? "#fff" : PULSE[s].color, border: `1px solid ${PULSE[s].color}40` }}>
+                          {PULSE[s].label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
