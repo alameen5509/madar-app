@@ -382,6 +382,7 @@ function PrayerSection() {
   const [tasbih, setTasbih] = useState<{ penaltyId: string } | null>(null);
   const [sunnahDone, setSunnahDone] = useState<Record<string, boolean>>({});
   const [sunnahWaiting, setSunnahWaiting] = useState<Record<string, boolean>>({});
+  const [sunnahSkipped, setSunnahSkipped] = useState<Record<string, boolean>>({});
   const [celebrateSunnah, setCelebrateSunnah] = useState<string | null>(null);
   const [declinedSunnah, setDeclinedSunnah] = useState<string | null>(null);
   const [penaltyConfig, setPenaltyConfig] = useState<Record<string, string>>({});
@@ -716,10 +717,10 @@ function PrayerSection() {
         } : { Fajr: 280, shuruq: 380, Dhuhr: 730, Asr: 900, Maghrib: 1070, Isha: 1170 };
 
         const visible = SUNNAH_PRAYERS.filter(s => {
-          if (sunnahDone[s.key]) return false; // already done
-          if (declinedSunnah === s.key) return false; // just declined, hide
+          if (sunnahDone[s.key]) return false;
+          if (sunnahSkipped[s.key]) return false;
           const start = startMap[s.startPrayer] ?? 0;
-          return nowMins >= start; // only show if time has come
+          return nowMins >= start;
         });
         const doneCount = SUNNAH_PRAYERS.filter(s => sunnahDone[s.key]).length;
         return visible.length > 0 || doneCount > 0 || celebrateSunnah ? (
@@ -782,9 +783,9 @@ function PrayerSection() {
                             className="flex-1 py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)", color: "#fff" }}>
                             نعم ✅
                           </button>
-                          <button onClick={() => { setDeclinedSunnah(s.key); setTimeout(() => setDeclinedSunnah(null), 3000); }}
+                          <button onClick={() => { setSunnahSkipped(prev => ({ ...prev, [s.key]: true })); setDeclinedSunnah(s.key); setTimeout(() => setDeclinedSunnah(null), 3000); }}
                             className="flex-1 py-3 rounded-xl text-sm font-bold border-2" style={{ background: "transparent", borderColor: "#9CA3AF40", color: "#9CA3AF" }}>
-                            لا
+                            تخطي
                           </button>
                         </div>
                       )}
