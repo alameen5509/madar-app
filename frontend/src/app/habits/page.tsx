@@ -362,7 +362,7 @@ function PrayerSection() {
 
   const loadPenalties = useCallback(() => {
     api.get("/api/prayer-tracking/penalties").then(({ data }) => {
-      setPenalties(data as Penalty[]);
+      setPenalties((data?.penalties ?? data ?? []) as Penalty[]);
     }).catch(() => {});
   }, []);
 
