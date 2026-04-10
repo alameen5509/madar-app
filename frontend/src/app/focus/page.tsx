@@ -157,24 +157,41 @@ export default function FocusPage() {
               {/* Title */}
               <h1 className="font-black text-xl leading-relaxed text-center" style={{ color: "var(--text)" }}>{task.title}</h1>
 
+              {/* Root breadcrumb */}
+              {task.root ? (() => {
+                const r = task.root;
+                const base = r.kind === "job" ? `/jobs/${r.entityId}` : `/circles/${r.entitySlug ?? r.entityId}`;
+                return (
+                  <div className="rounded-xl p-3 text-center space-y-1" style={{ background: "var(--bg)" }}>
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap text-[11px]">
+                      <Link href={base} className="font-bold hover:underline" style={{ color: "#5E5495" }}>{r.entityName}</Link>
+                      <span style={{ color: "var(--muted)" }}>←</span>
+                      <Link href={`${base}/dimensions/${r.dimensionId}`} className="hover:underline" style={{ color: "#D4AF37" }}>📁 {r.dimensionName}</Link>
+                      <span style={{ color: "var(--muted)" }}>←</span>
+                      <Link href={`${base}/goals/${r.goalId}`} className="hover:underline" style={{ color: "#3D8C5A" }}>🎯 {r.goalTitle}</Link>
+                    </div>
+                  </div>
+                );
+              })() : (task.goal || circle) && (
+                <div className="rounded-xl p-3 text-center space-y-1" style={{ background: "var(--bg)" }}>
+                  <div className="flex items-center justify-center gap-1.5 flex-wrap text-[11px]">
+                    {circle && <span className="font-bold" style={{ color: circle.color ?? "#5E5495" }}>{circle.icon ?? "●"} {circle.name}</span>}
+                    {circle && task.goal && <span style={{ color: "var(--muted)" }}>←</span>}
+                    {task.goal && <span style={{ color: "#D4AF37" }}>🎯 {task.goal.title}</span>}
+                  </div>
+                </div>
+              )}
+
               {/* Description */}
               {task.description && (
                 <p className="text-xs text-center leading-relaxed" style={{ color: "var(--muted)" }}>{task.description}</p>
               )}
 
-              {/* Meta */}
-              <div className="flex items-center justify-center gap-3 flex-wrap">
-                {circle && (
-                  <span className="text-[10px] px-2.5 py-1 rounded-full font-semibold" style={{ background: (circle.color ?? "#5E5495") + "15", color: circle.color ?? "#5E5495" }}>
-                    {circle.icon ?? "●"} {circle.name}
-                  </span>
-                )}
+              {/* Priority */}
+              <div className="flex items-center justify-center">
                 <span className="text-[10px] px-2.5 py-1 rounded-full font-semibold" style={{ background: priorityColor + "15", color: priorityColor }}>
                   {priorityLabel}
                 </span>
-                {task.goal && (
-                  <span className="text-[10px] px-2.5 py-1 rounded-full" style={{ background: "#D4AF3715", color: "#D4AF37" }}>🎯 {task.goal.title}</span>
-                )}
               </div>
             </div>
 
