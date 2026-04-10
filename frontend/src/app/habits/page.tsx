@@ -527,9 +527,20 @@ function PrayerSection() {
         </div>)}
         {step === 2 && (<div className="space-y-2"><p className="text-sm font-bold text-center" style={{ color: "#16213E" }}>هل صليت في المسجد؟</p><div className="flex gap-2"><button onClick={() => { setPrayerAnswers(prev => ({ ...prev, [p.key]: { ...ans, inMosque: true } })); setStep(p.key, 3); }} className="flex-1 py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #2C2C54, #5E5495)", color: "#fff" }}>نعم — في المسجد 🕌</button><button onClick={() => { setPrayerAnswers(prev => ({ ...prev, [p.key]: { ...ans, inMosque: false } })); setStep(p.key, 3); }} className="flex-1 py-3 rounded-xl text-sm font-bold border-2" style={{ background: "transparent", borderColor: "#2C2C54", color: "#2C2C54" }}>لا</button></div></div>)}
         {step === 3 && (<div className="space-y-2"><p className="text-sm font-bold text-center" style={{ color: "#16213E" }}>هل صليت في الوقت؟</p><div className="flex gap-2"><button onClick={() => { setPrayerAnswers(prev => ({ ...prev, [p.key]: { ...ans, onTime: true } })); setStep(p.key, 4); }} className="flex-1 py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #D4AF37, #B8912A)", color: "#fff" }}>نعم — في الوقت ⏰</button><button onClick={() => { setPrayerAnswers(prev => ({ ...prev, [p.key]: { ...ans, onTime: false } })); setStep(p.key, 4); }} className="flex-1 py-3 rounded-xl text-sm font-bold border-2" style={{ background: "transparent", borderColor: "#D4AF37", color: "#B8912A" }}>لا — بعد الوقت</button></div></div>)}
-        {step === 4 && (<div className="space-y-2"><p className="text-sm font-bold text-center" style={{ color: "#16213E" }}>هل صليت السنن الرواتب؟</p><p className="text-[10px] text-center" style={{ color: "#D4AF37" }}>✨ ١٢ ركعة يومياً تبني بيتاً في الجنة</p>
-          {isWS ? (<><button onClick={() => { setWaitingSunnah(prev => ({ ...prev, [p.key]: false })); finalizePrayer(p.key, ans); }} className="w-full py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)", color: "#fff" }}>أديتها ✅</button><p className="text-xs text-center animate-pulse" style={{ color: "#D4AF37" }}>بانتظارك...</p></>) : (
-            <div className="flex gap-2"><button onClick={() => finalizePrayer(p.key, ans)} className="flex-1 py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)", color: "#fff" }}>نعم — أديتها ✅</button><button onClick={() => setWaitingSunnah(prev => ({ ...prev, [p.key]: true }))} className="flex-1 py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #5E5495, #2C2C54)", color: "#fff" }}>لا — سأؤديها الآن</button></div>)}
+        {step === 4 && (<div className="space-y-2">
+          <p className="text-sm font-semibold text-center" style={{ color: "#D4AF37" }}>💡 السنن الرواتب (اختيارية)</p>
+          <p className="text-[10px] text-center" style={{ color: "#9CA3AF" }}>«من صلى ١٢ ركعة في يوم بُني له بيت في الجنة» — مسلم</p>
+          {isWS ? (<>
+            <button onClick={() => { setWaitingSunnah(prev => ({ ...prev, [p.key]: false })); finalizePrayer(p.key, ans); }} className="w-full py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)", color: "#fff" }}>أديتها ✅</button>
+            <button onClick={() => { setWaitingSunnah(prev => ({ ...prev, [p.key]: false })); finalizePrayer(p.key, ans); }} className="w-full py-2 rounded-xl text-xs font-medium" style={{ color: "#9CA3AF" }}>تخطي ←</button>
+            <p className="text-xs text-center animate-pulse" style={{ color: "#D4AF37" }}>بانتظارك...</p>
+          </>) : (
+            <div className="flex gap-2">
+              <button onClick={() => finalizePrayer(p.key, ans)} className="flex-1 py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)", color: "#fff" }}>أديتها ✅</button>
+              <button onClick={() => setWaitingSunnah(prev => ({ ...prev, [p.key]: true }))} className="flex-1 py-3 rounded-xl text-sm font-bold border" style={{ background: "transparent", borderColor: "#D4AF3740", color: "#D4AF37" }}>سأؤديها الآن</button>
+            </div>
+          )}
+          <button onClick={() => finalizePrayer(p.key, ans)} className="w-full py-2 rounded-xl text-xs font-medium transition hover:bg-gray-50" style={{ color: "#9CA3AF" }}>تخطي — لن أصليها الآن ←</button>
         </div>)}
       </div>
     );
