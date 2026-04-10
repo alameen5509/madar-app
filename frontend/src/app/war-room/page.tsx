@@ -237,6 +237,9 @@ export default function WarRoomIndexPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const getPulse = (s?: string) => s === "red" || s === "yellow" || s === "green" || s === "blue" ? s : "green";
+  const pulseOrder: Record<string, number> = { red: 0, yellow: 1, blue: 2, green: 3 };
+
   // Work-linked items
   const workItems: { id: string; name: string; type: string; icon: string; color: string; role?: Role; href: string }[] = [];
   for (const w of works) {
@@ -266,10 +269,7 @@ export default function WarRoomIndexPage() {
   const circleIdSet = new Set(circles.map(c => c.id));
   const manualRoles = roles.filter(r => !r.isAuto && !r.id.startsWith("auto-") && (!r.workId || (!workIdSet.has(r.workId) && !circleIdSet.has(r.workId))));
 
-  const getPulse = (s?: string) => s === "red" || s === "yellow" || s === "green" || s === "blue" ? s : "green";
-
   // Sort all items by pulse: red → yellow → blue → green
-  const pulseOrder: Record<string, number> = { red: 0, yellow: 1, blue: 2, green: 3 };
   workItems.sort((a, b) => (pulseOrder[getPulse(a.role?.pulseStatus)] ?? 3) - (pulseOrder[getPulse(b.role?.pulseStatus)] ?? 3));
   manualRoles.sort((a, b) => (pulseOrder[getPulse(a.pulseStatus)] ?? 3) - (pulseOrder[getPulse(b.pulseStatus)] ?? 3));
 
