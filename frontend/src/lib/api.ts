@@ -118,6 +118,8 @@ export interface Goal {
   suspendReason?: string;
   progressPercent: number;
   lifeCircle?: { id: string; name: string; color: string };
+  workId?: string | null;
+  source?: 'job' | 'role' | 'manual';
 }
 
 export interface SalahTimesResponse {

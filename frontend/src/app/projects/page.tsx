@@ -88,6 +88,7 @@ function ProjectsPageInner() {
   const [selected, setSelected] = useState<Goal | null>(null);
   const [prefs, setPrefs] = useState<ProjectPrefs>(DEFAULT_PREFS);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<"all" | "job" | "role" | "manual">("all");
   const [autoSelected, setAutoSelected] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -140,10 +141,12 @@ function ProjectsPageInner() {
     });
   }
 
-  // Filter by tag
-  const filteredGoals = tagFilter
-    ? goals.filter(g => (prefs.tags[g.id] ?? []).includes(tagFilter))
-    : goals;
+  // Filter by tag + source
+  const filteredGoals = goals.filter(g => {
+    if (tagFilter && !(prefs.tags[g.id] ?? []).includes(tagFilter)) return false;
+    if (sourceFilter !== "all" && (g.source ?? "manual") !== sourceFilter) return false;
+    return true;
+  });
 
   const techFocus = goals.find(g => g.focusType === "Tech");
   const nonTechFocus = goals.find(g => g.focusType === "NonTech");
@@ -187,14 +190,28 @@ function ProjectsPageInner() {
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div>
             <h2 className="font-bold text-lg sm:text-xl" style={{ color: "var(--text)" }}>إدارة المشاريع</h2>
-            {!loading && (
+            {!loading && (<>
               <div className="flex items-center gap-3 mt-1">
                 <span className="text-xs" style={{ color: "var(--muted)" }}>{stats.total} مشروع</span>
                 {techFocus && <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#3B82F615", color: "#3B82F6" }}>💻 {techFocus.title}</span>}
                 {nonTechFocus && <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#D4AF3715", color: "#D4AF37" }}>🌿 {nonTechFocus.title}</span>}
                 {stats.critical > 0 && <span className="text-xs font-bold px-2 py-0.5 rounded-full animate-pulse" style={{ background: "#DC262615", color: "#DC2626" }}>⚠️ {stats.critical} حرجة</span>}
               </div>
-            )}
+              <div className="flex gap-1.5 mt-2">
+                {([
+                  { key: "all", label: "الكل", color: "#5E5495", count: goals.length },
+                  { key: "job", label: "💼 الأعمال", color: "#2D6B9E", count: goals.filter(g => g.source === "job").length },
+                  { key: "role", label: "◎ الأدوار", color: "#C9A84C", count: goals.filter(g => g.source === "role").length },
+                  { key: "manual", label: "🎯 يدوية", color: "#3D8C5A", count: goals.filter(g => !g.source || g.source === "manual").length },
+                ] as const).map(f => (
+                  <button key={f.key} onClick={() => setSourceFilter(f.key)}
+                    className="px-3 py-1.5 rounded-lg text-[10px] font-bold transition"
+                    style={{ background: sourceFilter === f.key ? f.color + "20" : "var(--bg)", color: sourceFilter === f.key ? f.color : "var(--muted)", border: `1px solid ${sourceFilter === f.key ? f.color + "40" : "var(--card-border)"}` }}>
+                    {f.label} ({f.count})
+                  </button>
+                ))}
+              </div>
+            </>)}
           </div>
           <button onClick={() => setShowNew(true)}
             className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-white hover:opacity-90 transition"

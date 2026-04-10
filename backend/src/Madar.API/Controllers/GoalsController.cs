@@ -61,7 +61,38 @@ public class GoalsController : BaseController
             })
             .ToListAsync(ct);
 
-        return Ok(goals);
+        // Enrich with workId (raw SQL column) and source (job/role/manual)
+        var goalIds = goals.Select(g => g.id).ToList();
+        var jobLinked = new HashSet<Guid>(await _db.JobGoalProjects.Where(p => goalIds.Contains(p.ProjectId)).Select(p => p.ProjectId).ToListAsync(ct));
+        var roleLinked = new HashSet<Guid>(await _db.RoleGoalProjects.Where(p => goalIds.Contains(p.ProjectId)).Select(p => p.ProjectId).ToListAsync(ct));
+
+        // Read WorkId from raw SQL
+        var workIds = new Dictionary<string, string>();
+        try
+        {
+            var conn = _db.Database.GetDbConnection();
+            var wasOpen = conn.State == System.Data.ConnectionState.Open;
+            if (!wasOpen) await conn.OpenAsync(ct);
+            try
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = $"SELECT Id, WorkId FROM Goals WHERE OwnerId='{userId}' AND WorkId IS NOT NULL";
+                using var r = await cmd.ExecuteReaderAsync(ct);
+                while (await r.ReadAsync(ct))
+                    workIds[r.GetString(0)] = r.IsDBNull(1) ? "" : r.GetString(1);
+            }
+            finally { if (!wasOpen) await conn.CloseAsync(); }
+        } catch {}
+
+        var enriched = goals.Select(g => new
+        {
+            g.id, g.title, g.description, g.status, g.targetDate, g.priorityWeight,
+            g.focusType, g.suspendedUntil, g.suspendReason, g.progressPercent, g.lifeCircle,
+            workId = workIds.TryGetValue(g.id.ToString(), out var wid) ? wid : null,
+            source = jobLinked.Contains(g.id) ? "job" : roleLinked.Contains(g.id) ? "role" : "manual",
+        });
+
+        return Ok(enriched);
     }
 
     /// <summary>إنشاء هدف / مشروع جديد</summary>
