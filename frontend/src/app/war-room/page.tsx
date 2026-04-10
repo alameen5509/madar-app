@@ -402,28 +402,40 @@ export default function WarRoomIndexPage() {
   }
 
   async function startSession(mode: "review" | "work" = "review") {
-    // Build session items from visible work items + roles + manual
+    // Refresh roles to get latest pulse values
+    const freshRoles: Role[] = await api.get("/api/war-room/roles").then(r => Array.isArray(r.data) ? r.data : []).catch(() => []);
+    const findRole = (entityId: string) => {
+      const matches = freshRoles.filter(r => r.workId === entityId && !r.isAuto && !r.id.startsWith("auto-"));
+      return matches[matches.length - 1] ?? freshRoles.find(r => r.workId === entityId);
+    };
+
     const items: SessionItem[] = [];
+    // Works
     for (const wi of workItems.filter(i => !hiddenIds.has(i.id))) {
-      const rid = await ensureRoleId(wi);
+      const role = findRole(wi.id);
+      const rid = role?.id ?? (await ensureRoleId(wi));
       const notes = rid ? await api.get(`/api/war-room/roles/${rid}/notes`).then(r => r.data ?? []).catch(() => []) : [];
       const devReqs = rid ? await api.get(`/api/war-room/roles/${rid}/dev-requests`).then(r => r.data ?? []).catch(() => []) : [];
-      items.push({ id: wi.id, name: wi.name, icon: wi.icon, color: wi.color, roleId: rid, pulse: wi.role?.pulseStatus ?? "green", pulseNote: wi.role?.pulseNote, notes, devReqs });
+      items.push({ id: wi.id, name: wi.name, icon: wi.icon, color: wi.color, roleId: rid, pulse: role?.pulseStatus ?? "green", pulseNote: role?.pulseNote, notes, devReqs });
     }
+    // Roles (circles)
     for (const ri of roleItems.filter(i => !hiddenIds.has(i.id))) {
-      const rid = await ensureRoleId(ri);
+      const role = findRole(ri.id);
+      const rid = role?.id ?? (await ensureRoleId(ri));
       const notes = rid ? await api.get(`/api/war-room/roles/${rid}/notes`).then(r => r.data ?? []).catch(() => []) : [];
       const devReqs = rid ? await api.get(`/api/war-room/roles/${rid}/dev-requests`).then(r => r.data ?? []).catch(() => []) : [];
-      items.push({ id: ri.id, name: ri.name, icon: ri.icon, color: ri.color, roleId: rid, pulse: ri.role?.pulseStatus ?? "green", pulseNote: ri.role?.pulseNote, notes, devReqs });
+      items.push({ id: ri.id, name: ri.name, icon: ri.icon, color: ri.color, roleId: rid, pulse: role?.pulseStatus ?? "green", pulseNote: role?.pulseNote, notes, devReqs });
     }
+    // Manual
     for (const r of manualRoles) {
+      const fresh = freshRoles.find(fr => fr.id === r.id);
       const notes = await api.get(`/api/war-room/roles/${r.id}/notes`).then(res => res.data ?? []).catch(() => []);
       const devReqs = await api.get(`/api/war-room/roles/${r.id}/dev-requests`).then(res => res.data ?? []).catch(() => []);
-      items.push({ id: r.id, name: r.title, icon: r.icon || "🎯", color: r.color || "#5E5495", roleId: r.id, pulse: r.pulseStatus, pulseNote: r.pulseNote, notes, devReqs });
+      items.push({ id: r.id, name: r.title, icon: r.icon || "🎯", color: r.color || "#5E5495", roleId: r.id, pulse: fresh?.pulseStatus ?? r.pulseStatus, pulseNote: fresh?.pulseNote ?? r.pulseNote, notes, devReqs });
     }
-    // Sort: red first, then yellow, then blue (building), then green
-    const order = { red: 0, yellow: 1, blue: 2, green: 3 };
-    items.sort((a, b) => (order[a.pulse as keyof typeof order] ?? 2) - (order[b.pulse as keyof typeof order] ?? 2));
+    // Sort: حرج → متابعة → بناء → مستقر
+    const order: Record<string, number> = { red: 0, yellow: 1, blue: 2, green: 3 };
+    items.sort((a, b) => (order[a.pulse] ?? 3) - (order[b.pulse] ?? 3));
     if (mode === "work") setWorkSessionItems(items);
     else setSessionItems(items);
   }
