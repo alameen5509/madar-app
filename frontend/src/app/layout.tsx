@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { IBM_Plex_Sans_Arabic, Amiri } from "next/font/google";
 import SidebarWrapper from "@/components/SidebarWrapper";
 import ImpersonationBar from "@/components/ImpersonationBar";
+import PhoneReminder from "@/components/PhoneReminder";
 import "./globals.css";
 
 const mainFont = IBM_Plex_Sans_Arabic({
@@ -88,6 +89,7 @@ export default function RootLayout({
           تخطي إلى المحتوى
         </a>
         <ImpersonationBar />
+        <PhoneReminder />
         <div
           className="flex h-screen overflow-hidden"
           style={{ fontFamily: "var(--font-main, 'IBM Plex Sans Arabic', sans-serif)" }}
