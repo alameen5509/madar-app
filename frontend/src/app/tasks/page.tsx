@@ -1808,9 +1808,13 @@ function InlineDayPlanner({ prayers, tasks, blockedPeriods, onBlockToggle, onTog
                           <Link href={base} onClick={(e) => e.stopPropagation()} className="hover:underline hover:text-[#5E5495]">{r.entityName}</Link>
                         </span>
                       );
-                    })() : t.goalTitle && (
-                      <span className="text-[9px] truncate block" style={{ color: "#D4AF37" }}>📁 {t.goalTitle}</span>
-                    )}
+                    })() : (t.goalTitle || t.circle !== "—") ? (
+                      <span className="text-[9px] truncate block" style={{ color: "#9CA3AF" }}>
+                        {t.goalTitle && <>في هدف {t.goalTitle}</>}
+                        {t.goalTitle && t.circle !== "—" && <> · </>}
+                        {t.circle !== "—" && <>{t.circle}</>}
+                      </span>
+                    ) : null}
                     {parentSubTasks?.[t.id] && parentSubTasks[t.id].length > 0 && (() => {
                       const total = parentSubTasks[t.id].length; const done = parentSubTasks[t.id].filter(s => s.status === "Completed").length;
                       return <div className="flex items-center gap-1.5 mt-0.5"><div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "#E5E7EB" }}><div className="h-full rounded-full" style={{ width: `${Math.round(done/total*100)}%`, background: done === total ? "#3D8C5A" : "#D4AF37" }} /></div><span className="text-[8px] font-bold" style={{ color: done === total ? "#3D8C5A" : "#6B7280" }}>{done}/{total}</span></div>;
@@ -3697,11 +3701,13 @@ export default function TasksPage() {
                               <Link href={base} onClick={(e) => e.stopPropagation()} className="hover:underline hover:text-[#5E5495]">{r.entityName}</Link>
                             </p>
                           );
-                        })() : t.goalTitle && (
-                          <p className="text-[10px] truncate" style={{ color: "#D4AF37" }}>
-                            📁 {t.goalTitle}
+                        })() : (t.goalTitle || t.circle !== "—") ? (
+                          <p className="text-[10px] truncate" style={{ color: "#9CA3AF" }}>
+                            {t.goalTitle && <span>في هدف {t.goalTitle}</span>}
+                            {t.goalTitle && t.circle !== "—" && <span> · </span>}
+                            {t.circle !== "—" && <span>{t.circle}</span>}
                           </p>
-                        )}
+                        ) : null}
                         {t.reminder && t.reminder.frequency !== "none" && (
                           <p className="text-[9px] truncate" style={{ color: "#F59E0B" }}>
                             🔔 {t.reminder.personName ? `👤 ${t.reminder.personName}` : ""} {t.reminder.personRelation ? `(${t.reminder.personRelation})` : ""} · {({hourly:"كل ساعة",every3hours:"كل 3س",every5hours:"كل 5س",every10hours:"كل 10س",daily:"يومي",weekly:"أسبوعي",monthly:"شهري"} as Record<string,string>)[t.reminder.frequency] ?? "مخصص"}
