@@ -13,7 +13,10 @@ export interface RoleInfo {
 
 const NAV = [
   { key: "",              label: "نظرة عامة",       icon: "🏠" },
-  { key: "/dimensions",   label: "الجوانب والأهداف", icon: "📁" },
+  { key: "/dimensions",   label: "الجوانب",          icon: "📁" },
+  { key: "/goals",        label: "الأهداف",          icon: "🎯" },
+  { key: "/projects",     label: "المشاريع",         icon: "📋" },
+  { key: "/tasks",        label: "المهام",           icon: "✅" },
   { key: "/board",        label: "السبورة",          icon: "🎨" },
   { key: "/mindmap",      label: "خريطة ذهنية",      icon: "🧠" },
 ];

@@ -185,7 +185,7 @@ function GroupAccordion({ group, onRefresh, addingCircle, onToggleAddCircle }: {
             <div key={c.id} className="flex items-center gap-3 px-5 py-3 border-b last:border-0 hover:bg-black/[0.02] transition"
               style={{ borderColor: `${color}08` }}>
               <span className="text-base">{c.icon ?? "●"}</span>
-              <Link href={`/circles/${c.slug ?? c.id}`} className="flex-1 text-sm font-medium hover:underline" style={{ color: "var(--text)" }}>
+              <Link href={`/circles/${c.id}`} className="flex-1 text-sm font-medium hover:underline" style={{ color: "var(--text)" }}>
                 {c.name}
               </Link>
               <button onClick={() => deleteCircle(c.id, c.name)}
