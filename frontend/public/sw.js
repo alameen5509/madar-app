@@ -1,5 +1,5 @@
-const CACHE_NAME = 'madar-v4';
-const STATIC_CACHE = 'madar-static-v4';
+const CACHE_NAME = 'madar-v5';
+const STATIC_CACHE = 'madar-static-v5';
 const OFFLINE_URL = '/tasks';
 
 const PRECACHE_URLS = [
