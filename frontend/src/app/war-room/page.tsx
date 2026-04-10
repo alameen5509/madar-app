@@ -233,6 +233,11 @@ export default function WarRoomIndexPage() {
   // Manual roles (not linked to any work)
   const manualRoles = roles.filter(r => !r.isAuto && !r.workId && !r.id.startsWith("auto-"));
 
+  // Sort all items by pulse: red → yellow → blue → green
+  const pulseOrder: Record<string, number> = { red: 0, yellow: 1, blue: 2, green: 3 };
+  workItems.sort((a, b) => (pulseOrder[getPulse(a.role?.pulseStatus)] ?? 3) - (pulseOrder[getPulse(b.role?.pulseStatus)] ?? 3));
+  manualRoles.sort((a, b) => (pulseOrder[getPulse(a.pulseStatus)] ?? 3) - (pulseOrder[getPulse(b.pulseStatus)] ?? 3));
+
   const allItems = [...workItems];
   // Pulse counts — exclude hidden items
   const visibleWorkItems = allItems.filter(i => !hiddenIds.has(i.id));
