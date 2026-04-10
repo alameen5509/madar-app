@@ -28,6 +28,25 @@ export default function WarRoomIndexPage() {
   const [works, setWorks] = useState<Work[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("works");
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try { return new Set(JSON.parse(localStorage.getItem("madar_warroom_hidden") ?? "[]")); } catch { return new Set(); }
+  });
+  const [showHidden, setShowHidden] = useState(false);
+
+  function toggleHide(id: string) {
+    setHiddenIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      localStorage.setItem("madar_warroom_hidden", JSON.stringify([...next]));
+      return next;
+    });
+  }
+
+  async function deleteManualRole(id: string, title: string) {
+    if (!confirm(`حذف غرفة القيادة "${title}"؟ سيتم حذف جميع الملاحظات وطلبات التطوير المرتبطة.`)) return;
+    try { await api.delete(`/api/war-room/roles/${id}`); load(); } catch { alert("فشل الحذف"); }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,36 +83,45 @@ export default function WarRoomIndexPage() {
   const redCount = allItems.filter(i => i.role?.pulseStatus === "red").length + manualRoles.filter(r => r.pulseStatus === "red").length;
   const yellowCount = allItems.filter(i => i.role?.pulseStatus === "yellow").length + manualRoles.filter(r => r.pulseStatus === "yellow").length;
 
-  function renderCard(item: { name: string; type: string; icon: string; color: string; role?: Role; href: string }, idx: number) {
+  function renderCard(item: { id: string; name: string; type: string; icon: string; color: string; role?: Role; href: string }, idx: number) {
     const pulse = PULSE[item.role?.pulseStatus ?? "green"] ?? PULSE.green;
     const hasRole = !!item.role && !item.role.isAuto;
     const dueReview = item.role?.nextReviewDate && new Date(item.role.nextReviewDate) <= new Date();
+    const isHidden = hiddenIds.has(item.id);
+    if (isHidden && !showHidden) return null;
     return (
-      <Link key={idx} href={item.href} className="block rounded-2xl border overflow-hidden transition-all hover:shadow-lg hover:border-[#5E5495]" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-        <div className="p-4" style={{ borderRight: `4px solid ${item.color}` }}>
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">{item.icon}</span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{item.name}</p>
-                <span className="text-[10px] px-2 py-1 rounded-full font-bold" style={{ background: pulse.bg, color: pulse.color }}>{pulse.label}</span>
-                {dueReview && <span className="text-[10px] px-2 py-1 rounded-full font-bold animate-pulse" style={{ background: "#F59E0B15", color: "#F59E0B" }}>📋 مراجعة</span>}
+      <div key={idx} className={`rounded-2xl border overflow-hidden transition-all ${isHidden ? "opacity-50" : ""}`} style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+        <Link href={item.href} className="block">
+          <div className="p-4" style={{ borderRight: `4px solid ${item.color}` }}>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{item.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{item.name}</p>
+                  <span className="text-[10px] px-2 py-1 rounded-full font-bold" style={{ background: pulse.bg, color: pulse.color }}>{pulse.label}</span>
+                  {dueReview && <span className="text-[10px] px-2 py-1 rounded-full font-bold animate-pulse" style={{ background: "#F59E0B15", color: "#F59E0B" }}>📋 مراجعة</span>}
+                </div>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: `${item.color}15`, color: item.color }}>{item.type}</span>
+                  {item.role?.lastReviewDate && <span className="text-[10px]" style={{ color: "var(--muted)" }}>آخر مراجعة: {new Date(item.role.lastReviewDate).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>}
+                  {(item.role?.notesCount ?? 0) > 0 && <span className="text-[10px]" style={{ color: "#5E5495" }}>📝 {item.role?.notesCount}</span>}
+                  {(item.role?.pendingDevCount ?? 0) > 0 && <span className="text-[10px]" style={{ color: "#D4AF37" }}>🔧 {item.role?.pendingDevCount}</span>}
+                </div>
               </div>
-              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: `${item.color}15`, color: item.color }}>{item.type}</span>
-                {item.role?.lastReviewDate && <span className="text-[10px]" style={{ color: "var(--muted)" }}>آخر مراجعة: {new Date(item.role.lastReviewDate).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>}
-                {(item.role?.notesCount ?? 0) > 0 && <span className="text-[10px]" style={{ color: "#5E5495" }}>📝 {item.role?.notesCount}</span>}
-                {(item.role?.pendingDevCount ?? 0) > 0 && <span className="text-[10px]" style={{ color: "#D4AF37" }}>🔧 {item.role?.pendingDevCount}</span>}
+              <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                {hasRole ? <div className="w-3 h-3 rounded-full" style={{ background: pulse.color }} /> : <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--bg)", color: "var(--muted)" }}>جديد</span>}
+                <span className="text-xs" style={{ color: "#5E5495" }}>فتح ←</span>
               </div>
             </div>
-            <div className="flex flex-col items-center gap-1 flex-shrink-0">
-              {hasRole ? <div className="w-3 h-3 rounded-full" style={{ background: pulse.color }} /> : <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--bg)", color: "var(--muted)" }}>جديد</span>}
-              <span className="text-xs" style={{ color: "#5E5495" }}>فتح ←</span>
-            </div>
+            {item.role?.pulseNote && <p className="text-[10px] mt-2 px-3 py-1.5 rounded-lg" style={{ background: pulse.bg, color: pulse.color }}>💬 {item.role.pulseNote}</p>}
           </div>
-          {item.role?.pulseNote && <p className="text-[10px] mt-2 px-3 py-1.5 rounded-lg" style={{ background: pulse.bg, color: pulse.color }}>💬 {item.role.pulseNote}</p>}
+        </Link>
+        <div className="px-4 pb-3 flex justify-end">
+          <button onClick={() => toggleHide(item.id)} className="text-[10px] px-3 py-1.5 rounded-lg transition hover:bg-gray-100" style={{ color: "var(--muted)" }}>
+            {isHidden ? "👁 إظهار" : "🙈 إخفاء"}
+          </button>
         </div>
-      </Link>
+      </div>
     );
   }
 
@@ -130,7 +158,14 @@ export default function WarRoomIndexPage() {
               <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>أضف أعمال من صفحة "الأعمال"</p>
               <Link href="/works" className="inline-block mt-4 px-6 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #2D6B9E, #D4AF37)" }}>الذهاب للأعمال</Link>
             </div>
-          ) : workItems.map((item, idx) => renderCard(item, idx))}
+          ) : (<>
+            {workItems.map((item, idx) => renderCard(item, idx))}
+            {hiddenIds.size > 0 && (
+              <button onClick={() => setShowHidden(!showHidden)} className="w-full py-2 rounded-xl text-[10px] font-medium transition hover:bg-gray-100" style={{ color: "var(--muted)" }}>
+                {showHidden ? "🙈 إخفاء المخفية" : `👁 عرض المخفية (${[...hiddenIds].filter(id => workItems.some(i => i.id === id)).length})`}
+              </button>
+            )}
+          </>)}
         </>)}
 
         {/* Manual tab */}
@@ -163,6 +198,13 @@ export default function WarRoomIndexPage() {
                     <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: pulse.color }} />
                   </div>
                   {r.pulseNote && <p className="text-[10px] mt-2 px-3 py-1.5 rounded-lg" style={{ background: pulse.bg, color: pulse.color }}>💬 {r.pulseNote}</p>}
+                  <div className="flex justify-end mt-2">
+                    <button onClick={() => deleteManualRole(r.id, r.title)}
+                      className="text-[10px] px-3 py-1.5 rounded-lg transition hover:bg-red-50"
+                      style={{ color: "#ef4444", border: "1px solid #ef444430" }}>
+                      🗑️ حذف
+                    </button>
+                  </div>
                 </div>
               </div>
             );
