@@ -44,6 +44,9 @@ function WorkSession({ items, onClose, onUpdate }: { items: SessionItem[]; onClo
   const [newNote, setNewNote] = useState("");
 
   const totalMins = items.reduce((s, it) => s + (durations[it.id] ?? 10), 0);
+  const totalH = Math.floor(totalMins / 60);
+  const totalM = totalMins % 60;
+  const totalStr = totalH > 0 ? `${totalH} ساعة${totalM > 0 ? ` و ${totalM} دقيقة` : ""}` : `${totalM} دقيقة`;
 
   function saveDurations(d: Record<string, number>) {
     setDurations(d);
@@ -97,7 +100,7 @@ function WorkSession({ items, onClose, onUpdate }: { items: SessionItem[]; onClo
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="font-black text-base" style={{ color: "var(--text)" }}>⚙️ إعداد جلسة الأعمال</p>
-                <p className="text-[10px] mt-1" style={{ color: "var(--muted)" }}>{items.length} عنصر · إجمالي {totalMins} دقيقة ({Math.floor(totalMins / 60) > 0 ? `${Math.floor(totalMins / 60)} ساعة و ${totalMins % 60} دقيقة` : `${totalMins} دقيقة`})</p>
+                <p className="text-[10px] mt-1" style={{ color: "var(--muted)" }}>{items.length} عنصر · إجمالي {totalStr}</p>
               </div>
               <button onClick={onClose} className="text-lg" style={{ color: "var(--muted)" }}>✕</button>
             </div>
@@ -126,12 +129,12 @@ function WorkSession({ items, onClose, onUpdate }: { items: SessionItem[]; onClo
             </div>
 
             <div className="rounded-xl p-4 mb-4 text-center" style={{ background: "#5E549508", border: "1px solid #5E549520" }}>
-              <p className="text-2xl font-black" style={{ color: "#5E5495" }}>⏱ {totalMins} دقيقة</p>
+              <p className="text-2xl font-black" style={{ color: "#5E5495" }}>⏱ {totalStr}</p>
               <p className="text-[10px]" style={{ color: "var(--muted)" }}>الوقت المقدّر للجلسة الكاملة</p>
             </div>
 
             <button onClick={startSession} className="w-full py-3 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>
-              ابدأ الجلسة ({totalMins} دقيقة) →
+              ابدأ الجلسة ({totalStr}) →
             </button>
           </div>
         )}
