@@ -263,30 +263,39 @@ export default function FocusPage() {
               {/* Title */}
               <h1 className="font-black text-xl leading-relaxed text-center" style={{ color: "var(--text)" }}>{task.title}</h1>
 
-              {/* Root breadcrumb */}
-              {task.root ? (() => {
+              {/* Root breadcrumb — always show whatever context is available */}
+              {(() => {
                 const r = task.root;
-                const base = r.kind === "job" ? `/jobs/${r.entityId}` : `/circles/${r.entitySlug ?? r.entityId}`;
+                const hasRoot = r && r.entityName;
+                const hasGoal = !!task.goal?.title;
+                const hasCircle = !!circle?.name;
+                if (!hasRoot && !hasGoal && !hasCircle) return null;
+
+                if (hasRoot) {
+                  const base = r!.kind === "job" ? `/jobs/${r!.entityId}` : `/circles/${r!.entitySlug ?? r!.entityId}`;
+                  return (
+                    <div className="rounded-xl p-3 text-center" style={{ background: "var(--bg)" }}>
+                      <div className="flex items-center justify-center gap-1.5 flex-wrap text-[11px]">
+                        <Link href={base} className="font-bold hover:underline" style={{ color: "#5E5495" }}>{r!.entityName}</Link>
+                        <span style={{ color: "var(--muted)" }}>←</span>
+                        <Link href={`${base}/dimensions/${r!.dimensionId}`} className="hover:underline" style={{ color: "#D4AF37" }}>📁 {r!.dimensionName}</Link>
+                        <span style={{ color: "var(--muted)" }}>←</span>
+                        <Link href={`${base}/goals/${r!.goalId}`} className="hover:underline" style={{ color: "#3D8C5A" }}>🎯 {r!.goalTitle}</Link>
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
-                  <div className="rounded-xl p-3 text-center space-y-1" style={{ background: "var(--bg)" }}>
+                  <div className="rounded-xl p-3 text-center" style={{ background: "var(--bg)" }}>
                     <div className="flex items-center justify-center gap-1.5 flex-wrap text-[11px]">
-                      <Link href={base} className="font-bold hover:underline" style={{ color: "#5E5495" }}>{r.entityName}</Link>
-                      <span style={{ color: "var(--muted)" }}>←</span>
-                      <Link href={`${base}/dimensions/${r.dimensionId}`} className="hover:underline" style={{ color: "#D4AF37" }}>📁 {r.dimensionName}</Link>
-                      <span style={{ color: "var(--muted)" }}>←</span>
-                      <Link href={`${base}/goals/${r.goalId}`} className="hover:underline" style={{ color: "#3D8C5A" }}>🎯 {r.goalTitle}</Link>
+                      {hasCircle && <span className="font-bold" style={{ color: circle!.color ?? "#5E5495" }}>{circle!.icon ?? "●"} {circle!.name}</span>}
+                      {hasCircle && hasGoal && <span style={{ color: "var(--muted)" }}>←</span>}
+                      {hasGoal && <span style={{ color: "#D4AF37" }}>🎯 {task.goal!.title}</span>}
                     </div>
                   </div>
                 );
-              })() : (task.goal || circle) && (
-                <div className="rounded-xl p-3 text-center space-y-1" style={{ background: "var(--bg)" }}>
-                  <div className="flex items-center justify-center gap-1.5 flex-wrap text-[11px]">
-                    {circle && <span className="font-bold" style={{ color: circle.color ?? "#5E5495" }}>{circle.icon ?? "●"} {circle.name}</span>}
-                    {circle && task.goal && <span style={{ color: "var(--muted)" }}>←</span>}
-                    {task.goal && <span style={{ color: "#D4AF37" }}>🎯 {task.goal.title}</span>}
-                  </div>
-                </div>
-              )}
+              })()}
 
               {/* Description */}
               {task.description && (
