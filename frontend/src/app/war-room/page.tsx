@@ -28,6 +28,7 @@ export default function WarRoomIndexPage() {
   const [works, setWorks] = useState<Work[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("works");
+  const [pulseFilter, setPulseFilter] = useState<"all" | "red" | "yellow" | "green">("all");
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try { return new Set(JSON.parse(localStorage.getItem("madar_warroom_hidden") ?? "[]")); } catch { return new Set(); }
@@ -94,6 +95,8 @@ export default function WarRoomIndexPage() {
     const dueReview = item.role?.nextReviewDate && new Date(item.role.nextReviewDate) <= new Date();
     const isHidden = hiddenIds.has(item.id);
     if (isHidden && !showHidden) return null;
+    const itemPulse = getPulse(item.role?.pulseStatus);
+    if (pulseFilter !== "all" && itemPulse !== pulseFilter) return null;
     return (
       <div key={idx} className={`rounded-2xl border overflow-hidden transition-all ${isHidden ? "opacity-50" : ""}`} style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
         <Link href={item.href} className="block">
@@ -156,6 +159,20 @@ export default function WarRoomIndexPage() {
             🎯 يدوية ({manualRoles.length})
           </button>
         </div>
+        <div className="flex gap-1.5 mt-2 flex-wrap">
+          {([
+            { key: "all", label: "الكل", color: "#5E5495" },
+            { key: "red", label: "🔴 حرج", color: "#DC2626" },
+            { key: "yellow", label: "🟡 متابعة", color: "#F59E0B" },
+            { key: "green", label: "🟢 مستقر", color: "#3D8C5A" },
+          ] as const).map(f => (
+            <button key={f.key} onClick={() => setPulseFilter(f.key)}
+              className="px-3 py-1.5 rounded-lg text-[10px] font-bold transition"
+              style={{ background: pulseFilter === f.key ? f.color + "20" : "var(--bg)", color: pulseFilter === f.key ? f.color : "var(--muted)", border: `1px solid ${pulseFilter === f.key ? f.color + "40" : "var(--card-border)"}` }}>
+              {f.label}
+            </button>
+          ))}
+        </div>
       </header>
 
       <div className="px-4 sm:px-6 py-4 space-y-3 max-w-3xl mx-auto">
@@ -188,7 +205,7 @@ export default function WarRoomIndexPage() {
               <p className="font-bold" style={{ color: "var(--text)" }}>لا توجد غرف قيادة يدوية</p>
               <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>أنشئ غرفة قيادة يدوية من داخل أي عمل أو وظيفة</p>
             </div>
-          ) : manualRoles.map((r, idx) => {
+          ) : manualRoles.filter(r => pulseFilter === "all" || getPulse(r.pulseStatus) === pulseFilter).map((r, idx) => {
             const pulse = PULSE[r.pulseStatus] ?? PULSE.green;
             return (
               <div key={idx} className="rounded-2xl border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
