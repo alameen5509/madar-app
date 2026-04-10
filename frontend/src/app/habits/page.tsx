@@ -283,12 +283,59 @@ const CITIES: Record<string, { label: string; lat: string; lng: string }> = {
   abha: { label: "أبها", lat: "18.2164", lng: "42.5053" },
 };
 
+function TasbihCounter({ target, label, onComplete, onClose }: { target: number; label: string; onComplete: () => void; onClose: () => void }) {
+  const [count, setCount] = useState(0);
+  const pct = Math.min(100, Math.round((count / target) * 100));
+
+  function tap() {
+    const next = count + 1;
+    setCount(next);
+    if (next >= target) {
+      setTimeout(() => { onComplete(); }, 400);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.7)" }}>
+      <div className="w-full max-w-sm mx-4 rounded-3xl overflow-hidden shadow-2xl text-center" dir="rtl" style={{ background: "linear-gradient(180deg, #1A1830, #2C2C54)" }}>
+        <div className="px-6 pt-6 pb-2">
+          <div className="flex items-center justify-between mb-2">
+            <button onClick={onClose} className="text-white/40 text-lg hover:text-white/70 transition">✕</button>
+            <p className="text-white/60 text-xs font-medium">{label}</p>
+            <span className="text-white/40 text-xs">{pct}%</span>
+          </div>
+          <div className="h-1.5 rounded-full overflow-hidden mb-6" style={{ background: "rgba(255,255,255,0.1)" }}>
+            <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: count >= target ? "#3D8C5A" : "linear-gradient(90deg, #D4AF37, #C9A84C)" }} />
+          </div>
+        </div>
+
+        <div className="pb-8">
+          <button onClick={tap} disabled={count >= target}
+            className="w-40 h-40 rounded-full mx-auto flex flex-col items-center justify-center transition-all active:scale-95 disabled:opacity-50"
+            style={{ background: count >= target ? "linear-gradient(135deg, #3D8C5A, #2C8C4A)" : "linear-gradient(135deg, #D4AF37, #5E5495)", boxShadow: "0 0 40px rgba(212,175,55,0.3)" }}>
+            <span className="text-5xl font-black text-white">{count}</span>
+            <span className="text-white/70 text-xs mt-1">{count >= target ? "✓ تم" : `من ${target}`}</span>
+          </button>
+          <p className="text-white/50 text-[10px] mt-4">📿 اضغط للتسبيح</p>
+          {count > 0 && count < target && (
+            <p className="text-white/30 text-[10px] mt-1">باقي {target - count}</p>
+          )}
+          {count >= target && (
+            <p className="text-[#3D8C5A] text-sm font-bold mt-3 animate-pulse">بارك الله فيك ✓</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PrayerSection() {
   const [prayerState, setPrayerState] = useState<PrayerState>({});
   const [penalties, setPenalties] = useState<Penalty[]>([]);
   const [stats, setStats] = useState<PrayerStats | null>(null);
   const [salahTimes, setSalahTimes] = useState<Record<string, string> | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [tasbih, setTasbih] = useState<{ penaltyId: string } | null>(null);
   const [penaltyConfig, setPenaltyConfig] = useState<Record<string, string>>({});
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [showStats, setShowStats] = useState(false);
@@ -589,7 +636,10 @@ function PrayerSection() {
                 <p className="text-xs font-semibold mb-2" style={{ color: "#6B7280" }}>اختر عقوبتك وأدِّها:</p>
                 <div className="grid grid-cols-3 gap-2">
                   {PENALTY_TYPES.map(t => (
-                    <button key={t.key} onClick={() => fulfillPenalty(pen.id)} className="py-3.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 border-2" style={{ background: "linear-gradient(135deg, #2C2C54, #5E5495)", color: "white", borderColor: "#2C2C54" }}>
+                    <button key={t.key} onClick={() => {
+                      if (t.key === "istighfar") { setTasbih({ penaltyId: pen.id }); }
+                      else { fulfillPenalty(pen.id); }
+                    }} className="py-3.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 border-2" style={{ background: "linear-gradient(135deg, #2C2C54, #5E5495)", color: "white", borderColor: "#2C2C54" }}>
                       {t.key === "quran" ? "📖" : t.key === "nafila" ? "🕌" : "📿"}<br /><span className="text-[10px] font-medium opacity-90">{t.label}</span>
                     </button>
                   ))}
@@ -699,6 +749,15 @@ function PrayerSection() {
             <span className="text-sm text-[#16213E]">تفعيل التنبيهات</span>
           </label>
         </div>
+      )}
+
+      {tasbih && (
+        <TasbihCounter
+          target={100}
+          label="استغفر الله ١٠٠ مرة"
+          onComplete={() => { fulfillPenalty(tasbih.penaltyId); setTasbih(null); }}
+          onClose={() => setTasbih(null)}
+        />
       )}
     </>
   );
