@@ -4,6 +4,7 @@ import { use, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { calcGoalProgress, type RoleDim, type RoleGoalData } from "@/components/RoleTree";
+import { NewTaskDialog } from "@/app/tasks/page";
 
 interface ProjectInfo { id: string; title: string; description?: string; status?: string; targetDate?: string; progressPercent?: number; }
 interface TaskInfo { id: string; title: string; status: string; description?: string; dueDate?: string; userPriority?: number; }
@@ -251,18 +252,11 @@ export default function RoleGoalPage({ params }: { params: Promise<{ slug: strin
           </div>
         )}
         {showAdd === "newtask" && (
-          <div className="p-5 rounded-2xl border-2 fade-up space-y-3" style={{ background: "var(--card)", borderColor: "#3D8C5A40" }}>
-            <p className="text-xs font-bold" style={{ color: "#3D8C5A" }}>مهمة جديدة</p>
-            <input value={fTitle} onChange={e => setFTitle(e.target.value)} placeholder="عنوان المهمة *" autoFocus className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={IS} />
-            <input value={fDesc} onChange={e => setFDesc(e.target.value)} placeholder="وصف (اختياري)" className="w-full px-3 py-2 rounded-xl border text-xs focus:outline-none" style={IS} />
-            <div className="flex gap-2 items-center">
-              <input type="date" value={fDate} onChange={e => setFDate(e.target.value)} className="flex-1 px-3 py-2 rounded-xl border text-xs focus:outline-none" style={IS} />
-              <div className="flex gap-1">{[{v:2,l:"منخفضة"},{v:3,l:"متوسطة"},{v:4,l:"عالية"}].map(p => (
-                <button key={p.v} onClick={() => setFPriority(p.v)} className="px-2 py-1.5 rounded-lg text-[9px] font-bold" style={{ background: fPriority === p.v ? "#3D8C5A" : "#F3F4F6", color: fPriority === p.v ? "#fff" : "#6B7280" }}>{p.l}</button>
-              ))}</div>
-            </div>
-            <div className="flex gap-2"><button onClick={createTask} className="px-4 py-2 rounded-xl text-xs font-bold text-white" style={{ background: "#3D8C5A" }}>إنشاء وربط</button><button onClick={resetForm} className="px-3 py-2 rounded-xl text-xs text-[#6B7280] bg-gray-100">إلغاء</button></div>
-          </div>
+          <NewTaskDialog goals={[]} onClose={() => setShowAdd(null)}
+            onCreated={async (t) => {
+              try { await api.post(`/api/role-goals/${goalId}/link-task`, { id: t.id }); } catch {}
+              load();
+            }} />
         )}
         {showAdd === "linktask" && (
           <div className="p-5 rounded-2xl border-2 fade-up space-y-2" style={{ background: "var(--card)", borderColor: "#3D8C5A40" }}>

@@ -19,6 +19,8 @@ export default function FocusPage() {
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newPriority, setNewPriority] = useState(3);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [timerSecs, setTimerSecs] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -42,6 +44,13 @@ export default function FocusPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Task timer
+  useEffect(() => {
+    if (!timerRunning) return;
+    const t = setInterval(() => setTimerSecs(s => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [timerRunning]);
 
   async function complete() {
     const t = tasks[idx];
@@ -82,6 +91,7 @@ export default function FocusPage() {
   }
 
   function removeCurrentTask() {
+    setTimerRunning(false); setTimerSecs(0);
     setTasks(prev => prev.filter((_, i) => i !== idx));
     if (idx >= tasks.length - 1) setIdx(Math.max(0, idx - 1));
   }
@@ -115,11 +125,13 @@ export default function FocusPage() {
   }
 
   function skip() {
+    setTimerRunning(false); setTimerSecs(0);
     if (idx < tasks.length - 1) setIdx(idx + 1);
     else setIdx(0);
   }
 
   function skipToAfterNext() {
+    setTimerRunning(false); setTimerSecs(0);
     // Move current task to position idx+2 (after the next one)
     if (tasks.length <= 1) return;
     setTasks(prev => {
@@ -289,12 +301,26 @@ export default function FocusPage() {
               </div>
             </div>
 
-            {/* Actions */}
+            {/* Timer + Actions */}
             <div className="p-6 pt-0 space-y-3">
+              {timerRunning ? (
+                <div className="rounded-xl p-3 text-center mb-1" style={{ background: "#5E549508", border: "1px solid #5E549520" }}>
+                  <p className="text-2xl font-black font-mono" style={{ color: "#5E5495" }}>
+                    {`${Math.floor(timerSecs / 3600).toString().padStart(2, "0")}:${Math.floor((timerSecs % 3600) / 60).toString().padStart(2, "0")}:${(timerSecs % 60).toString().padStart(2, "0")}`}
+                  </p>
+                  <p className="text-[9px] mt-1" style={{ color: "var(--muted)" }}>جارٍ العمل على المهمة...</p>
+                </div>
+              ) : (
+                <button onClick={() => setTimerRunning(true)}
+                  className="w-full py-3 rounded-xl text-sm font-bold transition active:scale-95"
+                  style={{ background: "#5E549510", color: "#5E5495", border: "1px solid #5E549530" }}>
+                  ⏱ التقط المهمة
+                </button>
+              )}
               <button onClick={complete}
                 className="w-full py-4 rounded-2xl text-base font-black text-white transition-all active:scale-95"
                 style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)", boxShadow: "0 4px 20px rgba(61,140,90,0.3)" }}>
-                أنجزتها ✅
+                أنجزتها ✅{timerRunning ? ` (${Math.floor(timerSecs / 60)} د)` : ""}
               </button>
               <div className="grid grid-cols-3 gap-2">
                 <button onClick={() => postponeTo(1)} className="py-2.5 rounded-xl text-[11px] font-bold transition active:scale-95" style={{ background: "#F59E0B15", color: "#F59E0B", border: "1px solid #F59E0B30" }}>غداً</button>
