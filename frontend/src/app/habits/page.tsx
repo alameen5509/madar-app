@@ -268,10 +268,10 @@ const PENALTY_TYPES = [
 ];
 
 const SUNNAH_PRAYERS = [
-  { key: "SunnahFajr",   label: "ركعتا الفجر",   icon: "🌅", desc: "ركعتان قبل الفجر", endPrayer: "Fajr" },
-  { key: "Duha",         label: "صلاة الضحى",     icon: "☀️", desc: "٢-٨ ركعات بعد الشروق", endPrayer: "Dhuhr" },
-  { key: "Rawatib",      label: "السنن الرواتب",   icon: "📿", desc: "١٢ ركعة يومياً", endPrayer: "Isha" },
-  { key: "Witr",         label: "صلاة الوتر",     icon: "🌙", desc: "ركعة أو أكثر بعد العشاء", endPrayer: null },
+  { key: "SunnahFajr",   label: "ركعتا الفجر",   icon: "🌅", desc: "ركعتان قبل الفجر", startPrayer: "Fajr", endPrayer: "Fajr", yesMsg: "«ركعتا الفجر خير من الدنيا وما فيها» — مسلم", noMsg: "لا تفوّت أجراً خيراً من الدنيا وما فيها" },
+  { key: "Duha",         label: "صلاة الضحى",     icon: "☀️", desc: "٢-٨ ركعات بعد الشروق", startPrayer: "shuruq", endPrayer: "Dhuhr", yesMsg: "«يُصبح على كل سُلامى من أحدكم صدقة، وكل تسبيحة صدقة، ويُجزئ من ذلك ركعتا الضحى» — مسلم", noMsg: "ركعتا الضحى تُجزئ عن 360 صدقة!" },
+  { key: "Rawatib",      label: "السنن الرواتب",   icon: "📿", desc: "١٢ ركعة يومياً", startPrayer: "Fajr", endPrayer: "Isha", yesMsg: "«من صلى ١٢ ركعة في يومه بُني له بيت في الجنة» — مسلم", noMsg: "١٢ ركعة = بيت في الجنة كل يوم!" },
+  { key: "Witr",         label: "صلاة الوتر",     icon: "🌙", desc: "ركعة أو أكثر بعد العشاء", startPrayer: "Isha", endPrayer: null, yesMsg: "«اجعلوا آخر صلاتكم بالليل وتراً» — متفق عليه", noMsg: "الوتر سُنة مؤكدة لا ينبغي تركها" },
 ] as const;
 
 function toMin(hhmm: string): number {
@@ -382,6 +382,8 @@ function PrayerSection() {
   const [tasbih, setTasbih] = useState<{ penaltyId: string } | null>(null);
   const [sunnahDone, setSunnahDone] = useState<Record<string, boolean>>({});
   const [sunnahWaiting, setSunnahWaiting] = useState<Record<string, boolean>>({});
+  const [celebrateSunnah, setCelebrateSunnah] = useState<string | null>(null);
+  const [declinedSunnah, setDeclinedSunnah] = useState<string | null>(null);
   const [penaltyConfig, setPenaltyConfig] = useState<Record<string, string>>({});
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [showStats, setShowStats] = useState(false);
@@ -705,11 +707,48 @@ function PrayerSection() {
 
       {/* ═══ Sunnah Tracking — card-based like prayers ═══ */}
       {(() => {
-        const pending = SUNNAH_PRAYERS.filter(s => !sunnahDone[s.key]);
-        const doneCount = SUNNAH_PRAYERS.length - pending.length;
-        return pending.length > 0 || doneCount > 0 ? (
+        // Time-based filtering: only show sunnah when its time has come
+        const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+        const startMap: Record<string, number> = salahTimes ? {
+          Fajr: toMin(salahTimes.fajr), shuruq: toMin(salahTimes.shuruq),
+          Dhuhr: toMin(salahTimes.dhuhr), Asr: toMin(salahTimes.asr),
+          Maghrib: toMin(salahTimes.maghrib), Isha: toMin(salahTimes.isha),
+        } : { Fajr: 280, shuruq: 380, Dhuhr: 730, Asr: 900, Maghrib: 1070, Isha: 1170 };
+
+        const visible = SUNNAH_PRAYERS.filter(s => {
+          if (sunnahDone[s.key]) return false; // already done
+          if (declinedSunnah === s.key) return false; // just declined, hide
+          const start = startMap[s.startPrayer] ?? 0;
+          return nowMins >= start; // only show if time has come
+        });
+        const doneCount = SUNNAH_PRAYERS.filter(s => sunnahDone[s.key]).length;
+        return visible.length > 0 || doneCount > 0 || celebrateSunnah ? (
           <div className="mt-4 space-y-2">
-            {doneCount > 0 && (
+            {/* Celebration message */}
+            {celebrateSunnah && (() => {
+              const cs = SUNNAH_PRAYERS.find(s => s.key === celebrateSunnah);
+              setTimeout(() => setCelebrateSunnah(null), 3000);
+              return cs ? (
+                <div className="rounded-xl p-4 text-center animate-pulse" style={{ background: "#3D8C5A10", border: "1px solid #3D8C5A30" }}>
+                  <p className="text-lg mb-1">🌟</p>
+                  <p className="text-xs font-bold" style={{ color: "#3D8C5A" }}>أحسنت!</p>
+                  <p className="text-[10px] mt-1" style={{ color: "#3D8C5A" }}>{cs.yesMsg}</p>
+                </div>
+              ) : null;
+            })()}
+
+            {/* Decline nudge message */}
+            {declinedSunnah && (() => {
+              const ds = SUNNAH_PRAYERS.find(s => s.key === declinedSunnah);
+              return ds ? (
+                <div className="rounded-xl p-4 text-center" style={{ background: "#F59E0B08", border: "1px solid #F59E0B30" }}>
+                  <p className="text-lg mb-1">💡</p>
+                  <p className="text-[10px]" style={{ color: "#F59E0B" }}>{ds.noMsg}</p>
+                </div>
+              ) : null;
+            })()}
+
+            {doneCount > 0 && !celebrateSunnah && (
               <div className="flex items-center gap-2 px-1">
                 <span className="text-sm">📿</span>
                 <p className="text-xs font-semibold" style={{ color: "#3D8C5A" }}>
@@ -717,9 +756,9 @@ function PrayerSection() {
                 </p>
               </div>
             )}
-            {pending.length > 0 && (
+            {visible.length > 0 && (
               <div className="space-y-3">
-                {pending.map(s => {
+                {visible.map(s => {
                   const isWaiting = sunnahWaiting[s.key] ?? false;
                   return (
                     <div key={s.key} className="rounded-xl p-4 border-2 shadow-sm space-y-3" style={{ borderColor: "#D4AF3780", background: "var(--card, #fff)" }}>
@@ -732,20 +771,20 @@ function PrayerSection() {
                       </div>
                       <p className="text-sm font-bold text-center" style={{ color: "#16213E" }}>هل أديت {s.label}؟</p>
                       {isWaiting ? (<>
-                        <button onClick={() => { setSunnahWaiting(prev => ({ ...prev, [s.key]: false })); toggleSunnah(s.key, true); }}
+                        <button onClick={() => { setSunnahWaiting(prev => ({ ...prev, [s.key]: false })); toggleSunnah(s.key, true); setCelebrateSunnah(s.key); }}
                           className="w-full py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)", color: "#fff" }}>
                           أديتها ✅
                         </button>
                         <p className="text-xs text-center animate-pulse" style={{ color: "#D4AF37" }}>بانتظارك...</p>
                       </>) : (
                         <div className="flex gap-2">
-                          <button onClick={() => toggleSunnah(s.key, true)}
+                          <button onClick={() => { toggleSunnah(s.key, true); setCelebrateSunnah(s.key); }}
                             className="flex-1 py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)", color: "#fff" }}>
                             نعم ✅
                           </button>
-                          <button onClick={() => setSunnahWaiting(prev => ({ ...prev, [s.key]: true }))}
-                            className="flex-1 py-3 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg, #5E5495, #2C2C54)", color: "#fff" }}>
-                            سأؤديها الآن
+                          <button onClick={() => { setDeclinedSunnah(s.key); setTimeout(() => setDeclinedSunnah(null), 3000); }}
+                            className="flex-1 py-3 rounded-xl text-sm font-bold border-2" style={{ background: "transparent", borderColor: "#9CA3AF40", color: "#9CA3AF" }}>
+                            لا
                           </button>
                         </div>
                       )}
