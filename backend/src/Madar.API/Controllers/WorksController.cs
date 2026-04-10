@@ -148,15 +148,14 @@ public class WorksController : ControllerBase
         _db.WorkJobs.Add(j);
         await _db.SaveChangesAsync(ct);
 
-        // إنشاء منصب تلقائي في غرفة القيادة
+        // إنشاء منصب تلقائي في غرفة القيادة (WorkId = jobId for correct linkage)
         await CreateLeadershipRole(
             j.Id.ToString(),
             $"{req.Title} — {w.Name}",
             w.Sector,
             "👔",
             "#D4AF37",
-            ct,
-            w.Id.ToString());
+            ct);
 
         return Ok(new { j.Id, j.Title, j.WorkId });
     }
