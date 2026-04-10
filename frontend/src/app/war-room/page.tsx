@@ -133,6 +133,12 @@ export default function WarRoomIndexPage() {
           <span className="text-xs" style={{ color: "var(--muted)" }}>{workItems.length + manualRoles.length} غرفة</span>
           {redCount > 0 && <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: "#DC262615", color: "#DC2626" }}>🔴 {redCount}</span>}
           {yellowCount > 0 && <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: "#F59E0B15", color: "#F59E0B" }}>🟡 {yellowCount}</span>}
+          {hiddenIds.size > 0 && (
+            <button onClick={() => setShowHidden(!showHidden)} className="text-xs font-bold px-2 py-1 rounded-full transition"
+              style={{ background: showHidden ? "#5E549515" : "var(--bg)", color: showHidden ? "#5E5495" : "var(--muted)", border: `1px solid ${showHidden ? "#5E549530" : "var(--card-border)"}` }}>
+              {showHidden ? `🙈 إخفاء المخفية (${hiddenIds.size})` : `👁 عرض المخفية (${hiddenIds.size})`}
+            </button>
+          )}
         </div>
         <div className="flex gap-2 mt-2">
           <button onClick={() => setTab("works")} className="px-4 py-2.5 rounded-xl text-xs font-bold transition min-h-[40px]"
