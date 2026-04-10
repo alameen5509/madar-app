@@ -382,6 +382,14 @@ export default function WarRoomIndexPage() {
   // Ensure a leadership role exists for an item, creating one if needed
   async function ensureRoleId(item: { id: string; name: string; icon: string; color: string; role?: Role }): Promise<string | undefined> {
     if (item.role?.id && !item.role.id.startsWith("auto-")) return item.role.id;
+    // Check all roles again for a match (might have been created in a previous session)
+    try {
+      const { data: allRoles } = await api.get("/api/war-room/roles");
+      const existing = (Array.isArray(allRoles) ? allRoles : []).find(
+        (r: Role) => r.workId === item.id && !r.isAuto && !r.id.startsWith("auto-")
+      );
+      if (existing) return existing.id;
+    } catch {}
     // Create a real leadership role
     try {
       const { data } = await api.post("/api/war-room/roles", {
@@ -450,13 +458,14 @@ export default function WarRoomIndexPage() {
   // Work-linked items
   const workItems: { id: string; name: string; type: string; icon: string; color: string; role?: Role; href: string }[] = [];
   for (const w of works) {
-    const role = roles.find(r => r.workId === w.id && !r.isAuto && !r.id.startsWith("auto-"))
+    const wMatching = roles.filter(r => r.workId === w.id && !r.isAuto && !r.id.startsWith("auto-"));
+    const role = wMatching[wMatching.length - 1]
       ?? roles.find(r => r.workId === w.id && !r.autoSource?.includes("job"));
     workItems.push({ id: w.id, name: w.name, type: w.type === "job" ? "وظيفة" : "رجل أعمال", icon: w.type === "job" ? "💼" : "🏢", color: w.type === "job" ? "#2D6B9E" : "#D4AF37", role, href: "/works/" + w.id });
     if (w.jobs) {
       for (const j of w.jobs) {
-        const jRole = roles.find(r => r.workId === j.id && !r.isAuto && !r.id.startsWith("auto-"))
-          ?? roles.find(r => r.workId === j.id);
+        const jMatching = roles.filter(r => r.workId === j.id && !r.isAuto && !r.id.startsWith("auto-"));
+        const jRole = jMatching[jMatching.length - 1] ?? roles.find(r => r.workId === j.id);
         workItems.push({ id: j.id, name: j.title + " — " + w.name, type: "وظيفة فرعية", icon: "👔", color: "#5E5495", role: jRole, href: "/works/" + w.id + "/jobs/" + j.id });
       }
     }
@@ -466,8 +475,9 @@ export default function WarRoomIndexPage() {
   const workIdSet = new Set(works.flatMap(w => [w.id, ...(w.jobs?.map(j => j.id) ?? [])]));
   const roleItems: { id: string; name: string; type: string; icon: string; color: string; role?: Role; href: string }[] = [];
   for (const c of circles) {
-    const role = roles.find(r => r.workId === c.id && !r.isAuto && !r.id.startsWith("auto-"))
-      ?? roles.find(r => r.workId === c.id);
+    // Pick the last (most recently created) real role for this circle
+    const matching = roles.filter(r => r.workId === c.id && !r.isAuto && !r.id.startsWith("auto-"));
+    const role = matching[matching.length - 1] ?? roles.find(r => r.workId === c.id);
     roleItems.push({ id: c.id, name: c.name, type: "دور حياتي", icon: c.icon ?? "◎", color: c.color ?? "#5E5495", role, href: "/circles/" + c.id });
   }
   roleItems.sort((a, b) => (pulseOrder[getPulse(a.role?.pulseStatus)] ?? 3) - (pulseOrder[getPulse(b.role?.pulseStatus)] ?? 3));
