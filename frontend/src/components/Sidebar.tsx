@@ -29,6 +29,7 @@ const NAV_GROUPS = [
   { group: null, items: [
     { icon: "↻", label: "عبادات وعادات",      href: "/habits",      badgeKey: "habits" as const, fixed: true },
     { icon: "◻", label: "أعمال اليوم",        href: "/tasks",       badgeKey: "tasks" as const, fixed: true },
+    { icon: "🎯", label: "التركيز",            href: "/focus",       badgeKey: null, fixed: false },
   ]},
   { group: "التخطيط", items: [
     { icon: "▣", label: "المشاريع",           href: "/projects",    badgeKey: null, fixed: false },
