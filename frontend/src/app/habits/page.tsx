@@ -230,6 +230,13 @@ const PENALTY_TYPES = [
   { key: "istighfar", label: "استغفار ١٠٠ مرة" },
 ];
 
+const SUNNAH_PRAYERS = [
+  { key: "SunnahFajr",   label: "ركعتا الفجر",   icon: "🌅", desc: "ركعتان قبل الفجر", endPrayer: "Fajr" },
+  { key: "Duha",         label: "صلاة الضحى",     icon: "☀️", desc: "٢-٨ ركعات بعد الشروق", endPrayer: "Dhuhr" },
+  { key: "Rawatib",      label: "السنن الرواتب",   icon: "📿", desc: "١٢ ركعة يومياً", endPrayer: "Isha" },
+  { key: "Witr",         label: "صلاة الوتر",     icon: "🌙", desc: "ركعة أو أكثر بعد العشاء", endPrayer: null },
+] as const;
+
 function toMin(hhmm: string): number {
   const [h, m] = hhmm.split(":").map(Number);
   return h * 60 + m;
@@ -336,6 +343,7 @@ function PrayerSection() {
   const [salahTimes, setSalahTimes] = useState<Record<string, string> | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [tasbih, setTasbih] = useState<{ penaltyId: string } | null>(null);
+  const [sunnahDone, setSunnahDone] = useState<Record<string, boolean>>({});
   const [penaltyConfig, setPenaltyConfig] = useState<Record<string, string>>({});
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [showStats, setShowStats] = useState(false);
@@ -400,10 +408,16 @@ function PrayerSection() {
   const loadToday = useCallback(() => {
     api.get("/api/prayer-tracking/today").then(({ data }) => {
       const state: PrayerState = {};
+      const sd: Record<string, boolean> = {};
       for (const log of data as { prayer: string; prayedOnTime: boolean; prayedInMosque: boolean }[]) {
-        state[log.prayer] = { onTime: log.prayedOnTime, inMosque: log.prayedInMosque, expired: false };
+        if (SUNNAH_PRAYERS.some(s => s.key === log.prayer)) {
+          sd[log.prayer] = log.prayedOnTime;
+        } else {
+          state[log.prayer] = { onTime: log.prayedOnTime, inMosque: log.prayedInMosque, expired: false };
+        }
       }
       setPrayerState(state);
+      setSunnahDone(sd);
     }).catch(() => {});
   }, []);
 
@@ -449,11 +463,9 @@ function PrayerSection() {
         if (endTime && nowMins > endTime) {
           const cur = prayerState[p.key];
           if (!cur || (!cur.onTime && !cur.inMosque && !cur.expired)) {
-            // Time passed — call expire to create penalties for unchecked fields
             api.post("/api/prayer-tracking/expire", { prayer: p.key, date: today })
               .then(() => { loadToday(); loadPenalties(); loadStats(); })
               .catch(() => {});
-            // Mark as expired locally so we don't re-call
             setPrayerState(prev => ({
               ...prev,
               [p.key]: { ...(prev[p.key] ?? { onTime: false, inMosque: false }), expired: true },
@@ -461,11 +473,32 @@ function PrayerSection() {
           }
         }
       }
+
+      // Sunnah expiry — create penalty for unchecked sunnah when time passes
+      const sunnahEndMap: Record<string, number> = {
+        SunnahFajr: toMin(salahTimes.shuruq),
+        Duha:       toMin(salahTimes.dhuhr),
+        Rawatib:    23 * 60 + 30,
+        Witr:       23 * 60 + 50,
+      };
+      for (const s of SUNNAH_PRAYERS) {
+        const endTime = sunnahEndMap[s.key];
+        if (endTime && nowMins > endTime && !sunnahDone[s.key]) {
+          // Check we haven't already expired this one today
+          const expKey = `_sunnah_expired_${s.key}_${today}`;
+          if (typeof window !== "undefined" && !sessionStorage.getItem(expKey)) {
+            sessionStorage.setItem(expKey, "1");
+            api.post("/api/prayer-tracking/expire", { prayer: s.key, date: today })
+              .then(() => { loadPenalties(); loadStats(); })
+              .catch(() => {});
+          }
+        }
+      }
     };
     check();
     const interval = setInterval(check, 60_000);
     return () => clearInterval(interval);
-  }, [salahTimes, prayerState, loadToday, loadPenalties, loadStats]);
+  }, [salahTimes, prayerState, sunnahDone, loadToday, loadPenalties, loadStats]);
 
   async function togglePrayer(prayer: string, field: "onTime" | "inMosque") {
     const cur = prayerState[prayer] ?? { onTime: false, inMosque: false, expired: false };
@@ -490,6 +523,14 @@ function PrayerSection() {
       await api.post(`/api/prayer-tracking/penalties/${id}/fulfill`);
       loadStats();
     } catch { loadPenalties(); }
+  }
+
+  async function toggleSunnah(key: string, done: boolean) {
+    setSunnahDone(prev => ({ ...prev, [key]: done }));
+    try {
+      await api.post("/api/prayer-tracking/toggle", { prayer: key, field: "onTime", value: done });
+      loadPenalties(); loadStats();
+    } catch { loadToday(); }
   }
 
   async function saveSettings() {
@@ -538,7 +579,7 @@ function PrayerSection() {
     return map[prayerKey] ?? "";
   }
 
-  const prayerLabel = (key: string) => PRAYERS.find(p => p.key === key)?.label ?? key;
+  const prayerLabel = (key: string) => PRAYERS.find(p => p.key === key)?.label ?? SUNNAH_PRAYERS.find(s => s.key === key)?.label ?? key;
   const penaltyLabel = (type: string) => PENALTY_TYPES.find(t => t.key === type)?.label ?? type;
   const reasonLabel = (r: string) => r === "not_on_time" ? "لم تُصلَّ في الوقت" : "لم تُصلَّ في المسجد";
 
@@ -623,6 +664,32 @@ function PrayerSection() {
             )}
           </>);
       })()}
+
+      {/* ═══ Sunnah Tracking ═══ */}
+      <div className="mt-4 space-y-2">
+        <div className="flex items-center gap-2 px-1">
+          <span className="text-sm">📿</span>
+          <span className="text-xs font-bold" style={{ color: "var(--text)" }}>النوافل والسنن</span>
+          <span className="text-[9px]" style={{ color: "var(--muted)" }}>{SUNNAH_PRAYERS.filter(s => sunnahDone[s.key]).length}/{SUNNAH_PRAYERS.length}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {SUNNAH_PRAYERS.map(s => {
+            const done = !!sunnahDone[s.key];
+            return (
+              <button key={s.key} onClick={() => toggleSunnah(s.key, !done)}
+                className="rounded-xl p-3 border-2 transition-all text-right"
+                style={{ background: done ? "#3D8C5A10" : "var(--card)", borderColor: done ? "#3D8C5A40" : "var(--card-border)" }}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-lg">{s.icon}</span>
+                  <span className="text-xs font-bold flex-1" style={{ color: done ? "#3D8C5A" : "var(--text)" }}>{s.label}</span>
+                  {done && <span className="text-sm">✓</span>}
+                </div>
+                <p className="text-[9px]" style={{ color: "var(--muted)" }}>{s.desc}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* ═══ Penalties — all shown, sorted oldest first ═══ */}
       {penalties.length > 0 && (
