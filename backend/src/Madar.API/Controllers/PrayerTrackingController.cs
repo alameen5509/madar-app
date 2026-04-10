@@ -142,6 +142,7 @@ public class PrayerTrackingController : BaseController
 
         bool prayedOnTime = log?.PrayedOnTime ?? false;
         bool prayedInMosque = log?.PrayedInMosque ?? false;
+        bool notLoggedAtAll = log == null;
 
         // Create log if doesn't exist
         if (log == null)
@@ -154,7 +155,24 @@ public class PrayerTrackingController : BaseController
             _db.PrayerLogs.Add(log);
         }
 
-        // Penalty for not on time
+        // Penalty 1: not prayed at all (only if prayer was never logged)
+        if (notLoggedAtAll)
+        {
+            var exists = await _db.PrayerPenalties.AnyAsync(p =>
+                p.OwnerId == UserId && p.Date == date && p.Prayer == req.Prayer && p.Reason == "not_prayed", ct);
+            if (!exists)
+            {
+                _db.PrayerPenalties.Add(new PrayerPenalty
+                {
+                    Id = Guid.NewGuid(), OwnerId = UserId,
+                    Date = date, Prayer = req.Prayer,
+                    Reason = "not_prayed",
+                    PenaltyType = GetPenaltyType(req.Prayer, "time"),
+                });
+            }
+        }
+
+        // Penalty 2: not on time
         if (!prayedOnTime)
         {
             var exists = await _db.PrayerPenalties.AnyAsync(p =>
@@ -171,7 +189,7 @@ public class PrayerTrackingController : BaseController
             }
         }
 
-        // Penalty for not in mosque
+        // Penalty 3: not in mosque
         if (!prayedInMosque)
         {
             var exists = await _db.PrayerPenalties.AnyAsync(p =>

@@ -491,18 +491,23 @@ function PrayerSection() {
       const nowMins = now.getHours() * 60 + now.getMinutes();
       const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
 
+      // Day runs from Fajr to next Fajr — prayers expire at next prayer's adhan
+      const fajrMin = toMin(salahTimes.fajr);
       const prayerEndMap: Record<string, number> = {
         Fajr:    toMin(salahTimes.shuruq),
         Dhuhr:   toMin(salahTimes.asr),
         Asr:     toMin(salahTimes.maghrib),
         Maghrib: toMin(salahTimes.isha),
-        Isha:    23 * 60 + 59,
+        Isha:    fajrMin + 24 * 60, // next Fajr (wraps past midnight)
       };
 
       for (const p of PRAYERS) {
         const endTime = prayerEndMap[p.key];
-        if (endTime && nowMins > endTime) {
+        // For Isha: endTime > 24*60, so compare with nowMins or nowMins+24*60 if before fajr
+        const effectiveNow = (p.key === "Isha" && nowMins < fajrMin) ? nowMins + 24 * 60 : nowMins;
+        if (endTime && effectiveNow > endTime) {
           const cur = prayerState[p.key];
+          // Expire if not logged at all, or partially logged
           if (!cur || (!cur.onTime && !cur.inMosque && !cur.expired)) {
             api.post("/api/prayer-tracking/expire", { prayer: p.key, date: today })
               .then(() => { loadToday(); loadPenalties(); loadStats(); })
@@ -622,7 +627,7 @@ function PrayerSection() {
 
   const prayerLabel = (key: string) => PRAYERS.find(p => p.key === key)?.label ?? SUNNAH_PRAYERS.find(s => s.key === key)?.label ?? key;
   const penaltyLabel = (type: string) => PENALTY_TYPES.find(t => t.key === type)?.label ?? type;
-  const reasonLabel = (r: string) => r === "not_on_time" ? "لم تُصلَّ في الوقت" : "لم تُصلَّ في المسجد";
+  const reasonLabel = (r: string) => r === "not_prayed" ? "لم تُصلَّ" : r === "not_on_time" ? "لم تُصلَّ في الوقت" : "لم تُصلَّ في المسجد";
 
   function setStep(pk: string, s: number) { setPrayerSteps(prev => ({ ...prev, [pk]: s })); }
 
