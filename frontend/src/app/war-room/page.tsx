@@ -80,8 +80,13 @@ export default function WarRoomIndexPage() {
   const manualRoles = roles.filter(r => !r.isAuto && !r.workId && !r.id.startsWith("auto-"));
 
   const allItems = [...workItems];
-  const redCount = allItems.filter(i => i.role?.pulseStatus === "red").length + manualRoles.filter(r => r.pulseStatus === "red").length;
-  const yellowCount = allItems.filter(i => i.role?.pulseStatus === "yellow").length + manualRoles.filter(r => r.pulseStatus === "yellow").length;
+  // Pulse counts — exclude hidden items
+  const visibleWorkItems = allItems.filter(i => !hiddenIds.has(i.id));
+  const visibleManual = manualRoles;
+  const getPulse = (s?: string) => s === "red" || s === "yellow" || s === "green" ? s : "green";
+  const redCount = visibleWorkItems.filter(i => getPulse(i.role?.pulseStatus) === "red").length + visibleManual.filter(r => getPulse(r.pulseStatus) === "red").length;
+  const yellowCount = visibleWorkItems.filter(i => getPulse(i.role?.pulseStatus) === "yellow").length + visibleManual.filter(r => getPulse(r.pulseStatus) === "yellow").length;
+  const greenCount = visibleWorkItems.filter(i => getPulse(i.role?.pulseStatus) === "green").length + visibleManual.filter(r => getPulse(r.pulseStatus) === "green").length;
 
   function renderCard(item: { id: string; name: string; type: string; icon: string; color: string; role?: Role; href: string }, idx: number) {
     const pulse = PULSE[item.role?.pulseStatus ?? "green"] ?? PULSE.green;
@@ -131,8 +136,9 @@ export default function WarRoomIndexPage() {
         <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>🎖️ غرفة القيادة</h2>
         <div className="flex items-center gap-3 mt-1">
           <span className="text-xs" style={{ color: "var(--muted)" }}>{workItems.length + manualRoles.length} غرفة</span>
-          {redCount > 0 && <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: "#DC262615", color: "#DC2626" }}>🔴 {redCount}</span>}
-          {yellowCount > 0 && <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: "#F59E0B15", color: "#F59E0B" }}>🟡 {yellowCount}</span>}
+          {redCount > 0 && <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: "#DC262615", color: "#DC2626" }}>🔴 {redCount} حرج</span>}
+          {yellowCount > 0 && <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: "#F59E0B15", color: "#F59E0B" }}>🟡 {yellowCount} متابعة</span>}
+          {greenCount > 0 && <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>🟢 {greenCount} مستقر</span>}
           {hiddenIds.size > 0 && (
             <button onClick={() => setShowHidden(!showHidden)} className="text-xs font-bold px-2 py-1 rounded-full transition"
               style={{ background: showHidden ? "#5E549515" : "var(--bg)", color: showHidden ? "#5E5495" : "var(--muted)", border: `1px solid ${showHidden ? "#5E549530" : "var(--card-border)"}` }}>
