@@ -16,6 +16,9 @@ export default function FocusPage() {
   const [showDone, setShowDone] = useState(false);
   const [showUrgent, setShowUrgent] = useState(false);
   const [urgentTitle, setUrgentTitle] = useState("");
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newPriority, setNewPriority] = useState(3);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,6 +84,19 @@ export default function FocusPage() {
   function removeCurrentTask() {
     setTasks(prev => prev.filter((_, i) => i !== idx));
     if (idx >= tasks.length - 1) setIdx(Math.max(0, idx - 1));
+  }
+
+  async function addTask() {
+    if (!newTitle.trim()) return;
+    try {
+      const { data } = await api.post("/api/tasks", {
+        title: newTitle.trim(), userPriority: newPriority, dueDate: new Date().toISOString(),
+      });
+      if (data?.id) {
+        setTasks(prev => [...prev.slice(0, idx + 1), data as SmartTask, ...prev.slice(idx + 1)]);
+      }
+    } catch { alert("فشل الإضافة"); }
+    setNewTitle(""); setNewPriority(3); setShowAddTask(false);
   }
 
   async function addUrgent() {
@@ -163,10 +179,34 @@ export default function FocusPage() {
           <p className="text-[10px]" style={{ color: "var(--muted)" }}>{idx + 1} من {tasks.length} مهمة</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowUrgent(!showUrgent)} className="px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{ background: "#DC262615", color: "#DC2626" }}>+ طارئة</button>
+          <button onClick={() => { setShowAddTask(!showAddTask); setShowUrgent(false); }} className="px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{ background: "#5E549515", color: "#5E5495" }}>+ مهمة</button>
+          <button onClick={() => { setShowUrgent(!showUrgent); setShowAddTask(false); }} className="px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{ background: "#DC262615", color: "#DC2626" }}>+ طارئة</button>
           <Link href="/tasks" className="text-xs hover:underline" style={{ color: "#5E5495" }}>← المهام</Link>
         </div>
       </header>
+
+      {/* Add task form */}
+      {showAddTask && (
+        <div className="px-6 pt-3">
+          <div className="rounded-xl border p-3 space-y-2" style={{ background: "var(--card)", borderColor: "#5E549530" }}>
+            <input value={newTitle} onChange={e => setNewTitle(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") addTask(); }}
+              placeholder="عنوان المهمة..." autoFocus
+              className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none"
+              style={{ borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" }} />
+            <div className="flex gap-2 items-center">
+              <span className="text-[10px]" style={{ color: "var(--muted)" }}>الأولوية:</span>
+              {[{v:2,l:"منخفضة"},{v:3,l:"متوسطة"},{v:4,l:"عالية"}].map(p => (
+                <button key={p.v} onClick={() => setNewPriority(p.v)} className="px-2.5 py-1 rounded-lg text-[10px] font-bold"
+                  style={{ background: newPriority === p.v ? "#5E5495" : "#F3F4F6", color: newPriority === p.v ? "#fff" : "#6B7280" }}>{p.l}</button>
+              ))}
+              <div className="flex-1" />
+              <button onClick={addTask} disabled={!newTitle.trim()} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>إضافة</button>
+              <button onClick={() => { setShowAddTask(false); setNewTitle(""); }} className="text-[10px]" style={{ color: "var(--muted)" }}>✕</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Urgent task form */}
       {showUrgent && (
