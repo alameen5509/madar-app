@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { GeometricDivider } from "@/components/IslamicPattern";
 import {
   getGoals, getCircles, createGoal, updateGoal, deleteGoal, getGoalTasks,
@@ -73,6 +74,7 @@ const DEFAULT_PREFS: ProjectPrefs = { pinned: [], tags: {}, progressMode: {}, ma
    ═══════════════════════════════════════════════════════════════════════ */
 
 export default function ProjectsPage() {
+  const searchParams = useSearchParams();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [circles, setCircles] = useState<LifeCircle[]>([]);
   const [works, setWorks] = useState<{ id: string; name: string; type: string }[]>([]);
@@ -82,6 +84,7 @@ export default function ProjectsPage() {
   const [selected, setSelected] = useState<Goal | null>(null);
   const [prefs, setPrefs] = useState<ProjectPrefs>(DEFAULT_PREFS);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [autoSelected, setAutoSelected] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError("");
@@ -97,6 +100,16 @@ export default function ProjectsPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Auto-select project from URL ?id=xxx
+  useEffect(() => {
+    if (autoSelected || goals.length === 0) return;
+    const id = searchParams.get("id");
+    if (id) {
+      const match = goals.find(g => g.id === id);
+      if (match) { setSelected(match); setAutoSelected(true); }
+    }
+  }, [goals, searchParams, autoSelected]);
 
   function savePrefs(updated: ProjectPrefs) {
     setPrefs(updated);

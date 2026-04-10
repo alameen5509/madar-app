@@ -87,10 +87,12 @@ export default function GoalPage({ params }: { params: Promise<{ id: string; goa
     try {
       const { data } = await api.post("/api/goals", {
         title: fTitle.trim(), description: fDesc.trim() || undefined,
-        targetDate: fDate || undefined, lifeCircleId: dimChain[0]?.jobId,
+        targetDate: fDate || undefined,
       });
-      await api.post(`/api/job-goals/${goalId}/link-project`, { id: data.id });
-    } catch {}
+      if (data?.id) {
+        await api.post(`/api/job-goals/${goalId}/link-project`, { id: data.id });
+      }
+    } catch (err) { console.error("createProject failed:", err); alert("فشل إنشاء المشروع"); }
     resetForm(); load();
   }
 
@@ -313,18 +315,21 @@ export default function GoalPage({ params }: { params: Promise<{ id: string; goa
                     <input type="date" value={epDate} onChange={e => setEpDate(e.target.value)} className="w-full px-3 py-2 rounded-xl border text-xs focus:outline-none" style={IS} />
                   </div>
                 ) : (
-                  <div className="p-4 flex items-center gap-3">
-                    <span className="text-lg">📦</span>
-                    <div className="flex-1">
-                      <p className="text-sm font-bold" style={{ color: "var(--text)" }}>{p.title}</p>
-                      {p.description && <p className="text-[10px] mt-0.5" style={{ color: "var(--muted)" }}>{p.description}</p>}
-                      {p.targetDate && <p className="text-[9px] mt-0.5" style={{ color: "var(--muted)" }}>⏰ {new Date(p.targetDate).toLocaleDateString("ar-SA")}</p>}
-                    </div>
-                    <div className="flex gap-1 flex-shrink-0">
-                      <button onClick={() => { setEditingProject(p.id); setEpTitle(p.title); setEpDesc(p.description ?? ""); setEpDate(p.targetDate?.slice(0, 10) ?? ""); }}
-                        className="text-[9px] px-2 py-1 rounded-lg text-[#2D6B9E] hover:bg-blue-50 transition">تعديل</button>
-                      <button onClick={() => unlinkProject(p.id)} className="text-[9px] px-2 py-1 rounded-lg text-[#6B7280] hover:bg-gray-100 transition">فك</button>
-                      <button onClick={() => deleteProject(p.id)} className="text-[9px] px-2 py-1 rounded-lg text-red-400 hover:bg-red-50 transition">حذف</button>
+                  <div className="p-4">
+                    <div className="flex items-center gap-3">
+                      <Link href={`/projects?id=${p.id}`} className="text-lg hover:scale-110 transition">📦</Link>
+                      <div className="flex-1">
+                        <Link href={`/projects?id=${p.id}`} className="text-sm font-bold hover:underline" style={{ color: "var(--text)" }}>{p.title}</Link>
+                        {p.description && <p className="text-[10px] mt-0.5" style={{ color: "var(--muted)" }}>{p.description}</p>}
+                        {p.targetDate && <p className="text-[9px] mt-0.5" style={{ color: "var(--muted)" }}>⏰ {new Date(p.targetDate).toLocaleDateString("ar-SA")}</p>}
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <Link href={`/projects?id=${p.id}`} className="text-[9px] px-2 py-1.5 rounded-lg font-bold hover:bg-blue-50 transition" style={{ color: "#5E5495" }}>فتح ←</Link>
+                        <button onClick={() => { setEditingProject(p.id); setEpTitle(p.title); setEpDesc(p.description ?? ""); setEpDate(p.targetDate?.slice(0, 10) ?? ""); }}
+                          className="text-[9px] px-2 py-1 rounded-lg text-[#2D6B9E] hover:bg-blue-50 transition">تعديل</button>
+                        <button onClick={() => unlinkProject(p.id)} className="text-[9px] px-2 py-1 rounded-lg text-[#6B7280] hover:bg-gray-100 transition">فك</button>
+                        <button onClick={() => deleteProject(p.id)} className="text-[9px] px-2 py-1 rounded-lg text-red-400 hover:bg-red-50 transition">حذف</button>
+                      </div>
                     </div>
                   </div>
                 )}
