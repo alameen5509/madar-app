@@ -22,7 +22,8 @@ const PULSE: Record<string, { label: string; color: string; bg: string }> = {
   blue: { label: "بناء", color: "#3B82F6", bg: "#3B82F615" },
 };
 
-type Tab = "works" | "manual";
+type Tab = "works" | "roles" | "manual";
+interface Circle { id: string; name: string; icon?: string; color?: string; slug?: string; groupId?: string }
 
 interface SessionItem { id: string; name: string; icon: string; color: string; roleId?: string; pulse: string; pulseNote?: string; notes: { id: string; content: string; createdAt: string }[]; devReqs: { id: string; title: string; status: string }[] }
 
@@ -159,8 +160,11 @@ function LeadershipSession({ items, onClose, onUpdate }: { items: SessionItem[];
 export default function WarRoomIndexPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [works, setWorks] = useState<Work[]>([]);
+  const [circles, setCircles] = useState<Circle[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("works");
+  const [showAddManual, setShowAddManual] = useState(false);
+  const [newManual, setNewManual] = useState({ title: "", org: "" });
   const [pulseFilter, setPulseFilter] = useState<"all" | "red" | "yellow" | "green" | "blue">("all");
   const [sessionItems, setSessionItems] = useState<SessionItem[] | null>(null);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => {
@@ -191,6 +195,11 @@ export default function WarRoomIndexPage() {
       const devReqs = wi.role ? await api.get(`/api/war-room/roles/${wi.role.id}/dev-requests`).then(r => r.data ?? []).catch(() => []) : [];
       items.push({ id: wi.id, name: wi.name, icon: wi.icon, color: wi.color, roleId: wi.role?.id, pulse: wi.role?.pulseStatus ?? "green", pulseNote: wi.role?.pulseNote, notes, devReqs });
     }
+    for (const ri of roleItems.filter(i => !hiddenIds.has(i.id))) {
+      const notes = ri.role ? await api.get(`/api/war-room/roles/${ri.role.id}/notes`).then(r => r.data ?? []).catch(() => []) : [];
+      const devReqs = ri.role ? await api.get(`/api/war-room/roles/${ri.role.id}/dev-requests`).then(r => r.data ?? []).catch(() => []) : [];
+      items.push({ id: ri.id, name: ri.name, icon: ri.icon, color: ri.color, roleId: ri.role?.id, pulse: ri.role?.pulseStatus ?? "green", pulseNote: ri.role?.pulseNote, notes, devReqs });
+    }
     for (const r of manualRoles) {
       const notes = await api.get(`/api/war-room/roles/${r.id}/notes`).then(res => res.data ?? []).catch(() => []);
       const devReqs = await api.get(`/api/war-room/roles/${r.id}/dev-requests`).then(res => res.data ?? []).catch(() => []);
@@ -205,15 +214,26 @@ export default function WarRoomIndexPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [r, w] = await Promise.all([
+      const [r, w, cg] = await Promise.all([
         api.get("/api/war-room/roles").then(r => r.data ?? []).catch(() => []),
         api.get("/api/works").then(r => r.data ?? []).catch(() => []),
+        api.get("/api/circle-groups").then(r => r.data ?? []).catch(() => []),
       ]);
       setRoles(Array.isArray(r) ? r : []);
       setWorks(Array.isArray(w) ? w : []);
+      const allCircles: Circle[] = (Array.isArray(cg) ? cg : []).flatMap((g: { circles?: Circle[] }) => g.circles ?? []);
+      setCircles(allCircles);
     } catch {}
     setLoading(false);
   }, []);
+
+  async function addManualRole() {
+    if (!newManual.title.trim()) return;
+    try {
+      await api.post("/api/war-room/roles", { title: newManual.title, organization: newManual.org || undefined, reviewFrequency: "weekly", color: "#5E5495", icon: "🎯" });
+      setNewManual({ title: "", org: "" }); setShowAddManual(false); load();
+    } catch { alert("فشل الإضافة"); }
+  }
 
   useEffect(() => { load(); }, [load]);
 
@@ -232,8 +252,19 @@ export default function WarRoomIndexPage() {
     }
   }
 
-  // Manual roles (not linked to any work)
-  const manualRoles = roles.filter(r => !r.isAuto && !r.workId && !r.id.startsWith("auto-"));
+  // Role-linked items (from circles/UserCircles)
+  const workIdSet = new Set(works.flatMap(w => [w.id, ...(w.jobs?.map(j => j.id) ?? [])]));
+  const roleItems: { id: string; name: string; type: string; icon: string; color: string; role?: Role; href: string }[] = [];
+  for (const c of circles) {
+    const role = roles.find(r => r.workId === c.id && !r.isAuto && !r.id.startsWith("auto-"))
+      ?? roles.find(r => r.workId === c.id);
+    roleItems.push({ id: c.id, name: c.name, type: "دور حياتي", icon: c.icon ?? "◎", color: c.color ?? "#5E5495", role, href: "/circles/" + c.id });
+  }
+  roleItems.sort((a, b) => (pulseOrder[getPulse(a.role?.pulseStatus)] ?? 3) - (pulseOrder[getPulse(b.role?.pulseStatus)] ?? 3));
+
+  // Manual roles (not linked to any work or circle)
+  const circleIdSet = new Set(circles.map(c => c.id));
+  const manualRoles = roles.filter(r => !r.isAuto && !r.id.startsWith("auto-") && (!r.workId || (!workIdSet.has(r.workId) && !circleIdSet.has(r.workId))));
 
   const getPulse = (s?: string) => s === "red" || s === "yellow" || s === "green" || s === "blue" ? s : "green";
 
@@ -242,7 +273,7 @@ export default function WarRoomIndexPage() {
   workItems.sort((a, b) => (pulseOrder[getPulse(a.role?.pulseStatus)] ?? 3) - (pulseOrder[getPulse(b.role?.pulseStatus)] ?? 3));
   manualRoles.sort((a, b) => (pulseOrder[getPulse(a.pulseStatus)] ?? 3) - (pulseOrder[getPulse(b.pulseStatus)] ?? 3));
 
-  const allItems = [...workItems];
+  const allItems = [...workItems, ...roleItems];
   // Pulse counts — exclude hidden items
   const visibleWorkItems = allItems.filter(i => !hiddenIds.has(i.id));
   const visibleManual = manualRoles;
@@ -308,7 +339,7 @@ export default function WarRoomIndexPage() {
           </button>
         </div>
         <div className="flex items-center gap-3 mt-1">
-          <span className="text-xs" style={{ color: "var(--muted)" }}>{workItems.length + manualRoles.length} غرفة</span>
+          <span className="text-xs" style={{ color: "var(--muted)" }}>{workItems.length + roleItems.length + manualRoles.length} غرفة</span>
           {redCount > 0 && <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: "#DC262615", color: "#DC2626" }}>🔴 {redCount} حرج</span>}
           {yellowCount > 0 && <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: "#F59E0B15", color: "#F59E0B" }}>🟡 {yellowCount} متابعة</span>}
           {greenCount > 0 && <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>🟢 {greenCount} مستقر</span>}
@@ -324,6 +355,10 @@ export default function WarRoomIndexPage() {
           <button onClick={() => setTab("works")} className="px-4 py-2.5 rounded-xl text-xs font-bold transition min-h-[40px]"
             style={{ background: tab === "works" ? "#2D6B9E" : "var(--bg)", color: tab === "works" ? "#fff" : "var(--muted)", border: `1px solid ${tab === "works" ? "#2D6B9E" : "var(--card-border)"}` }}>
             💼 الأعمال والوظائف ({workItems.length})
+          </button>
+          <button onClick={() => setTab("roles")} className="px-4 py-2.5 rounded-xl text-xs font-bold transition min-h-[40px]"
+            style={{ background: tab === "roles" ? "#C9A84C" : "var(--bg)", color: tab === "roles" ? "#fff" : "var(--muted)", border: `1px solid ${tab === "roles" ? "#C9A84C" : "var(--card-border)"}` }}>
+            ◎ الأدوار ({roleItems.length})
           </button>
           <button onClick={() => setTab("manual")} className="px-4 py-2.5 rounded-xl text-xs font-bold transition min-h-[40px]"
             style={{ background: tab === "manual" ? "#5E5495" : "var(--bg)", color: tab === "manual" ? "#fff" : "var(--muted)", border: `1px solid ${tab === "manual" ? "#5E5495" : "var(--card-border)"}` }}>
@@ -369,13 +404,50 @@ export default function WarRoomIndexPage() {
           </>)}
         </>)}
 
+        {/* Roles tab */}
+        {!loading && tab === "roles" && (<>
+          {roleItems.length === 0 ? (
+            <div className="text-center py-16">
+              <p className="text-4xl mb-3">◎</p>
+              <p className="font-bold" style={{ color: "var(--text)" }}>لا توجد أدوار حياتية</p>
+              <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>أضف أدوار من صفحة "أدوار الحياة"</p>
+              <Link href="/circles" className="inline-block mt-4 px-6 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, #C9A84C, #5E5495)" }}>الذهاب للأدوار</Link>
+            </div>
+          ) : (<>
+            {roleItems.map((item, idx) => renderCard(item, idx))}
+          </>)}
+        </>)}
+
         {/* Manual tab */}
         {!loading && tab === "manual" && (<>
-          {manualRoles.length === 0 ? (
-            <div className="text-center py-16">
+          {/* Add manual role button */}
+          {!showAddManual ? (
+            <button onClick={() => setShowAddManual(true)}
+              className="w-full py-3 rounded-xl text-sm font-bold transition border-2 border-dashed hover:bg-[#5E5495]/5"
+              style={{ borderColor: "#5E549540", color: "#5E5495" }}>
+              + إضافة غرفة قيادة يدوية
+            </button>
+          ) : (
+            <div className="rounded-xl border p-4 space-y-2" style={{ background: "var(--card)", borderColor: "#5E549530" }}>
+              <input value={newManual.title} onChange={e => setNewManual({ ...newManual, title: e.target.value })}
+                placeholder="عنوان الغرفة *" className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none"
+                style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} autoFocus
+                onKeyDown={e => { if (e.key === "Enter") addManualRole(); }} />
+              <input value={newManual.org} onChange={e => setNewManual({ ...newManual, org: e.target.value })}
+                placeholder="المؤسسة / الجهة (اختياري)" className="w-full px-3 py-2 rounded-lg border text-xs focus:outline-none"
+                style={{ background: "var(--bg)", borderColor: "var(--card-border)", color: "var(--text)" }} />
+              <div className="flex gap-2">
+                <button onClick={addManualRole} disabled={!newManual.title.trim()} className="px-5 py-2 rounded-lg text-xs font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>إضافة</button>
+                <button onClick={() => { setShowAddManual(false); setNewManual({ title: "", org: "" }); }} className="px-3 py-2 rounded-lg text-xs" style={{ color: "var(--muted)" }}>إلغاء</button>
+              </div>
+            </div>
+          )}
+
+          {manualRoles.length === 0 && !showAddManual ? (
+            <div className="text-center py-12">
               <p className="text-4xl mb-3">🎯</p>
               <p className="font-bold" style={{ color: "var(--text)" }}>لا توجد غرف قيادة يدوية</p>
-              <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>أنشئ غرفة قيادة يدوية من داخل أي عمل أو وظيفة</p>
+              <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>أضف غرفة قيادة يدوية من الزر أعلاه</p>
             </div>
           ) : manualRoles.filter(r => pulseFilter === "all" || getPulse(r.pulseStatus) === pulseFilter).map((r, idx) => {
             const pulse = PULSE[r.pulseStatus] ?? PULSE.green;
