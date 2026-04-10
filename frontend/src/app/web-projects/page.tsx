@@ -154,15 +154,9 @@ export default function WebProjectsPage() {
           const currentPhaseNum = [1,2,3,4,5].find(n => !completedSet.includes(n)) ?? 5;
           const currentPhaseName = PHASES[currentPhaseNum - 1] ?? "";
           const currentPhaseIcon = PHASE_ICONS[currentPhaseNum - 1] ?? "📋";
-          // Counters from localStorage
-          let p1Tasks = 0, p3Cmds = 0, p5Cmds = 0, p6Reqs = 0, p7Users = 0;
+          // Counters now stored in API — shown in detail page
+          const p1Tasks = 0, p3Cmds = 0, p5Cmds = 0, p6Reqs = 0, p7Users = 0;
           let siteUrl = "";
-          try { siteUrl = JSON.parse(localStorage.getItem("wp_hosting_" + p.id) ?? "{}")?.launch?.url ?? ""; } catch {}
-          try { p1Tasks = JSON.parse(localStorage.getItem("wp_p1tasks_" + p.id) ?? "[]").length; } catch {}
-          try { p3Cmds = JSON.parse(localStorage.getItem("wp_p3_" + p.id) ?? "[]").length; } catch {}
-          try { p5Cmds = JSON.parse(localStorage.getItem("wp_p5_" + p.id) ?? "[]").length; } catch {}
-          try { p6Reqs = JSON.parse(localStorage.getItem("wp_p6_" + p.id) ?? "[]").length; } catch {}
-          try { p7Users = JSON.parse(localStorage.getItem("wp_p7_" + p.id) ?? "[]").length; } catch {}
           const isOverdue = p.dueDate && new Date(p.dueDate) < new Date() && completedCount < 7;
           return (
             <div key={p.id} className="rounded-2xl border overflow-hidden transition-all hover:shadow-lg" style={{ background: "var(--card)", borderColor: isOverdue ? "#DC262640" : "var(--card-border)" }}>

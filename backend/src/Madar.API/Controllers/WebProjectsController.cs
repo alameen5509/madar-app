@@ -367,6 +367,27 @@ public class WebProjectsController : ControllerBase
 
     // ═══ HELPERS ═══
     static string NewId() => Guid.NewGuid().ToString();
+    // ═══ GENERIC KEY-VALUE STORE (replaces localStorage) ═══
+
+    [HttpGet("{id}/kv/{key}")]
+    public async Task<IActionResult> GetKV(string id, string key, CancellationToken ct)
+    {
+        // Ensure table exists
+        try { await E("CREATE TABLE IF NOT EXISTS WebProjectKV (ProjectId VARCHAR(36) NOT NULL, `Key` VARCHAR(100) NOT NULL, Value LONGTEXT, UpdatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), PRIMARY KEY (ProjectId, `Key`))", [], ct); } catch {}
+        var rows = await Q("SELECT Value FROM WebProjectKV WHERE ProjectId=@pid AND `Key`=@k LIMIT 1", [P("@pid", id), P("@k", key)], ct);
+        if (rows.Count == 0) return Ok(new { value = (string?)null });
+        return Ok(new { value = rows[0]["value"]?.ToString() });
+    }
+
+    [HttpPut("{id}/kv/{key}")]
+    public async Task<IActionResult> SetKV(string id, string key, [FromBody] KVReq req, CancellationToken ct)
+    {
+        try { await E("CREATE TABLE IF NOT EXISTS WebProjectKV (ProjectId VARCHAR(36) NOT NULL, `Key` VARCHAR(100) NOT NULL, Value LONGTEXT, UpdatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), PRIMARY KEY (ProjectId, `Key`))", [], ct); } catch {}
+        await E("REPLACE INTO WebProjectKV (ProjectId, `Key`, Value, UpdatedAt) VALUES(@pid, @k, @v, NOW())",
+            [P("@pid", id), P("@k", key), P("@v", req.Value)], ct);
+        return Ok(new { success = true });
+    }
+
     static MySqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);
     static List<MySqlParameter> Ps(string n, object? v) => [P(n, v)];
 
@@ -395,3 +416,4 @@ public class CmdReq { public string? Title{get;set;} public string? Command{get;
 public class CredReq { public string? Type{get;set;} public string? Label{get;set;} public string? Value{get;set;} }
 public class ClientReqReq { public string? Title{get;set;} public string? Description{get;set;} public string? ClientNote{get;set;} public string? OwnerNote{get;set;} public string? Status{get;set;} }
 public class WpNoteReq { public string? Notes{get;set;} }
+public class KVReq { public string? Value{get;set;} }

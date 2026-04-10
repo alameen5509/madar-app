@@ -18,16 +18,21 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
   const [showEdit, setShowEdit] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [userRole, setUserRole] = useState<string>("owner");
-  const [completedPhases, setCompletedPhases] = useState<Set<number>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("wp_completed_" + id) ?? "[]")); } catch { return new Set(); }
-  });
+  const [completedPhases, setCompletedPhases] = useState<Set<number>>(new Set());
+
+  // Load completed phases from API
+  useEffect(() => {
+    api.get(`/api/web-projects/${id}/kv/completed_phases`).then(({ data: r }) => {
+      if (r?.value) try { setCompletedPhases(new Set(JSON.parse(r.value))); } catch {}
+    }).catch(() => {});
+  }, [id]);
 
   function togglePhaseComplete(n: number) {
     setCompletedPhases(prev => {
       const s = new Set(prev);
       const wasComplete = s.has(n);
       wasComplete ? s.delete(n) : s.add(n);
-      localStorage.setItem("wp_completed_" + id, JSON.stringify([...s]));
+      api.put(`/api/web-projects/${id}/kv/completed_phases`, { value: JSON.stringify([...s]) }).catch(() => {});
       // Auto-advance to next phase if completing
       if (!wasComplete) {
         const nextPhase = PHASES.find(p => p.n > n && !s.has(p.n));
@@ -448,12 +453,21 @@ function Phase3({ projectId }: { projectId: string }) {
 // ═══ PHASE 4: Credentials ═══
 // ═══ PHASE 4: Hosting (6 steps) ═══
 function Phase4({ projectId }: { projectId: string }) {
-  const lk = "wp_hosting_" + projectId;
   interface HostingData { hosting: { provider: string; user: string; pass: string; panel: string; done: boolean }; domain: { name: string; registrar: string; dns: string; done: boolean }; ssl: { type: string; done: boolean }; db: { host: string; name: string; user: string; pass: string; done: boolean }; connect: { notes: string; done: boolean }; launch: { url: string; done: boolean } }
   const empty: HostingData = { hosting: { provider: "", user: "", pass: "", panel: "", done: false }, domain: { name: "", registrar: "", dns: "", done: false }, ssl: { type: "Let's Encrypt", done: false }, db: { host: "", name: "", user: "", pass: "", done: false }, connect: { notes: "", done: false }, launch: { url: "", done: false } };
-  const [data, setData] = useState<HostingData>(() => { try { return { ...empty, ...JSON.parse(localStorage.getItem(lk) ?? "null") }; } catch { return empty; } });
+  const [data, setData] = useState<HostingData>(empty);
   const [vis, setVis] = useState<Set<string>>(new Set());
-  function save(d: HostingData) { setData(d); localStorage.setItem(lk, JSON.stringify(d)); }
+
+  useEffect(() => {
+    api.get(`/api/web-projects/${projectId}/kv/hosting`).then(({ data: r }) => {
+      if (r?.value) try { setData({ ...empty, ...JSON.parse(r.value) }); } catch {}
+    }).catch(() => {});
+  }, [projectId]);
+
+  function save(d: HostingData) {
+    setData(d);
+    api.put(`/api/web-projects/${projectId}/kv/hosting`, { value: JSON.stringify(d) }).catch(() => {});
+  }
   function toggleVis(k: string) { setVis(prev => { const s = new Set(prev); s.has(k) ? s.delete(k) : s.add(k); return s; }); }
   function copy(v: string) { navigator.clipboard.writeText(v); }
 
@@ -606,13 +620,22 @@ function Phase6({ projectId }: { projectId: string }) {
 
 // ═══ PHASE 7: Users / Accounts ═══
 function Phase7({ projectId }: { projectId: string }) {
-  const lk7 = "wp_p7_" + projectId;
   interface UserAccount { id: string; label: string; email: string; password: string; phone?: string; notes?: string }
-  const [accounts, setAccounts] = useState<UserAccount[]>(() => { try { return JSON.parse(localStorage.getItem(lk7) ?? "[]"); } catch { return []; } });
+  const [accounts, setAccounts] = useState<UserAccount[]>([]);
   const [showNew, setShowNew] = useState(false);
   const [na, setNa] = useState({ label: "", email: "", password: "", phone: "", notes: "" });
   const [visible, setVisible] = useState<Set<string>>(new Set());
-  function save(a: UserAccount[]) { setAccounts(a); localStorage.setItem(lk7, JSON.stringify(a)); }
+
+  useEffect(() => {
+    api.get(`/api/web-projects/${projectId}/kv/accounts`).then(({ data: r }) => {
+      if (r?.value) try { setAccounts(JSON.parse(r.value)); } catch {}
+    }).catch(() => {});
+  }, [projectId]);
+
+  function save(a: UserAccount[]) {
+    setAccounts(a);
+    api.put(`/api/web-projects/${projectId}/kv/accounts`, { value: JSON.stringify(a) }).catch(() => {});
+  }
   function add() { if (!na.email.trim() || !na.password.trim()) return; save([...accounts, { id: "u_" + Date.now(), label: na.label.trim() || "مستخدم", email: na.email.trim(), password: na.password, phone: na.phone.trim() || undefined, notes: na.notes || undefined }]); setNa({ label: "", email: "", password: "", phone: "", notes: "" }); setShowNew(false); }
   function del(uid: string) { if (confirm("حذف؟")) save(accounts.filter(a => a.id !== uid)); }
 
