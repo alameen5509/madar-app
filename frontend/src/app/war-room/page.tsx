@@ -33,7 +33,8 @@ function WorkSession({ items, onClose, onUpdate }: { items: SessionItem[]; onClo
   const [durations, setDurations] = useState<Record<string, number>>(() => {
     const saved: Record<string, number> = {};
     try { Object.assign(saved, JSON.parse(localStorage.getItem("madar_session_durations") ?? "{}")); } catch {}
-    for (const it of items) if (!saved[it.id]) saved[it.id] = it.duration ?? 10;
+    const defaultByPulse: Record<string, number> = { red: 15, blue: 15, yellow: 7, green: 3 };
+    for (const it of items) if (!saved[it.id]) saved[it.id] = defaultByPulse[it.pulse] ?? 10;
     return saved;
   });
   const [idx, setIdx] = useState(0);
