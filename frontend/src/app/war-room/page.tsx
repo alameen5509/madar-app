@@ -235,6 +235,8 @@ export default function WarRoomIndexPage() {
   // Manual roles (not linked to any work)
   const manualRoles = roles.filter(r => !r.isAuto && !r.workId && !r.id.startsWith("auto-"));
 
+  const getPulse = (s?: string) => s === "red" || s === "yellow" || s === "green" || s === "blue" ? s : "green";
+
   // Sort all items by pulse: red → yellow → blue → green
   const pulseOrder: Record<string, number> = { red: 0, yellow: 1, blue: 2, green: 3 };
   workItems.sort((a, b) => (pulseOrder[getPulse(a.role?.pulseStatus)] ?? 3) - (pulseOrder[getPulse(b.role?.pulseStatus)] ?? 3));
@@ -244,7 +246,6 @@ export default function WarRoomIndexPage() {
   // Pulse counts — exclude hidden items
   const visibleWorkItems = allItems.filter(i => !hiddenIds.has(i.id));
   const visibleManual = manualRoles;
-  const getPulse = (s?: string) => s === "red" || s === "yellow" || s === "green" || s === "blue" ? s : "green";
   const countPulse = (p: string) => visibleWorkItems.filter(i => getPulse(i.role?.pulseStatus) === p).length + visibleManual.filter(r => getPulse(r.pulseStatus) === p).length;
   const redCount = countPulse("red");
   const yellowCount = countPulse("yellow");
