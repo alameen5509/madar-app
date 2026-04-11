@@ -37,10 +37,15 @@ export default function FocusPage() {
       const nowTime = new Date();
       const completed = all.filter(t => t.status === "Completed").length;
       const cancelled = all.filter(t => t.status === "Cancelled").length;
-      // Filter: pending, hide postponed-by-hours, apply session context
+      // Filter: overdue + today + no date only (not future), hide hour-postponed, apply session
+      const todayStr = localDateStr();
       const pending = all.filter(t => {
         if (t.status === "Completed" || t.status === "Cancelled") return false;
+        // Only show: overdue, today, or no date — exclude future dates
         if (t.dueDate) {
+          const ds = t.dueDate.slice(0, 10);
+          if (ds > todayStr) return false; // future date — skip
+          // Hide hour-postponed tasks (today with specific future time)
           const due = new Date(t.dueDate);
           const h = due.getUTCHours(), m = due.getUTCMinutes();
           if ((h !== 0 || m !== 0) && due > nowTime) return false;
