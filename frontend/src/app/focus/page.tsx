@@ -56,7 +56,7 @@ export default function FocusPage() {
           const ctxMap: Record<string, string[]> = {
             office: ["Office", "Computer", "Anywhere"],
             outside: ["Outside", "Phone", "Anywhere"],
-            haram: ["Anywhere"],
+            haram: ["Haram", "Anywhere"],
           };
           if (!ctxMap[sessionCtx]?.includes(ctx)) return false;
         }
@@ -406,6 +406,7 @@ export default function FocusPage() {
                     Computer: { label: "حاسوب", icon: "🖥️", color: "#5E5495" },
                     Home: { label: "منزلي", icon: "🏠", color: "#D4AF37" },
                     Outside: { label: "خارجي", icon: "🚶", color: "#3D8C5A" },
+                    Haram: { label: "الحرم", icon: "🕌", color: "#2C8C4A" },
                     Phone: { label: "جوال", icon: "📱", color: "#F59E0B" },
                     Anywhere: { label: "أي مكان", icon: "📋", color: "#9CA3AF" },
                   };
@@ -418,6 +419,7 @@ export default function FocusPage() {
                 {[
                   { key: "Office", icon: "💻" },
                   { key: "Outside", icon: "🚶" },
+                  { key: "Haram", icon: "🕌" },
                   { key: "Anywhere", icon: "📋" },
                 ].map(c => {
                   const current = (task.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
