@@ -26,6 +26,8 @@ export default function FocusPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editDate, setEditDate] = useState("");
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [pickTime, setPickTime] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,7 +97,9 @@ export default function FocusPage() {
     if (!t) return;
     const d = new Date();
     d.setHours(d.getHours() + hours);
+    const timeStr = `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
     try { await api.post(`/api/tasks/${t.id}/update`, { dueDate: d.toISOString() }); } catch {}
+    alert(`⏰ المهمة مؤجلة حتى ${timeStr}`);
     removeCurrentTask();
   }
 
@@ -153,6 +157,21 @@ export default function FocusPage() {
       setTasks(prev => prev.map((tk, i) => i === idx ? { ...tk, title: editTitle.trim(), description: editDesc.trim() || tk.description, dueDate: editDate || tk.dueDate } : tk));
     } catch { alert("فشل التعديل"); }
     setShowEdit(false);
+  }
+
+  async function setTaskTime() {
+    const t = tasks[idx];
+    if (!t || !pickTime) return;
+    const [h, m] = pickTime.split(":").map(Number);
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    // If time is past today, set for tomorrow
+    if (d < new Date()) d.setDate(d.getDate() + 1);
+    try {
+      await api.post(`/api/tasks/${t.id}/update`, { dueDate: d.toISOString() });
+      setTasks(prev => prev.map((tk, i) => i === idx ? { ...tk, dueDate: d.toISOString() } : tk));
+    } catch {}
+    setShowTimePicker(false); setPickTime("");
   }
 
   function openEdit() {
@@ -298,9 +317,18 @@ export default function FocusPage() {
           </div>
         ) : (
           <div className="w-full max-w-md rounded-3xl border-2 shadow-xl overflow-hidden" style={{ background: "var(--card)", borderColor: dl.color + "40" }}>
-            {/* Date badge */}
+            {/* Date + Time badge */}
             <div className="px-6 py-3 text-center" style={{ background: dl.color + "10" }}>
               <span className="text-sm font-black" style={{ color: dl.color }}>{dl.text}</span>
+              {task.dueDate && (() => {
+                const due = new Date(task.dueDate);
+                const h = due.getUTCHours(), m = due.getUTCMinutes();
+                if (h !== 0 || m !== 0) {
+                  const localDue = new Date(task.dueDate);
+                  return <span className="text-xs font-bold mr-2" style={{ color: dl.color }}> ⏰ {localDue.getHours().toString().padStart(2,"0")}:{localDue.getMinutes().toString().padStart(2,"0")}</span>;
+                }
+                return null;
+              })()}
             </div>
 
             <div className="p-6 space-y-4">
@@ -386,10 +414,23 @@ export default function FocusPage() {
                 <button onClick={skipToAfterNext} className="py-2.5 rounded-xl text-[11px] font-bold transition active:scale-95" style={{ background: "#D4AF3710", color: "#D4AF37", border: "1px solid #D4AF3730" }}>بعد التالية</button>
                 <button onClick={skip} className="py-2.5 rounded-xl text-[11px] font-bold transition active:scale-95" style={{ background: "var(--bg)", color: "var(--muted)", border: "1px solid var(--card-border)" }}>تخطي →</button>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
+                <button onClick={() => setShowTimePicker(!showTimePicker)} className="py-2.5 rounded-xl text-[11px] font-bold transition active:scale-95" style={{ background: "#3B82F610", color: "#3B82F6", border: "1px solid #3B82F630" }}>⏰ وقت</button>
                 <button onClick={openEdit} className="py-2.5 rounded-xl text-[11px] font-bold transition active:scale-95" style={{ background: "#5E549510", color: "#5E5495", border: "1px solid #5E549530" }}>✏️ تعديل</button>
                 <button onClick={deleteTask} className="py-2.5 rounded-xl text-[11px] font-bold transition active:scale-95" style={{ background: "#DC262610", color: "#DC2626", border: "1px solid #DC262630" }}>حذف 🗑️</button>
               </div>
+
+              {/* Time picker */}
+              {showTimePicker && (
+                <div className="rounded-xl border p-3 flex items-center gap-2" style={{ background: "var(--bg)", borderColor: "#3B82F630" }}>
+                  <span className="text-xs font-bold" style={{ color: "#3B82F6" }}>⏰</span>
+                  <input type="time" value={pickTime} onChange={e => setPickTime(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-lg border text-sm focus:outline-none"
+                    style={{ background: "var(--card)", borderColor: "var(--card-border)", color: "var(--text)" }} />
+                  <button onClick={setTaskTime} disabled={!pickTime} className="px-4 py-2 rounded-lg text-xs font-bold text-white disabled:opacity-40" style={{ background: "#3B82F6" }}>تعيين</button>
+                  <button onClick={() => { setShowTimePicker(false); setPickTime(""); }} className="text-xs" style={{ color: "var(--muted)" }}>✕</button>
+                </div>
+              )}
 
               {/* Edit form */}
               {showEdit && (
