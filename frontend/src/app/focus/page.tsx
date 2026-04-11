@@ -199,7 +199,7 @@ export default function FocusPage() {
     d.setHours(d.getHours() + hours);
     const timeStr = `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
     try { await api.post(`/api/tasks/${t.id}/update`, { dueDate: d.toISOString() }); } catch {}
-    alert(`⏰ المهمة مؤجلة حتى ${timeStr}`);
+    // No confirmation — instant action
     removeCurrentTask();
   }
 
@@ -241,7 +241,6 @@ export default function FocusPage() {
       return [frogTask, ...rest];
     });
     setIdx(0);
-    alert("🐸 تم تحويلها لمهمة ضفدع — أولوية قصوى ونبض حرج!");
   }
 
 
