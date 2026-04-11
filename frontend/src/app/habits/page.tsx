@@ -270,7 +270,7 @@ const PENALTY_TYPES = [
 const SUNNAH_PRAYERS = [
   { key: "SunnahFajr",   label: "ركعتا الفجر",   icon: "🌅", desc: "ركعتان قبل الفجر", startPrayer: "Fajr", endPrayer: "Fajr", yesMsg: "«ركعتا الفجر خير من الدنيا وما فيها» — مسلم", noMsg: "لا تفوّت أجراً خيراً من الدنيا وما فيها" },
   { key: "Duha",         label: "صلاة الضحى",     icon: "☀️", desc: "٢-٨ ركعات بعد الشروق", startPrayer: "shuruq", endPrayer: "Dhuhr", yesMsg: "«يُصبح على كل سُلامى من أحدكم صدقة، وكل تسبيحة صدقة، ويُجزئ من ذلك ركعتا الضحى» — مسلم", noMsg: "ركعتا الضحى تُجزئ عن 360 صدقة!" },
-  { key: "Rawatib",      label: "السنن الرواتب",   icon: "📿", desc: "١٢ ركعة يومياً", startPrayer: "Fajr", endPrayer: "Isha", yesMsg: "«من صلى ١٢ ركعة في يومه بُني له بيت في الجنة» — مسلم", noMsg: "١٢ ركعة = بيت في الجنة كل يوم!" },
+  { key: "Rawatib",      label: "السنن الرواتب",   icon: "📿", desc: "١٢ ركعة يومياً", startPrayer: "Isha", endPrayer: "Isha", yesMsg: "«من صلى ١٢ ركعة في يومه بُني له بيت في الجنة» — مسلم", noMsg: "١٢ ركعة = بيت في الجنة كل يوم!" },
   { key: "Witr",         label: "صلاة الوتر",     icon: "🌙", desc: "ركعة أو أكثر بعد العشاء", startPrayer: "Isha", endPrayer: null, yesMsg: "«اجعلوا آخر صلاتكم بالليل وتراً» — متفق عليه", noMsg: "الوتر سُنة مؤكدة لا ينبغي تركها" },
 ] as const;
 
