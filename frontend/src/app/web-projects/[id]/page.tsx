@@ -152,21 +152,10 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
           const hostingBlocked = phase === 3 && !kvHostingUrl;
           return (
             <div className="mt-6 space-y-3">
-              {/* Ask for site URL when completing hosting phase */}
-              {phase === 3 && !completedPhases.has(3) && !hostingData?.launch?.url && (
-                <div className="rounded-xl p-4" style={{ background: "#F59E0B08", border: "1px solid #F59E0B30" }}>
-                  <p className="text-xs font-bold mb-2" style={{ color: "#F59E0B" }}>🌐 أدخل رابط الموقع النهائي لإكمال مرحلة الاستضافة</p>
-                  <input placeholder="https://example.com" dir="ltr" className="w-full px-3 py-3 rounded-xl border text-sm font-mono focus:outline-none" style={is}
-                    onChange={e => {
-                      const d = { ...hostingData, launch: { ...(hostingData?.launch ?? {}), url: e.target.value } };
-                      localStorage.setItem("wp_hosting_" + id, JSON.stringify(d));
-                    }} />
-                </div>
-              )}
               {/* Show site link if exists */}
-              {hostingData?.launch?.url && (
-                <a href={hostingData.launch.url} target="_blank" className="flex items-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition hover:opacity-90" style={{ background: "#2D6B9E15", color: "#2D6B9E", border: "1px solid #2D6B9E30" }}>
-                  🌐 زيارة الموقع: <span className="font-mono text-xs flex-1 truncate" dir="ltr">{hostingData.launch.url}</span> ←
+              {kvHostingUrl && (
+                <a href={kvHostingUrl} target="_blank" className="flex items-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition hover:opacity-90" style={{ background: "#2D6B9E15", color: "#2D6B9E", border: "1px solid #2D6B9E30" }}>
+                  🌐 زيارة الموقع: <span className="font-mono text-xs flex-1 truncate" dir="ltr">{kvHostingUrl}</span> ←
                 </a>
               )}
               <div className="flex flex-col sm:flex-row gap-2">
