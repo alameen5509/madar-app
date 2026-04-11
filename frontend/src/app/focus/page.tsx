@@ -22,6 +22,10 @@ export default function FocusPage() {
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerSecs, setTimerSecs] = useState(0);
   const [stats, setStats] = useState({ total: 0, completed: 0, cancelled: 0 });
+  const [showEdit, setShowEdit] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editDate, setEditDate] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -125,6 +129,29 @@ export default function FocusPage() {
       }
     } catch { alert("فشل الإضافة"); }
     setUrgentTitle(""); setShowUrgent(false);
+  }
+
+  async function saveEdit() {
+    const t = tasks[idx];
+    if (!t || !editTitle.trim()) return;
+    try {
+      await api.post(`/api/tasks/${t.id}/update`, {
+        title: editTitle.trim(),
+        description: editDesc.trim() || undefined,
+        dueDate: editDate || undefined,
+      });
+      setTasks(prev => prev.map((tk, i) => i === idx ? { ...tk, title: editTitle.trim(), description: editDesc.trim() || tk.description, dueDate: editDate || tk.dueDate } : tk));
+    } catch { alert("فشل التعديل"); }
+    setShowEdit(false);
+  }
+
+  function openEdit() {
+    const t = tasks[idx];
+    if (!t) return;
+    setEditTitle(t.title);
+    setEditDesc(t.description ?? "");
+    setEditDate(t.dueDate?.slice(0, 10) ?? "");
+    setShowEdit(true);
   }
 
   function skip() {
@@ -338,9 +365,30 @@ export default function FocusPage() {
                 <button onClick={skipToAfterNext} className="py-2.5 rounded-xl text-[11px] font-bold transition active:scale-95" style={{ background: "#D4AF3710", color: "#D4AF37", border: "1px solid #D4AF3730" }}>بعد التالية</button>
                 <button onClick={skip} className="py-2.5 rounded-xl text-[11px] font-bold transition active:scale-95" style={{ background: "var(--bg)", color: "var(--muted)", border: "1px solid var(--card-border)" }}>تخطي →</button>
               </div>
-              <div className="grid grid-cols-1">
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={openEdit} className="py-2.5 rounded-xl text-[11px] font-bold transition active:scale-95" style={{ background: "#5E549510", color: "#5E5495", border: "1px solid #5E549530" }}>✏️ تعديل</button>
                 <button onClick={deleteTask} className="py-2.5 rounded-xl text-[11px] font-bold transition active:scale-95" style={{ background: "#DC262610", color: "#DC2626", border: "1px solid #DC262630" }}>حذف 🗑️</button>
               </div>
+
+              {/* Edit form */}
+              {showEdit && (
+                <div className="rounded-xl border p-4 space-y-2" style={{ background: "var(--bg)", borderColor: "#5E549530" }}>
+                  <p className="text-xs font-bold" style={{ color: "#5E5495" }}>✏️ تعديل المهمة</p>
+                  <input value={editTitle} onChange={e => setEditTitle(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none"
+                    style={{ background: "var(--card)", borderColor: "var(--card-border)", color: "var(--text)" }} />
+                  <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={2} placeholder="وصف (اختياري)"
+                    className="w-full px-3 py-2 rounded-lg border text-xs resize-none focus:outline-none"
+                    style={{ background: "var(--card)", borderColor: "var(--card-border)", color: "var(--text)" }} />
+                  <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border text-xs focus:outline-none"
+                    style={{ background: "var(--card)", borderColor: "var(--card-border)", color: "var(--text)" }} />
+                  <div className="flex gap-2">
+                    <button onClick={saveEdit} className="px-4 py-2 rounded-lg text-xs font-bold text-white" style={{ background: "#5E5495" }}>حفظ</button>
+                    <button onClick={() => setShowEdit(false)} className="px-3 py-2 rounded-lg text-xs" style={{ color: "var(--muted)" }}>إلغاء</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
