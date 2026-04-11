@@ -377,6 +377,7 @@ export default function FocusPage() {
           <div className="w-full max-w-md rounded-3xl border-2 shadow-xl overflow-hidden" style={{ background: "var(--card)", borderColor: dl.color + "40" }}>
             {/* Date + Time badge */}
             <div className="px-6 py-3 text-center" style={{ background: dl.color + "10" }}>
+              <span className="text-[10px] font-bold ml-2" style={{ color: dl.color + "80" }}>{idx + 1}/{tasks.length}</span>
               <span className="text-sm font-black" style={{ color: dl.color }}>{dl.text}</span>
               {task.dueDate && (() => {
                 const due = new Date(task.dueDate);
