@@ -394,11 +394,44 @@ export default function FocusPage() {
                 <p className="text-xs text-center leading-relaxed" style={{ color: "var(--muted)" }}>{task.description}</p>
               )}
 
-              {/* Priority */}
-              <div className="flex items-center justify-center">
+              {/* Priority + Task context */}
+              <div className="flex items-center justify-center gap-2 flex-wrap">
                 <span className="text-[10px] px-2.5 py-1 rounded-full font-semibold" style={{ background: priorityColor + "15", color: priorityColor }}>
                   {priorityLabel}
                 </span>
+                {(() => {
+                  const ctx = (task.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
+                  const ctxLabels: Record<string, { label: string; icon: string; color: string }> = {
+                    Office: { label: "مكتبي", icon: "💻", color: "#2D6B9E" },
+                    Computer: { label: "حاسوب", icon: "🖥️", color: "#5E5495" },
+                    Home: { label: "منزلي", icon: "🏠", color: "#D4AF37" },
+                    Outside: { label: "خارجي", icon: "🚶", color: "#3D8C5A" },
+                    Phone: { label: "جوال", icon: "📱", color: "#F59E0B" },
+                    Anywhere: { label: "أي مكان", icon: "📋", color: "#9CA3AF" },
+                  };
+                  const c = ctxLabels[ctx] ?? ctxLabels.Anywhere;
+                  return <span className="text-[10px] px-2.5 py-1 rounded-full font-semibold" style={{ background: c.color + "15", color: c.color }}>{c.icon} {c.label}</span>;
+                })()}
+              </div>
+              {/* Change task context */}
+              <div className="flex items-center justify-center gap-1">
+                {[
+                  { key: "Office", icon: "💻" },
+                  { key: "Outside", icon: "🚶" },
+                  { key: "Anywhere", icon: "📋" },
+                ].map(c => {
+                  const current = (task.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
+                  return (
+                    <button key={c.key} onClick={async () => {
+                      try { await api.post(`/api/tasks/${task.id}/update`, { taskContext: c.key }); } catch {}
+                      setTasks(prev => prev.map((t, i) => i === idx ? { ...t, contextNote: (t.contextNote ?? "").replace(/ctx:\w+/, "") + `|ctx:${c.key}` } : t));
+                    }}
+                      className="px-2 py-1 rounded-lg text-[9px] font-bold transition"
+                      style={{ background: current === c.key ? "#5E549515" : "transparent", color: current === c.key ? "#5E5495" : "var(--muted)" }}>
+                      {c.icon}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
