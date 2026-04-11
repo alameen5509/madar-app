@@ -439,7 +439,8 @@ export default function FocusPage() {
                   return (
                     <button key={c.key} onClick={async () => {
                       try { await api.post(`/api/tasks/${task.id}/update`, { taskContext: c.key }); } catch {}
-                      setTasks(prev => prev.map((t, i) => i === idx ? { ...t, contextNote: (t.contextNote ?? "").replace(/ctx:\w+/, "") + `|ctx:${c.key}` } : t));
+                      // Reload to re-apply session filter
+                      load();
                     }}
                       className="px-3 py-2 rounded-xl text-[10px] font-bold transition"
                       style={{ background: current === c.key ? "#5E5495" : "var(--bg)", color: current === c.key ? "#fff" : "var(--muted)", border: `1px solid ${current === c.key ? "#5E5495" : "var(--card-border)"}` }}>
