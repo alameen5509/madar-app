@@ -21,7 +21,7 @@ export default function FocusPage() {
   const [newPriority, setNewPriority] = useState(3);
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerSecs, setTimerSecs] = useState(0);
-  const [postponedIds, setPostponedIds] = useState<Set<string>>(new Set());
+  const [stats, setStats] = useState({ total: 0, completed: 0, cancelled: 0 });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -29,7 +29,10 @@ export default function FocusPage() {
       const { data } = await api.get("/api/tasks");
       const all = (data ?? []) as SmartTask[];
       // Filter: pending only, no inbox, no cancelled
+      const completed = all.filter(t => t.status === "Completed").length;
+      const cancelled = all.filter(t => t.status === "Cancelled").length;
       const pending = all.filter(t => t.status !== "Completed" && t.status !== "Inbox" && t.status !== "Cancelled");
+      setStats({ total: all.length, completed, cancelled });
       // Sort: overdue first → today → tomorrow → future → no date last
       pending.sort((a, b) => {
         const da = a.dueDate?.slice(0, 10) ?? "9999";
@@ -188,7 +191,11 @@ export default function FocusPage() {
       <header className="px-6 py-4 pr-14 md:pr-6 border-b flex items-center justify-between" style={{ borderColor: "var(--card-border)" }}>
         <div>
           <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>🎯 التركيز</h2>
-          <p className="text-[10px]" style={{ color: "var(--muted)" }}>{idx + 1} من {tasks.length} مهمة</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-[10px]" style={{ color: "var(--muted)" }}>{idx + 1} من {tasks.length} نشطة</span>
+            {stats.completed > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>✅ {stats.completed} مكتملة</span>}
+            {stats.cancelled > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "#DC262615", color: "#DC2626" }}>🗑 {stats.cancelled} ملغاة</span>}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => { setShowAddTask(!showAddTask); setShowUrgent(false); }} className="px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{ background: "#5E549515", color: "#5E5495" }}>+ مهمة</button>
