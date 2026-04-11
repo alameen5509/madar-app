@@ -260,6 +260,37 @@ public class TasksController : BaseController
         return Ok(withRoots);
     }
 
+    /// <summary>Debug: show unlinked tasks with their raw IDs</summary>
+    [HttpGet("debug-unlinked")]
+    public async Task<IActionResult> DebugUnlinked(CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tasks = await _db.SmartTasks
+            .Where(t => t.OwnerId == userId && t.Status != Madar.Domain.Enums.TaskStatus.Cancelled && t.ParentTaskId == null)
+            .Select(t => new { t.Id, t.Title, t.LifeCircleId, t.GoalId, hasCircle = t.LifeCircle != null, circleName = t.LifeCircle != null ? t.LifeCircle.Name : null })
+            .ToListAsync(ct);
+
+        // Check which have JobGoalTasks or RoleGoalTasks
+        var allIds = tasks.Select(t => t.Id).ToList();
+        var jobLinked = new HashSet<Guid>(await _db.JobGoalTasks.Where(j => allIds.Contains(j.TaskId)).Select(j => j.TaskId).ToListAsync(ct));
+        var roleLinked = new HashSet<Guid>(await _db.RoleGoalTasks.Where(r => allIds.Contains(r.TaskId)).Select(r => r.TaskId).ToListAsync(ct));
+
+        var unlinked = tasks.Where(t => !jobLinked.Contains(t.Id) && !roleLinked.Contains(t.Id) && !t.hasCircle && t.GoalId == null && t.LifeCircleId == null).ToList();
+        var hasCircleIdOnly = tasks.Where(t => !jobLinked.Contains(t.Id) && !roleLinked.Contains(t.Id) && t.LifeCircleId != null && !t.hasCircle).ToList();
+
+        return Ok(new
+        {
+            total = tasks.Count,
+            withJobGoal = jobLinked.Count,
+            withRoleGoal = roleLinked.Count,
+            withCircleNav = tasks.Count(t => t.hasCircle),
+            withCircleIdOnly = hasCircleIdOnly.Count,
+            trulyUnlinked = unlinked.Count,
+            sampleUnlinked = unlinked.Take(5).Select(t => new { t.Id, t.Title, t.LifeCircleId, t.GoalId }),
+            sampleCircleIdOnly = hasCircleIdOnly.Take(5).Select(t => new { t.Id, t.Title, t.LifeCircleId, t.GoalId }),
+        });
+    }
+
     /// <summary>إنشاء مهمة جديدة</summary>
     [HttpPost]
     public async Task<IActionResult> CreateTask(

@@ -271,14 +271,26 @@ export default function FocusPage() {
     </main>
   );
 
-  if (tasks.length === 0) return (
-    <main className="flex-1 flex flex-col items-center justify-center gap-4 px-6" style={{ background: "var(--bg)" }}>
-      <p className="text-5xl">🎉</p>
-      <p className="font-black text-lg" style={{ color: "var(--text)" }}>لا توجد مهام!</p>
-      <p className="text-xs" style={{ color: "var(--muted)" }}>أتممت جميع مهامك — استمر</p>
-      <Link href="/tasks" className="px-6 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: "#5E5495" }}>← العودة للمهام</Link>
-    </main>
-  );
+  if (tasks.length === 0) {
+    const sessionLabels: Record<string, string> = { office: "مكتبي", outside: "غير مكتبي", haram: "الحرم" };
+    return (
+      <main className="flex-1 flex flex-col items-center justify-center gap-4 px-6" style={{ background: "var(--bg)" }}>
+        <p className="text-5xl">🎉</p>
+        <p className="font-black text-lg" style={{ color: "var(--text)" }}>لا توجد مهام!</p>
+        <p className="text-xs" style={{ color: "var(--muted)" }}>لا توجد مهام في جلسة "{sessionLabels[sessionCtx]}" — جرّب تغيير الجلسة</p>
+        <div className="flex gap-2">
+          {(["outside", "office", "haram"] as const).map(s => (
+            <button key={s} onClick={() => { setSessionCtx(s); load(); }}
+              className="px-4 py-2.5 rounded-xl text-xs font-bold transition"
+              style={{ background: sessionCtx === s ? "#5E5495" : "var(--card)", color: sessionCtx === s ? "#fff" : "var(--muted)", border: `1px solid ${sessionCtx === s ? "#5E5495" : "var(--card-border)"}` }}>
+              {s === "outside" ? "🚶 غير مكتبي" : s === "office" ? "💻 مكتبي" : "🕌 الحرم"}
+            </button>
+          ))}
+        </div>
+        <Link href="/tasks" className="text-xs hover:underline mt-2" style={{ color: "#5E5495" }}>← العودة للمهام</Link>
+      </main>
+    );
+  }
 
   if (!task) return null;
   const dl = dateLabel(task.dueDate);
