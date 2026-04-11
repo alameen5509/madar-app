@@ -19,11 +19,19 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
   const [showMembers, setShowMembers] = useState(false);
   const [userRole, setUserRole] = useState<string>("owner");
   const [completedPhases, setCompletedPhases] = useState<Set<number>>(new Set());
+  const [kvAccounts, setKvAccounts] = useState<number>(0);
+  const [kvHostingUrl, setKvHostingUrl] = useState("");
 
-  // Load completed phases from API
+  // Load completed phases + accounts + hosting from API
   useEffect(() => {
     api.get(`/api/web-projects/${id}/kv/completed_phases`).then(({ data: r }) => {
       if (r?.value) try { setCompletedPhases(new Set(JSON.parse(r.value))); } catch {}
+    }).catch(() => {});
+    api.get(`/api/web-projects/${id}/kv/accounts`).then(({ data: r }) => {
+      if (r?.value) try { setKvAccounts(JSON.parse(r.value).length); } catch {}
+    }).catch(() => {});
+    api.get(`/api/web-projects/${id}/kv/hosting`).then(({ data: r }) => {
+      if (r?.value) try { setKvHostingUrl(JSON.parse(r.value)?.launch?.url ?? ""); } catch {}
     }).catch(() => {});
   }, [id]);
 
@@ -140,10 +148,8 @@ export default function WebProjectDetailPage({ params }: { params: Promise<{ id:
 
         {/* Complete phase button */}
         {(() => {
-          const blocked = phase === 1 && (() => { try { return JSON.parse(localStorage.getItem("wp_p7_" + id) ?? "[]").length === 0; } catch { return true; } })();
-          // Phase 3 (hosting): require site URL before completing
-          const hostingData = (() => { try { return JSON.parse(localStorage.getItem("wp_hosting_" + id) ?? "{}"); } catch { return {}; } })();
-          const hostingBlocked = phase === 3 && !hostingData?.launch?.url;
+          const blocked = false; // accounts check removed — now managed in Phase 7
+          const hostingBlocked = phase === 3 && !kvHostingUrl;
           return (
             <div className="mt-6 space-y-3">
               {/* Ask for site URL when completing hosting phase */}
