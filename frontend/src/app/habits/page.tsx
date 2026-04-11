@@ -1,8 +1,38 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { GeometricDivider } from "@/components/IslamicPattern";
 import { api } from "@/lib/api";
+
+/** Synced KV: load from API, save to API + localStorage cache */
+function useSyncedKV<T>(key: string, fallback: T): [T, (v: T) => void, boolean] {
+  const [data, setData] = useState<T>(fallback);
+  const [loaded, setLoaded] = useState(false);
+  const saving = useRef(false);
+
+  useEffect(() => {
+    // Load from localStorage first (instant), then API (authoritative)
+    try { const cached = localStorage.getItem("kv_" + key); if (cached) setData(JSON.parse(cached)); } catch {}
+    api.get(`/api/users/me/kv/${key}`).then(({ data: r }) => {
+      if (r?.value) { try { const parsed = JSON.parse(r.value); setData(parsed); localStorage.setItem("kv_" + key, r.value); } catch {} }
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
+  }, [key]);
+
+  function save(v: T) {
+    setData(v);
+    const json = JSON.stringify(v);
+    localStorage.setItem("kv_" + key, json);
+    if (!saving.current) {
+      saving.current = true;
+      setTimeout(() => {
+        api.put(`/api/users/me/kv/${key}`, { value: json }).catch(() => {}).finally(() => { saving.current = false; });
+      }, 300); // debounce
+    }
+  }
+
+  return [data, save, loaded];
+}
 
 /* ─── Types ───────────────────────────────────────────────────────────── */
 
@@ -62,50 +92,16 @@ const DEFAULT_HYGIENE: HygieneHabit[] = [
 ];
 
 function HygieneSection() {
-  const STORAGE_KEY = "madar_hygiene";
-  const DATE_KEY = "madar_hygiene_date";
-
-  const [habits, setHabits] = useState<HygieneHabit[]>(() => {
-    if (typeof window === "undefined") return DEFAULT_HYGIENE;
-    try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null") as HygieneHabit[] | null;
-      if (!saved) return DEFAULT_HYGIENE;
-      // Merge: keep saved + add any new defaults
-      const savedIds = new Set(saved.map(h => h.id));
-      const newDefaults = DEFAULT_HYGIENE.filter(d => !savedIds.has(d.id));
-      return [...saved, ...newDefaults];
-    } catch { return DEFAULT_HYGIENE; }
-  });
+  const [habits, setHabits] = useSyncedKV<HygieneHabit[]>("hygiene", DEFAULT_HYGIENE);
   const [showManage, setShowManage] = useState(false);
   const [showAddCustom, setShowAddCustom] = useState(false);
   const [customTitle, setCustomTitle] = useState("");
 
-  // Reset todayDone based on each habit's frequency
-  useEffect(() => {
-    const today = new Date().toDateString();
-    const lastCheck = localStorage.getItem(DATE_KEY);
-    if (lastCheck !== today) {
-      const now = new Date(); now.setHours(0, 0, 0, 0);
-      setHabits(prev => {
-        const reset = prev.map(h => {
-          if (!h.todayDone) return h; // already not done
-          if (!h.lastDoneDate) return { ...h, todayDone: false };
-          const last = new Date(h.lastDoneDate); last.setHours(0, 0, 0, 0);
-          const daysPassed = Math.floor((now.getTime() - last.getTime()) / 86400000);
-          const interval = FREQ_DAYS[h.frequency] ?? 1;
-          if (daysPassed >= interval) return { ...h, todayDone: false };
-          return h; // still within the period
-        });
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(reset));
-        localStorage.setItem(DATE_KEY, today);
-        return reset;
-      });
-    }
-  }, []);
-
   function save(updated: HygieneHabit[]) {
-    setHabits(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    // Merge new defaults
+    const savedIds = new Set(updated.map(h => h.id));
+    const newDefaults = DEFAULT_HYGIENE.filter(d => !savedIds.has(d.id));
+    setHabits(newDefaults.length > 0 ? [...updated, ...newDefaults] : updated);
   }
 
   function toggle(id: string) {
@@ -268,9 +264,7 @@ const PENALTY_TYPES = [
 ];
 
 const SUNNAH_PRAYERS = [
-  { key: "SunnahFajr",   label: "ركعتا الفجر",   icon: "🌅", desc: "ركعتان قبل الفجر", startPrayer: "Fajr", endPrayer: "Fajr", yesMsg: "«ركعتا الفجر خير من الدنيا وما فيها» — مسلم", noMsg: "لا تفوّت أجراً خيراً من الدنيا وما فيها" },
   { key: "Duha",         label: "صلاة الضحى",     icon: "☀️", desc: "٢-٨ ركعات بعد الشروق", startPrayer: "shuruq", endPrayer: "Dhuhr", yesMsg: "«يُصبح على كل سُلامى من أحدكم صدقة، وكل تسبيحة صدقة، ويُجزئ من ذلك ركعتا الضحى» — مسلم", noMsg: "ركعتا الضحى تُجزئ عن 360 صدقة!" },
-  { key: "Rawatib",      label: "السنن الرواتب",   icon: "📿", desc: "١٢ ركعة يومياً", startPrayer: "Isha", endPrayer: "Isha", yesMsg: "«من صلى ١٢ ركعة في يومه بُني له بيت في الجنة» — مسلم", noMsg: "١٢ ركعة = بيت في الجنة كل يوم!" },
   { key: "Witr",         label: "صلاة الوتر",     icon: "🌙", desc: "ركعة أو أكثر بعد العشاء", startPrayer: "Isha", endPrayer: null, yesMsg: "«اجعلوا آخر صلاتكم بالليل وتراً» — متفق عليه", noMsg: "الوتر سُنة مؤكدة لا ينبغي تركها" },
 ] as const;
 
@@ -965,23 +959,16 @@ function PrayerSection() {
 /* ─── Sin / Bad Habit Penalty Section ──────────────────────────────────── */
 
 function SinPenaltySection() {
-  const [penalties, setPenalties] = useState<{ id: string; type: "bad_habit" | "sin"; createdAt: string }[]>(() => {
-    if (typeof window === "undefined") return [];
-    try { return JSON.parse(localStorage.getItem("madar_sin_penalties") ?? "[]"); } catch { return []; }
-  });
+  const [penalties, setPenalties] = useSyncedKV<{ id: string; type: "bad_habit" | "sin"; createdAt: string }[]>("sin_penalties", []);
   const [tasbih, setTasbih] = useState<{ penaltyIdx: number } | null>(null);
 
   function addPenalty(type: "bad_habit" | "sin") {
     const pen = { id: "sp_" + Date.now(), type, createdAt: new Date().toISOString() };
-    const updated = [pen, ...penalties];
-    setPenalties(updated);
-    localStorage.setItem("madar_sin_penalties", JSON.stringify(updated));
+    setPenalties([pen, ...penalties]);
   }
 
   function fulfillPenalty(id: string) {
-    const updated = penalties.filter(p => p.id !== id);
-    setPenalties(updated);
-    localStorage.setItem("madar_sin_penalties", JSON.stringify(updated));
+    setPenalties(penalties.filter(p => p.id !== id));
   }
 
   const KAFFARA = [
@@ -1077,10 +1064,9 @@ function SinPenaltySection() {
 /* ─── Page ─────────────────────────────────────────────────────────────── */
 
 export default function HabitsPage() {
-  const [habits, setHabits] = useState<Habit[]>(() => {
-    if (typeof window === "undefined") return DEFAULT_HABITS;
-    try { const s = localStorage.getItem("madar_habits"); return s ? JSON.parse(s) : DEFAULT_HABITS; } catch { return DEFAULT_HABITS; }
-  });
+  const [habits, setHabitsSync] = useSyncedKV<Habit[]>("habits", DEFAULT_HABITS);
+  const [habitsState, setHabits] = useState(habits);
+  useEffect(() => { setHabits(habits); }, [habits]);
   const [showAdd, setShowAdd] = useState(false);
   const [tab, setTab] = useState<"active" | "ideas">("active");
   const [newTitle, setNewTitle] = useState("");
@@ -1096,26 +1082,9 @@ export default function HabitsPage() {
   const [editIcon, setEditIcon] = useState("");
   const [editCat, setEditCat] = useState<Habit["category"]>("worship");
 
-  // Reset todayDone at start of new day
-  useEffect(() => {
-    const today = new Date().toDateString();
-    const lastDate = localStorage.getItem("madar_habits_date");
-    if (lastDate && lastDate !== today) {
-      setHabits(prev => {
-        const reset = prev.map(h => ({ ...h, todayDone: false }));
-        localStorage.setItem("madar_habits", JSON.stringify(reset));
-        localStorage.setItem("madar_habits_date", today);
-        return reset;
-      });
-    } else if (!lastDate) {
-      localStorage.setItem("madar_habits_date", today);
-    }
-  }, []);
-
   function saveLocal(updated: Habit[]) {
     setHabits(updated);
-    localStorage.setItem("madar_habits", JSON.stringify(updated));
-    localStorage.setItem("madar_habits_date", new Date().toDateString());
+    setHabitsSync(updated);
     window.dispatchEvent(new Event("madar-update"));
   }
 
