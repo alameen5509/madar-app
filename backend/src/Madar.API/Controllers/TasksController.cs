@@ -159,19 +159,57 @@ public class TasksController : BaseController
             }
         }
 
-        // Fallback: for tasks with GoalId/LifeCircleId but no JobGoalTasks/RoleGoalTasks link,
-        // build a simple root from the old system so they don't show as "مستقلة"
+        // Fallback: check raw LifeCircleId/GoalId + also look up UserCircles for circle-linked tasks
+        // Build a lookup of all LifeCircleId → UserCircles name (some tasks link to UserCircles, not LifeCircles)
+        var taskCircleIds = new HashSet<string>();
         foreach (var t in tasks)
         {
             if (roots.ContainsKey(t.id)) continue;
-            if (t.goal != null || t.lifeCircle != null)
+            if (t.lifeCircle != null) taskCircleIds.Add(t.lifeCircle.id.ToString());
+        }
+
+        // Also check UserCircles for any matching IDs
+        var circleNames = new Dictionary<string, string>();
+        if (taskCircleIds.Count > 0)
+        {
+            try
+            {
+                var conn2 = _db.Database.GetDbConnection();
+                var wasOpen2 = conn2.State == System.Data.ConnectionState.Open;
+                if (!wasOpen2) await conn2.OpenAsync(ct);
+                try
+                {
+                    using var cmd2 = conn2.CreateCommand();
+                    var pNames = taskCircleIds.Select((_, i) => $"@uc{i}").ToList();
+                    cmd2.CommandText = $"SELECT Id, Name FROM UserCircles WHERE Id IN ({string.Join(",", pNames)})";
+                    int ci = 0;
+                    foreach (var cid in taskCircleIds)
+                        cmd2.Parameters.Add(new MySqlParameter(pNames[ci++], cid));
+                    using var rr = await cmd2.ExecuteReaderAsync(ct);
+                    while (await rr.ReadAsync(ct))
+                        circleNames[rr.GetString(0)] = rr.IsDBNull(1) ? "" : rr.GetString(1);
+                }
+                finally { if (!wasOpen2) await conn2.CloseAsync(); }
+            } catch {}
+        }
+
+        foreach (var t in tasks)
+        {
+            if (roots.ContainsKey(t.id)) continue;
+            // Try to find name from LifeCircle, UserCircles, or Goal
+            var circleName = t.lifeCircle?.name ?? "";
+            if (string.IsNullOrEmpty(circleName) && t.lifeCircle != null)
+                circleNames.TryGetValue(t.lifeCircle.id.ToString(), out circleName);
+            var goalTitle = t.goal?.Title ?? "";
+
+            if (!string.IsNullOrEmpty(circleName) || !string.IsNullOrEmpty(goalTitle))
             {
                 roots[t.id] = new
                 {
                     taskId = t.id,
                     kind = "legacy",
                     entityId = t.lifeCircle != null ? (object)t.lifeCircle.id : Guid.Empty,
-                    entityName = t.lifeCircle?.name ?? "",
+                    entityName = circleName ?? "",
                     entitySlug = (string?)null,
                     dimensionId = Guid.Empty,
                     dimensionName = "",
