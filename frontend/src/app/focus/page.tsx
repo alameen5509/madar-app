@@ -42,7 +42,7 @@ export default function FocusPage() {
       const cancelled = all.filter(t => t.status === "Cancelled").length;
       // Filter: pending, hide postponed-by-hours, apply session context
       const pending = all.filter(t => {
-        if (t.status === "Completed" || t.status === "Inbox" || t.status === "Cancelled") return false;
+        if (t.status === "Completed" || t.status === "Cancelled") return false;
         if (t.dueDate) {
           const due = new Date(t.dueDate);
           const h = due.getUTCHours(), m = due.getUTCMinutes();
