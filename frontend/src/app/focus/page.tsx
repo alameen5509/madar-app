@@ -27,21 +27,29 @@ export default function FocusPage() {
     try {
       const { data } = await api.get("/api/tasks");
       const all = (data ?? []) as SmartTask[];
-      // Filter: pending only, no inbox, no cancelled
-      const pending = all.filter(t => t.status !== "Completed" && t.status !== "Inbox" && t.status !== "Cancelled");
+      const nowTime = new Date();
+      // Filter: pending, not inbox/cancelled, and not postponed to later today
+      const pending = all.filter(t => {
+        if (t.status === "Completed" || t.status === "Inbox" || t.status === "Cancelled") return false;
+        // Hide tasks postponed to later today (dueDate has future time)
+        if (t.dueDate) {
+          const due = new Date(t.dueDate);
+          const dueDate = t.dueDate.slice(0, 10);
+          const today = localDateStr();
+          if (dueDate === today && due > nowTime) return false; // postponed to later today
+        }
+        return true;
+      });
       // Sort: overdue first → today → tomorrow → future → no date last
-      const todayStr = localDateStr();
       pending.sort((a, b) => {
         const da = a.dueDate?.slice(0, 10) ?? "9999";
         const db = b.dueDate?.slice(0, 10) ?? "9999";
         if (da !== db) return da.localeCompare(db);
         return (b.userPriority ?? 0) - (a.userPriority ?? 0);
       });
-      // Log first task for debugging
-      if (pending.length > 0) console.log("[Focus] sample task:", JSON.stringify({ title: pending[0].title, root: pending[0].root, goal: pending[0].goal, lifeCircle: pending[0].lifeCircle }, null, 2));
       setTasks(pending);
       setIdx(0);
-    } catch (err) { console.error("[Focus] load error:", err); }
+    } catch {}
     setLoading(false);
   }, []);
 
@@ -265,39 +273,29 @@ export default function FocusPage() {
               {/* Title */}
               <h1 className="font-black text-xl leading-relaxed text-center" style={{ color: "var(--text)" }}>{task.title}</h1>
 
-              {/* Root breadcrumb — always show whatever context is available */}
-              {(() => {
-                const r = task.root;
-                const hasRoot = r && r.entityName;
-                const hasGoal = !!task.goal?.title;
-                const hasCircle = !!circle?.name;
-                if (!hasRoot && !hasGoal && !hasCircle) return null;
-
-                if (hasRoot) {
-                  const base = r!.kind === "job" ? `/jobs/${r!.entityId}` : `/circles/${r!.entitySlug ?? r!.entityId}`;
+              {/* Root breadcrumb — always show context */}
+              <div className="rounded-xl p-3 text-center" style={{ background: "var(--bg)" }}>
+                {task.root ? (() => {
+                  const r = task.root;
+                  const base = r.kind === "job" ? `/jobs/${r.entityId}` : `/circles/${r.entitySlug ?? r.entityId}`;
                   return (
-                    <div className="rounded-xl p-3 text-center" style={{ background: "var(--bg)" }}>
-                      <div className="flex items-center justify-center gap-1.5 flex-wrap text-[11px]">
-                        <Link href={base} className="font-bold hover:underline" style={{ color: "#5E5495" }}>{r!.entityName}</Link>
-                        <span style={{ color: "var(--muted)" }}>←</span>
-                        <Link href={`${base}/dimensions/${r!.dimensionId}`} className="hover:underline" style={{ color: "#D4AF37" }}>📁 {r!.dimensionName}</Link>
-                        <span style={{ color: "var(--muted)" }}>←</span>
-                        <Link href={`${base}/goals/${r!.goalId}`} className="hover:underline" style={{ color: "#3D8C5A" }}>🎯 {r!.goalTitle}</Link>
-                      </div>
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap text-[11px]">
+                      <Link href={base} className="font-bold hover:underline" style={{ color: "#5E5495" }}>{r.entityName}</Link>
+                      <span style={{ color: "var(--muted)" }}>←</span>
+                      <Link href={`${base}/dimensions/${r.dimensionId}`} className="hover:underline" style={{ color: "#D4AF37" }}>📁 {r.dimensionName}</Link>
+                      <span style={{ color: "var(--muted)" }}>←</span>
+                      <Link href={`${base}/goals/${r.goalId}`} className="hover:underline" style={{ color: "#3D8C5A" }}>🎯 {r.goalTitle}</Link>
                     </div>
                   );
-                }
-
-                return (
-                  <div className="rounded-xl p-3 text-center" style={{ background: "var(--bg)" }}>
-                    <div className="flex items-center justify-center gap-1.5 flex-wrap text-[11px]">
-                      {hasCircle && <span className="font-bold" style={{ color: circle!.color ?? "#5E5495" }}>{circle!.icon ?? "●"} {circle!.name}</span>}
-                      {hasCircle && hasGoal && <span style={{ color: "var(--muted)" }}>←</span>}
-                      {hasGoal && <span style={{ color: "#D4AF37" }}>🎯 {task.goal!.title}</span>}
-                    </div>
+                })() : (
+                  <div className="flex items-center justify-center gap-1.5 flex-wrap text-[11px]">
+                    {circle?.name && <span className="font-bold" style={{ color: circle.color ?? "#5E5495" }}>{circle.icon ?? "●"} {circle.name}</span>}
+                    {circle?.name && task.goal?.title && <span style={{ color: "var(--muted)" }}>←</span>}
+                    {task.goal?.title && <span style={{ color: "#D4AF37" }}>🎯 {task.goal.title}</span>}
+                    {!circle?.name && !task.goal?.title && <span className="text-[10px]" style={{ color: "var(--muted)" }}>📋 مهمة مستقلة — غير مرتبطة بهدف</span>}
                   </div>
-                );
-              })()}
+                )}
+              </div>
 
               {/* Description */}
               {task.description && (
