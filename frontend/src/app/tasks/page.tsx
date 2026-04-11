@@ -1245,7 +1245,7 @@ function SubTasksPanel({ taskId, subs, onRefresh, onUpdateSubs }: { taskId: stri
 
 /* ─── Edit Task Dialog (تعديل المهمة) ─────────────────────────────────────── */
 
-function EditTaskDialog({ task, onClose, onSaved }: {
+export function EditTaskDialog({ task, onClose, onSaved }: {
   task: TaskRow; onClose: () => void; onSaved: () => void;
 }) {
   const [title, setTitle] = useState(task.title);
