@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { api, type SmartTask } from "@/lib/api";
+import { NewTaskDialog } from "@/app/tasks/page";
 
 function localDateStr(d?: Date): string {
   const dt = d ?? new Date();
@@ -18,11 +19,7 @@ export default function FocusPage() {
   });
   function setIdx(n: number) { setIdxRaw(n); sessionStorage.setItem("focus_idx", String(n)); }
   const [showDone, setShowDone] = useState(false);
-  const [showUrgent, setShowUrgent] = useState(false);
-  const [urgentTitle, setUrgentTitle] = useState("");
   const [showAddTask, setShowAddTask] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newPriority, setNewPriority] = useState(3);
   const [timerSecs, setTimerSecs] = useState(() => {
     if (typeof window === "undefined") return 0;
     const saved = sessionStorage.getItem("focus_timer");
@@ -184,33 +181,6 @@ export default function FocusPage() {
     alert("🐸 تم تحويلها لمهمة ضفدع — أولوية قصوى ونبض حرج!");
   }
 
-  async function addTask() {
-    if (!newTitle.trim()) return;
-    try {
-      const { data } = await api.post("/api/tasks", {
-        title: newTitle.trim(), userPriority: newPriority, dueDate: new Date().toISOString(),
-      });
-      if (data?.id) {
-        setTasks(prev => [...prev.slice(0, idx + 1), data as SmartTask, ...prev.slice(idx + 1)]);
-      }
-    } catch { alert("فشل الإضافة"); }
-    setNewTitle(""); setNewPriority(3); setShowAddTask(false);
-  }
-
-  async function addUrgent() {
-    if (!urgentTitle.trim()) return;
-    try {
-      const { data } = await api.post("/api/tasks", {
-        title: urgentTitle.trim(), userPriority: 5, dueDate: new Date().toISOString(),
-        isUrgent: true, contextNote: "urgent",
-      });
-      if (data?.id) {
-        // Insert right after current task
-        setTasks(prev => [...prev.slice(0, idx + 1), data as SmartTask, ...prev.slice(idx + 1)]);
-      }
-    } catch { alert("فشل الإضافة"); }
-    setUrgentTitle(""); setShowUrgent(false);
-  }
 
   async function saveEdit() {
     const t = tasks[idx];
@@ -319,8 +289,7 @@ export default function FocusPage() {
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => { setShowAddTask(!showAddTask); setShowUrgent(false); }} className="px-2.5 py-1.5 rounded-lg text-[9px] font-bold" style={{ background: "#5E549515", color: "#5E5495" }}>+ مهمة</button>
-            <button onClick={() => { setShowUrgent(!showUrgent); setShowAddTask(false); }} className="px-2.5 py-1.5 rounded-lg text-[9px] font-bold" style={{ background: "#DC262615", color: "#DC2626" }}>+ طارئة</button>
+            <button onClick={() => setShowAddTask(true)} className="px-2.5 py-1.5 rounded-lg text-[9px] font-bold" style={{ background: "#5E549515", color: "#5E5495" }}>+ مهمة</button>
             <Link href="/tasks" className="text-[9px] hover:underline" style={{ color: "#5E5495" }}>← المهام</Link>
           </div>
         </div>
@@ -341,45 +310,14 @@ export default function FocusPage() {
         </div>
       </header>
 
-      {/* Add task form */}
+      {/* Full task dialog — same as أعمال اليوم */}
       {showAddTask && (
-        <div className="px-6 pt-3">
-          <div className="rounded-xl border p-3 space-y-2" style={{ background: "var(--card)", borderColor: "#5E549530" }}>
-            <input value={newTitle} onChange={e => setNewTitle(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") addTask(); }}
-              placeholder="عنوان المهمة..." autoFocus
-              className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none"
-              style={{ borderColor: "var(--card-border)", background: "var(--bg)", color: "var(--text)" }} />
-            <div className="flex gap-2 items-center">
-              <span className="text-[10px]" style={{ color: "var(--muted)" }}>الأولوية:</span>
-              {[{v:2,l:"منخفضة"},{v:3,l:"متوسطة"},{v:4,l:"عالية"}].map(p => (
-                <button key={p.v} onClick={() => setNewPriority(p.v)} className="px-2.5 py-1 rounded-lg text-[10px] font-bold"
-                  style={{ background: newPriority === p.v ? "#5E5495" : "#F3F4F6", color: newPriority === p.v ? "#fff" : "#6B7280" }}>{p.l}</button>
-              ))}
-              <div className="flex-1" />
-              <button onClick={addTask} disabled={!newTitle.trim()} className="px-4 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-40" style={{ background: "#5E5495" }}>إضافة</button>
-              <button onClick={() => { setShowAddTask(false); setNewTitle(""); }} className="text-[10px]" style={{ color: "var(--muted)" }}>✕</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Urgent task form */}
-      {showUrgent && (
-        <div className="px-6 pt-3">
-          <div className="flex gap-2">
-            <input value={urgentTitle} onChange={e => setUrgentTitle(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") addUrgent(); }}
-              placeholder="مهمة طارئة..." autoFocus
-              className="flex-1 px-4 py-2.5 rounded-xl border text-sm focus:outline-none"
-              style={{ borderColor: "#DC262640", background: "var(--bg)", color: "var(--text)" }} />
-            <button onClick={addUrgent} disabled={!urgentTitle.trim()}
-              className="px-4 py-2.5 rounded-xl text-xs font-bold text-white disabled:opacity-40"
-              style={{ background: "#DC2626" }}>إضافة</button>
-            <button onClick={() => { setShowUrgent(false); setUrgentTitle(""); }}
-              className="px-3 py-2.5 rounded-xl text-xs" style={{ color: "var(--muted)" }}>✕</button>
-          </div>
-        </div>
+        <NewTaskDialog goals={[]} onClose={() => setShowAddTask(false)}
+          onCreated={(t) => {
+            setTasks(prev => [...prev.slice(0, idx + 1), { ...t, id: t.id } as unknown as SmartTask, ...prev.slice(idx + 1)]);
+            setShowAddTask(false);
+            load(); // reload to get full task data
+          }} />
       )}
 
       {/* Progress */}
