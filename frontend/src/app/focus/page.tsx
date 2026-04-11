@@ -19,9 +19,9 @@ export default function FocusPage() {
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newPriority, setNewPriority] = useState(3);
-  const [timerRunning, setTimerRunning] = useState(false);
   const [timerSecs, setTimerSecs] = useState(0);
   const [stats, setStats] = useState({ total: 0, completed: 0, cancelled: 0 });
+  const [sessionCtx, setSessionCtx] = useState<"all" | "office" | "outside" | "haram">("all");
   const [showEdit, setShowEdit] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
@@ -37,14 +37,23 @@ export default function FocusPage() {
       const nowTime = new Date();
       const completed = all.filter(t => t.status === "Completed").length;
       const cancelled = all.filter(t => t.status === "Cancelled").length;
-      // Filter: pending, hide postponed-by-hours tasks until their time
+      // Filter: pending, hide postponed-by-hours, apply session context
       const pending = all.filter(t => {
         if (t.status === "Completed" || t.status === "Inbox" || t.status === "Cancelled") return false;
         if (t.dueDate) {
           const due = new Date(t.dueDate);
-          // Check if dueDate has hours/minutes (not just a plain date at midnight)
           const h = due.getUTCHours(), m = due.getUTCMinutes();
           if ((h !== 0 || m !== 0) && due > nowTime) return false;
+        }
+        // Session context filter
+        if (sessionCtx !== "all") {
+          const ctx = (t.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
+          const ctxMap: Record<string, string[]> = {
+            office: ["Office", "Computer", "Anywhere"],
+            outside: ["Outside", "Phone", "Anywhere"],
+            haram: ["Anywhere"],
+          };
+          if (!ctxMap[sessionCtx]?.includes(ctx)) return false;
         }
         return true;
       });
@@ -60,16 +69,21 @@ export default function FocusPage() {
       setIdx(0);
     } catch {}
     setLoading(false);
-  }, []);
+  }, [sessionCtx]);
 
   useEffect(() => { load(); }, [load]);
 
-  // Task timer
+  // Auto-start timer when task changes
   useEffect(() => {
-    if (!timerRunning) return;
+    setTimerSecs(0);
+  }, [idx]);
+
+  // Timer always running
+  useEffect(() => {
+    if (tasks.length === 0) return;
     const t = setInterval(() => setTimerSecs(s => s + 1), 1000);
     return () => clearInterval(t);
-  }, [timerRunning]);
+  }, [tasks.length]);
 
   async function complete() {
     const t = tasks[idx];
@@ -112,9 +126,34 @@ export default function FocusPage() {
   }
 
   function removeCurrentTask() {
-    setTimerRunning(false); setTimerSecs(0);
+    setTimerSecs(0);
     setTasks(prev => prev.filter((_, i) => i !== idx));
     if (idx >= tasks.length - 1) setIdx(Math.max(0, idx - 1));
+  }
+
+  async function markFrog() {
+    const t = tasks[idx];
+    if (!t) return;
+    // 1. Set priority to 5 (highest)
+    try { await api.post(`/api/tasks/${t.id}/update`, { userPriority: 5 }); } catch {}
+    // 2. Update pulse of linked entity to "red" (critical)
+    if (t.root?.entityId && t.root.kind !== "legacy") {
+      try {
+        const { data: allRoles } = await api.get("/api/war-room/roles");
+        const roles = Array.isArray(allRoles) ? allRoles : [];
+        const role = roles.find((r: { workId?: string }) => r.workId === t.root?.entityId);
+        if (role) await api.patch(`/api/war-room/roles/${role.id}/pulse`, { status: "red", note: `🐸 مهمة حرجة: ${t.title}` });
+      } catch {}
+    }
+    // 3. Update locally: move to top, mark as priority 5
+    setTasks(prev => {
+      const updated = prev.map((tk, i) => i === idx ? { ...tk, userPriority: 5 } : tk);
+      const frogTask = updated[idx];
+      const rest = updated.filter((_, i) => i !== idx);
+      return [frogTask, ...rest];
+    });
+    setIdx(0);
+    alert("🐸 تم تحويلها لمهمة ضفدع — أولوية قصوى ونبض حرج!");
   }
 
   async function addTask() {
@@ -184,13 +223,11 @@ export default function FocusPage() {
   }
 
   function skip() {
-    setTimerRunning(false); setTimerSecs(0);
     if (idx < tasks.length - 1) setIdx(idx + 1);
     else setIdx(0);
   }
 
   function skipToAfterNext() {
-    setTimerRunning(false); setTimerSecs(0);
     // Move current task to position idx+2 (after the next one)
     if (tasks.length <= 1) return;
     setTasks(prev => {
@@ -257,6 +294,21 @@ export default function FocusPage() {
           <button onClick={() => { setShowAddTask(!showAddTask); setShowUrgent(false); }} className="px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{ background: "#5E549515", color: "#5E5495" }}>+ مهمة</button>
           <button onClick={() => { setShowUrgent(!showUrgent); setShowAddTask(false); }} className="px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{ background: "#DC262615", color: "#DC2626" }}>+ طارئة</button>
           <Link href="/tasks" className="text-xs hover:underline" style={{ color: "#5E5495" }}>← المهام</Link>
+        </div>
+        {/* Session context */}
+        <div className="flex gap-1 mt-2">
+          {([
+            { key: "all", label: "الكل", icon: "📋" },
+            { key: "office", label: "مكتبي", icon: "💻" },
+            { key: "outside", label: "خارجي", icon: "🚶" },
+            { key: "haram", label: "الحرم", icon: "🕌" },
+          ] as const).map(s => (
+            <button key={s.key} onClick={() => { setSessionCtx(s.key); load(); }}
+              className="px-2.5 py-1.5 rounded-lg text-[9px] font-bold transition"
+              style={{ background: sessionCtx === s.key ? "#5E5495" : "var(--bg)", color: sessionCtx === s.key ? "#fff" : "var(--muted)", border: `1px solid ${sessionCtx === s.key ? "#5E5495" : "var(--card-border)"}` }}>
+              {s.icon} {s.label}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -383,27 +435,25 @@ export default function FocusPage() {
               </div>
             </div>
 
-            {/* Timer + Actions */}
+            {/* Timer (auto-start) + Actions */}
             <div className="p-6 pt-0 space-y-3">
-              {timerRunning ? (
-                <div className="rounded-xl p-3 text-center mb-1" style={{ background: "#5E549508", border: "1px solid #5E549520" }}>
-                  <p className="text-2xl font-black font-mono" style={{ color: "#5E5495" }}>
-                    {`${Math.floor(timerSecs / 3600).toString().padStart(2, "0")}:${Math.floor((timerSecs % 3600) / 60).toString().padStart(2, "0")}:${(timerSecs % 60).toString().padStart(2, "0")}`}
-                  </p>
-                  <p className="text-[9px] mt-1" style={{ color: "var(--muted)" }}>جارٍ العمل على المهمة...</p>
-                </div>
-              ) : (
-                <button onClick={() => setTimerRunning(true)}
-                  className="w-full py-3 rounded-xl text-sm font-bold transition active:scale-95"
-                  style={{ background: "#5E549510", color: "#5E5495", border: "1px solid #5E549530" }}>
-                  ⏱ التقط المهمة
+              <div className="rounded-xl p-2 text-center" style={{ background: "#5E549508", border: "1px solid #5E549520" }}>
+                <p className="text-xl font-black font-mono" style={{ color: "#5E5495" }}>
+                  {`${Math.floor(timerSecs / 3600).toString().padStart(2, "0")}:${Math.floor((timerSecs % 3600) / 60).toString().padStart(2, "0")}:${(timerSecs % 60).toString().padStart(2, "0")}`}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={complete}
+                  className="py-4 rounded-2xl text-sm font-black text-white transition-all active:scale-95"
+                  style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)" }}>
+                  أنجزتها ✅ {timerSecs >= 60 ? `(${Math.floor(timerSecs / 60)} د)` : ""}
                 </button>
-              )}
-              <button onClick={complete}
-                className="w-full py-4 rounded-2xl text-base font-black text-white transition-all active:scale-95"
-                style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)", boxShadow: "0 4px 20px rgba(61,140,90,0.3)" }}>
-                أنجزتها ✅{timerRunning ? ` (${Math.floor(timerSecs / 60)} د)` : ""}
-              </button>
+                <button onClick={markFrog}
+                  className="py-4 rounded-2xl text-sm font-black transition-all active:scale-95"
+                  style={{ background: "#F59E0B15", color: "#F59E0B", border: "2px solid #F59E0B40" }}>
+                  🐸 ضفدع
+                </button>
+              </div>
               <div className="grid grid-cols-3 gap-2">
                 <button onClick={() => postponeTo(1)} className="py-2.5 rounded-xl text-[11px] font-bold transition active:scale-95" style={{ background: "#F59E0B15", color: "#F59E0B", border: "1px solid #F59E0B30" }}>غداً</button>
                 <button onClick={() => postponeHours(1)} className="py-2.5 rounded-xl text-[11px] font-bold transition active:scale-95" style={{ background: "#3B82F615", color: "#3B82F6", border: "1px solid #3B82F630" }}>بعد ساعة</button>
