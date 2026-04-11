@@ -281,22 +281,23 @@ export default function FocusPage() {
   return (
     <main className="flex-1 flex flex-col" style={{ background: "var(--bg)" }}>
       {/* Header */}
-      <header className="px-6 py-4 pr-14 md:pr-6 border-b flex items-center justify-between" style={{ borderColor: "var(--card-border)" }}>
-        <div>
-          <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>🎯 التركيز</h2>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[10px]" style={{ color: "var(--muted)" }}>{idx + 1} من {tasks.length} نشطة</span>
-            {stats.completed > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>✅ {stats.completed} مكتملة</span>}
-            {stats.cancelled > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "#DC262615", color: "#DC2626" }}>🗑 {stats.cancelled} ملغاة</span>}
+      <header className="px-6 py-3 pr-14 md:pr-6 border-b" style={{ borderColor: "var(--card-border)" }}>
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>🎯 التركيز</h2>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-[10px]" style={{ color: "var(--muted)" }}>{idx + 1} من {tasks.length} نشطة</span>
+              {stats.completed > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>✅ {stats.completed}</span>}
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => { setShowAddTask(!showAddTask); setShowUrgent(false); }} className="px-2.5 py-1.5 rounded-lg text-[9px] font-bold" style={{ background: "#5E549515", color: "#5E5495" }}>+ مهمة</button>
+            <button onClick={() => { setShowUrgent(!showUrgent); setShowAddTask(false); }} className="px-2.5 py-1.5 rounded-lg text-[9px] font-bold" style={{ background: "#DC262615", color: "#DC2626" }}>+ طارئة</button>
+            <Link href="/tasks" className="text-[9px] hover:underline" style={{ color: "#5E5495" }}>← المهام</Link>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => { setShowAddTask(!showAddTask); setShowUrgent(false); }} className="px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{ background: "#5E549515", color: "#5E5495" }}>+ مهمة</button>
-          <button onClick={() => { setShowUrgent(!showUrgent); setShowAddTask(false); }} className="px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{ background: "#DC262615", color: "#DC2626" }}>+ طارئة</button>
-          <Link href="/tasks" className="text-xs hover:underline" style={{ color: "#5E5495" }}>← المهام</Link>
-        </div>
         {/* Session context */}
-        <div className="flex gap-1 mt-2">
+        <div className="flex gap-1.5">
           {([
             { key: "all", label: "الكل", icon: "📋" },
             { key: "office", label: "مكتبي", icon: "💻" },
@@ -304,7 +305,7 @@ export default function FocusPage() {
             { key: "haram", label: "الحرم", icon: "🕌" },
           ] as const).map(s => (
             <button key={s.key} onClick={() => { setSessionCtx(s.key); load(); }}
-              className="px-2.5 py-1.5 rounded-lg text-[9px] font-bold transition"
+              className="flex-1 py-2 rounded-lg text-[10px] font-bold transition"
               style={{ background: sessionCtx === s.key ? "#5E5495" : "var(--bg)", color: sessionCtx === s.key ? "#fff" : "var(--muted)", border: `1px solid ${sessionCtx === s.key ? "#5E5495" : "var(--card-border)"}` }}>
               {s.icon} {s.label}
             </button>
