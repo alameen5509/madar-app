@@ -93,7 +93,7 @@ export default function Sidebar() {
         const focusTasks = pending.filter(t => {
           if (t.dueDate) {
             const due = new Date(t.dueDate);
-            const h = due.getUTCHours(), m = due.getUTCMinutes();
+            const h = due.getHours(), m = due.getMinutes();
             if ((h !== 0 || m !== 0) && due > nowTime) return false;
           }
           return true;

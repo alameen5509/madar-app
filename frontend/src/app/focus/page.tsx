@@ -50,7 +50,7 @@ export default function FocusPage() {
         {
           // Hide hour-postponed tasks (today with specific future time)
           const due = new Date(t.dueDate);
-          const h = due.getUTCHours(), m = due.getUTCMinutes();
+          const h = due.getHours(), m = due.getMinutes();
           if ((h !== 0 || m !== 0) && due > nowTime) return false;
         }
         // Session context filter
@@ -411,7 +411,7 @@ export default function FocusPage() {
               <span className="text-sm font-black" style={{ color: dl.color }}>{dl.text}</span>
               {task.dueDate && (() => {
                 const due = new Date(task.dueDate);
-                const h = due.getUTCHours(), m = due.getUTCMinutes();
+                const h = due.getHours(), m = due.getMinutes();
                 if (h !== 0 || m !== 0) {
                   const localDue = new Date(task.dueDate);
                   return <span className="text-xs font-bold mr-2" style={{ color: dl.color }}> ⏰ {localDue.getHours().toString().padStart(2,"0")}:{localDue.getMinutes().toString().padStart(2,"0")}</span>;
