@@ -27,6 +27,7 @@ export default function FocusPage() {
   });
   const [stats, setStats] = useState({ total: 0, completed: 0, cancelled: 0 });
   const [sessionCtx, setSessionCtx] = useState<"office" | "outside" | "haram">("outside");
+  const [nextPrayer, setNextPrayer] = useState<{ name: string; mins: number } | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
@@ -75,6 +76,41 @@ export default function FocusPage() {
   }, [sessionCtx]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Next prayer countdown
+  useEffect(() => {
+    function calcNext() {
+      api.get("/api/salah/today?lat=24.7136&lng=46.6753").then(({ data }) => {
+        if (!data) return;
+        const now = new Date();
+        const nowMins = now.getHours() * 60 + now.getMinutes();
+        const prayers = [
+          { name: "الفجر", time: data.fajr },
+          { name: "الظهر", time: data.dhuhr },
+          { name: "العصر", time: data.asr },
+          { name: "المغرب", time: data.maghrib },
+          { name: "العشاء", time: data.isha },
+        ];
+        for (const p of prayers) {
+          if (!p.time) continue;
+          const [h, m] = p.time.split(":").map(Number);
+          const pMins = h * 60 + m;
+          if (pMins > nowMins) {
+            setNextPrayer({ name: p.name, mins: pMins - nowMins });
+            return;
+          }
+        }
+        // All prayers passed — next is Fajr tomorrow
+        if (prayers[0]?.time) {
+          const [h, m] = prayers[0].time.split(":").map(Number);
+          setNextPrayer({ name: "الفجر", mins: (24 * 60 - nowMins) + h * 60 + m });
+        }
+      }).catch(() => {});
+    }
+    calcNext();
+    const iv = setInterval(calcNext, 60_000);
+    return () => clearInterval(iv);
+  }, []);
 
   // Auto-start timer when task changes (only reset if different task)
   const [lastTaskId, setLastTaskId] = useState("");
@@ -281,9 +317,14 @@ export default function FocusPage() {
         <div className="flex items-center justify-between mb-2">
           <div>
             <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>🎯 التركيز</h2>
-            <div className="flex items-center gap-2 mt-0.5">
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <span className="text-[10px]" style={{ color: "var(--muted)" }}>{idx + 1} من {tasks.length} نشطة</span>
               {stats.completed > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>✅ {stats.completed}</span>}
+              {nextPrayer && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: nextPrayer.mins <= 15 ? "#DC262615" : "#D4AF3715", color: nextPrayer.mins <= 15 ? "#DC2626" : "#D4AF37" }}>
+                  🕌 {nextPrayer.name} بعد {nextPrayer.mins >= 60 ? `${Math.floor(nextPrayer.mins / 60)} س ${nextPrayer.mins % 60} د` : `${nextPrayer.mins} د`}
+                </span>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-1.5">
