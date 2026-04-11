@@ -20,11 +20,7 @@ export default function FocusPage() {
   function setIdx(n: number) { setIdxRaw(n); sessionStorage.setItem("focus_idx", String(n)); }
   const [showDone, setShowDone] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
-  const [timerSecs, setTimerSecs] = useState(() => {
-    if (typeof window === "undefined") return 0;
-    const saved = sessionStorage.getItem("focus_timer");
-    return saved ? parseInt(saved) || 0 : 0;
-  });
+  const [timerSecs, setTimerSecs] = useState(0);
   const [stats, setStats] = useState({ total: 0, completed: 0, cancelled: 0 });
   const [sessionCtx, setSessionCtx] = useState<"office" | "outside" | "haram">("outside");
   const [nextPrayer, setNextPrayer] = useState<{ name: string; mins: number } | null>(null);
@@ -125,34 +121,30 @@ export default function FocusPage() {
     return () => clearInterval(iv);
   }, []);
 
-  // Auto-start timer when task changes (only reset if different task)
+  // Timer: use start timestamp — accurate even after leaving page
   const [lastTaskId, setLastTaskId] = useState("");
   useEffect(() => {
     const currentId = tasks[idx]?.id ?? "";
     if (currentId && currentId !== lastTaskId) {
-      // New task — check if we had a saved timer for it
       const savedId = sessionStorage.getItem("focus_task_id");
-      if (savedId === currentId) {
-        // Same task as before refresh — keep timer
-      } else {
-        setTimerSecs(0);
-        sessionStorage.setItem("focus_timer", "0");
+      if (savedId !== currentId) {
+        // New task — record start time
+        sessionStorage.setItem("focus_start", String(Date.now()));
       }
       setLastTaskId(currentId);
       sessionStorage.setItem("focus_task_id", currentId);
     }
   }, [idx, tasks, lastTaskId]);
 
-  // Timer always running — save every 5 seconds
+  // Calculate elapsed from start timestamp every second
   useEffect(() => {
     if (tasks.length === 0) return;
-    const t = setInterval(() => {
-      setTimerSecs(s => {
-        const next = s + 1;
-        if (next % 5 === 0) sessionStorage.setItem("focus_timer", String(next));
-        return next;
-      });
-    }, 1000);
+    function calc() {
+      const start = parseInt(sessionStorage.getItem("focus_start") ?? "0");
+      if (start > 0) setTimerSecs(Math.floor((Date.now() - start) / 1000));
+    }
+    calc();
+    const t = setInterval(calc, 1000);
     return () => clearInterval(t);
   }, [tasks.length]);
 
@@ -197,7 +189,8 @@ export default function FocusPage() {
   }
 
   function removeCurrentTask() {
-    setTimerSecs(0); sessionStorage.setItem("focus_timer", "0");
+    setTimerSecs(0);
+    sessionStorage.setItem("focus_start", String(Date.now()));
     sessionStorage.removeItem("focus_task_id");
     setTasks(prev => prev.filter((_, i) => i !== idx));
     if (idx >= tasks.length - 1) setIdx(Math.max(0, idx - 1));
