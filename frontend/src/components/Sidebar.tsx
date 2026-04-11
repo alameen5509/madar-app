@@ -86,10 +86,20 @@ export default function Sidebar() {
   useEffect(() => {
     import("@/lib/api").then(({ api }) => {
       api.get("/api/tasks").then((r) => {
-        const all = r.data as { status: string }[];
+        const all = r.data as { status: string; dueDate?: string }[];
         const pending = all.filter((t) => t.status !== "Completed" && t.status !== "Cancelled" && t.status !== "Inbox");
+        // Focus: exclude hour-postponed tasks
+        const nowTime = new Date();
+        const focusTasks = pending.filter(t => {
+          if (t.dueDate) {
+            const due = new Date(t.dueDate);
+            const h = due.getUTCHours(), m = due.getUTCMinutes();
+            if ((h !== 0 || m !== 0) && due > nowTime) return false;
+          }
+          return true;
+        });
         setApiTasks(pending.length);
-        setApiFocus(pending.length);
+        setApiFocus(focusTasks.length);
         setApiInbox(all.filter((t) => t.status === "Inbox").length);
       }).catch(() => {});
     });
@@ -204,12 +214,23 @@ export default function Sidebar() {
                 }`}>
                 <span className="text-base">{item.icon}</span>
                 <span className="flex-1">{item.label}</span>
-                {count > 0 && (
+                {count > 0 && item.badgeKey === "focus" ? (<>
+                  <span className="min-w-[18px] h-5 flex items-center justify-center rounded-full text-[10px] font-bold px-1"
+                    style={{ background: "#3D8C5A", color: "#fff" }}>
+                    {count > 99 ? "99+" : count}
+                  </span>
+                  {counts.tasks > count && (
+                    <span className="min-w-[18px] h-5 flex items-center justify-center rounded-full text-[10px] font-bold px-1"
+                      style={{ background: "#9CA3AF30", color: "#9CA3AF" }}>
+                      {counts.tasks}
+                    </span>
+                  )}
+                </>) : count > 0 ? (
                   <span className="min-w-[20px] h-5 flex items-center justify-center rounded-full text-[10px] font-bold px-1.5"
                     style={{ background: "#D4AF37", color: "#1A1A2E" }}>
                     {count > 99 ? "99+" : count}
                   </span>
-                )}
+                ) : null}
               </Link>
             </div>
           );
