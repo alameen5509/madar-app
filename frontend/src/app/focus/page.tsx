@@ -313,22 +313,33 @@ export default function FocusPage() {
               <div className="rounded-xl p-3 text-center" style={{ background: "var(--bg)" }}>
                 {task.root ? (() => {
                   const r = task.root;
+                  if (r.kind === "legacy") {
+                    // Old system: show circle + goal without dimension
+                    return (
+                      <div className="flex items-center justify-center gap-1.5 flex-wrap text-[11px]">
+                        {r.entityName && <span className="font-bold" style={{ color: "#5E5495" }}>{r.entityName}</span>}
+                        {r.entityName && r.goalTitle && <span style={{ color: "var(--muted)" }}>←</span>}
+                        {r.goalTitle && <span style={{ color: "#D4AF37" }}>🎯 {r.goalTitle}</span>}
+                      </div>
+                    );
+                  }
                   const base = r.kind === "job" ? `/jobs/${r.entityId}` : `/circles/${r.entitySlug ?? r.entityId}`;
                   return (
                     <div className="flex items-center justify-center gap-1.5 flex-wrap text-[11px]">
                       <Link href={base} className="font-bold hover:underline" style={{ color: "#5E5495" }}>{r.entityName}</Link>
-                      <span style={{ color: "var(--muted)" }}>←</span>
-                      <Link href={`${base}/dimensions/${r.dimensionId}`} className="hover:underline" style={{ color: "#D4AF37" }}>📁 {r.dimensionName}</Link>
-                      <span style={{ color: "var(--muted)" }}>←</span>
-                      <Link href={`${base}/goals/${r.goalId}`} className="hover:underline" style={{ color: "#3D8C5A" }}>🎯 {r.goalTitle}</Link>
+                      {r.dimensionName && <>
+                        <span style={{ color: "var(--muted)" }}>←</span>
+                        <Link href={`${base}/dimensions/${r.dimensionId}`} className="hover:underline" style={{ color: "#D4AF37" }}>📁 {r.dimensionName}</Link>
+                      </>}
+                      {r.goalTitle && <>
+                        <span style={{ color: "var(--muted)" }}>←</span>
+                        <Link href={`${base}/goals/${r.goalId}`} className="hover:underline" style={{ color: "#3D8C5A" }}>🎯 {r.goalTitle}</Link>
+                      </>}
                     </div>
                   );
                 })() : (
                   <div className="flex items-center justify-center gap-1.5 flex-wrap text-[11px]">
-                    {circle?.name && <span className="font-bold" style={{ color: circle.color ?? "#5E5495" }}>{circle.icon ?? "●"} {circle.name}</span>}
-                    {circle?.name && task.goal?.title && <span style={{ color: "var(--muted)" }}>←</span>}
-                    {task.goal?.title && <span style={{ color: "#D4AF37" }}>🎯 {task.goal.title}</span>}
-                    {!circle?.name && !task.goal?.title && <span className="text-[10px]" style={{ color: "var(--muted)" }}>📋 مهمة مستقلة — غير مرتبطة بهدف</span>}
+                    <span className="text-[10px]" style={{ color: "var(--muted)" }}>📋 مهمة مستقلة</span>
                   </div>
                 )}
               </div>

@@ -143,7 +143,7 @@ interface TaskRow {
   goalId?: string;
   goalTitle?: string;
   root?: {
-    kind: "job" | "role";
+    kind: "job" | "role" | "legacy";
     entityId: string;
     entityName: string;
     entitySlug?: string | null;

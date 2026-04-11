@@ -95,7 +95,7 @@ export interface SmartTask {
   projectId?: string;
   project?: { id: string; title: string };
   root?: {
-    kind: 'job' | 'role';
+    kind: 'job' | 'role' | 'legacy';
     entityId: string;
     entityName: string;
     entitySlug?: string | null;

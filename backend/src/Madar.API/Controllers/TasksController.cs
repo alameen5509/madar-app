@@ -159,6 +159,28 @@ public class TasksController : BaseController
             }
         }
 
+        // Fallback: for tasks with GoalId/LifeCircleId but no JobGoalTasks/RoleGoalTasks link,
+        // build a simple root from the old system so they don't show as "مستقلة"
+        foreach (var t in tasks)
+        {
+            if (roots.ContainsKey(t.id)) continue;
+            if (t.goal != null || t.lifeCircle != null)
+            {
+                roots[t.id] = new
+                {
+                    taskId = t.id,
+                    kind = "legacy",
+                    entityId = t.lifeCircle != null ? (object)t.lifeCircle.id : Guid.Empty,
+                    entityName = t.lifeCircle?.name ?? "",
+                    entitySlug = (string?)null,
+                    dimensionId = Guid.Empty,
+                    dimensionName = "",
+                    goalId = t.goal != null ? (object)t.goal.Id : Guid.Empty,
+                    goalTitle = t.goal?.Title ?? ""
+                };
+            }
+        }
+
         // Merge root into each task response
         var withRoots = tasks.Select(t => new
         {
