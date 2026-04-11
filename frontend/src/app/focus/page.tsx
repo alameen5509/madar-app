@@ -26,7 +26,7 @@ export default function FocusPage() {
     return saved ? parseInt(saved) || 0 : 0;
   });
   const [stats, setStats] = useState({ total: 0, completed: 0, cancelled: 0 });
-  const [sessionCtx, setSessionCtx] = useState<"all" | "office" | "outside" | "haram">("all");
+  const [sessionCtx, setSessionCtx] = useState<"office" | "outside" | "haram">("outside");
   const [showEdit, setShowEdit] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
@@ -51,15 +51,13 @@ export default function FocusPage() {
           if ((h !== 0 || m !== 0) && due > nowTime) return false;
         }
         // Session context filter
-        if (sessionCtx !== "all") {
-          const ctx = (t.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
-          const ctxMap: Record<string, string[]> = {
-            office: ["Office", "Computer", "Anywhere"],
-            outside: ["Outside", "Phone", "Anywhere"],
-            haram: ["Haram", "Anywhere"],
-          };
-          if (!ctxMap[sessionCtx]?.includes(ctx)) return false;
-        }
+        const ctx = (t.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
+        const ctxMap: Record<string, string[]> = {
+          outside: ["Outside", "Phone", "Anywhere", "Haram", "Home"],
+          office: ["Office", "Computer", "Anywhere"],
+          haram: ["Haram", "Anywhere"],
+        };
+        if (!ctxMap[sessionCtx]?.includes(ctx)) return false;
         return true;
       });
       setStats({ total: all.length, completed, cancelled });
@@ -296,9 +294,8 @@ export default function FocusPage() {
         {/* Session context */}
         <div className="flex gap-1.5">
           {([
-            { key: "all", label: "الكل", icon: "📋" },
+            { key: "outside", label: "غير مكتبي", icon: "🚶" },
             { key: "office", label: "مكتبي", icon: "💻" },
-            { key: "outside", label: "خارجي", icon: "🚶" },
             { key: "haram", label: "الحرم", icon: "🕌" },
           ] as const).map(s => (
             <button key={s.key} onClick={() => { setSessionCtx(s.key); load(); }}
@@ -415,12 +412,11 @@ export default function FocusPage() {
                 })()}
               </div>
               {/* Change task context */}
-              <div className="flex items-center justify-center gap-1">
+              <div className="flex items-center justify-center gap-2">
                 {[
-                  { key: "Office", icon: "💻" },
-                  { key: "Outside", icon: "🚶" },
-                  { key: "Haram", icon: "🕌" },
-                  { key: "Anywhere", icon: "📋" },
+                  { key: "Office", icon: "💻", label: "مكتبي" },
+                  { key: "Anywhere", icon: "🚶", label: "غير مكتبي" },
+                  { key: "Haram", icon: "🕌", label: "الحرم" },
                 ].map(c => {
                   const current = (task.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
                   return (
@@ -428,9 +424,9 @@ export default function FocusPage() {
                       try { await api.post(`/api/tasks/${task.id}/update`, { taskContext: c.key }); } catch {}
                       setTasks(prev => prev.map((t, i) => i === idx ? { ...t, contextNote: (t.contextNote ?? "").replace(/ctx:\w+/, "") + `|ctx:${c.key}` } : t));
                     }}
-                      className="px-2 py-1 rounded-lg text-[9px] font-bold transition"
-                      style={{ background: current === c.key ? "#5E549515" : "transparent", color: current === c.key ? "#5E5495" : "var(--muted)" }}>
-                      {c.icon}
+                      className="px-3 py-2 rounded-xl text-[10px] font-bold transition"
+                      style={{ background: current === c.key ? "#5E5495" : "var(--bg)", color: current === c.key ? "#fff" : "var(--muted)", border: `1px solid ${current === c.key ? "#5E5495" : "var(--card-border)"}` }}>
+                      {c.icon} {c.label}
                     </button>
                   );
                 })}
