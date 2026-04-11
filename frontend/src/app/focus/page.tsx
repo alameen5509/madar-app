@@ -15,9 +15,9 @@ export default function FocusPage() {
   const [loading, setLoading] = useState(true);
   const [idx, setIdxRaw] = useState(() => {
     if (typeof window === "undefined") return 0;
-    return parseInt(sessionStorage.getItem("focus_idx") ?? "0") || 0;
+    return parseInt(localStorage.getItem("focus_idx") ?? "0") || 0;
   });
-  function setIdx(n: number) { setIdxRaw(n); sessionStorage.setItem("focus_idx", String(n)); }
+  function setIdx(n: number) { setIdxRaw(n); localStorage.setItem("focus_idx", String(n)); }
   const [showDone, setShowDone] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
   const [timerSecs, setTimerSecs] = useState(0);
@@ -149,13 +149,13 @@ export default function FocusPage() {
   useEffect(() => {
     const currentId = tasks[idx]?.id ?? "";
     if (currentId && currentId !== lastTaskId) {
-      const savedId = sessionStorage.getItem("focus_task_id");
+      const savedId = localStorage.getItem("focus_task_id");
       if (savedId !== currentId) {
         // New task — record start time
-        sessionStorage.setItem("focus_start", String(Date.now()));
+        localStorage.setItem("focus_start", String(Date.now()));
       }
       setLastTaskId(currentId);
-      sessionStorage.setItem("focus_task_id", currentId);
+      localStorage.setItem("focus_task_id", currentId);
     }
   }, [idx, tasks, lastTaskId]);
 
@@ -163,7 +163,7 @@ export default function FocusPage() {
   useEffect(() => {
     if (tasks.length === 0) return;
     function calc() {
-      const start = parseInt(sessionStorage.getItem("focus_start") ?? "0");
+      const start = parseInt(localStorage.getItem("focus_start") ?? "0");
       if (start > 0) setTimerSecs(Math.floor((Date.now() - start) / 1000));
     }
     calc();
@@ -213,8 +213,8 @@ export default function FocusPage() {
 
   function removeCurrentTask() {
     setTimerSecs(0);
-    sessionStorage.setItem("focus_start", String(Date.now()));
-    sessionStorage.removeItem("focus_task_id");
+    localStorage.setItem("focus_start", String(Date.now()));
+    localStorage.removeItem("focus_task_id");
     setTasks(prev => prev.filter((_, i) => i !== idx));
     if (idx >= tasks.length - 1) setIdx(Math.max(0, idx - 1));
   }
