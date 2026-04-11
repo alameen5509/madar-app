@@ -21,25 +21,15 @@ export default function FocusPage() {
   const [newPriority, setNewPriority] = useState(3);
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerSecs, setTimerSecs] = useState(0);
+  const [postponedIds, setPostponedIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get("/api/tasks");
       const all = (data ?? []) as SmartTask[];
-      const nowTime = new Date();
-      // Filter: pending, not inbox/cancelled, and not postponed to later today
-      const pending = all.filter(t => {
-        if (t.status === "Completed" || t.status === "Inbox" || t.status === "Cancelled") return false;
-        // Hide tasks postponed to later today (dueDate has future time)
-        if (t.dueDate) {
-          const due = new Date(t.dueDate);
-          const dueDate = t.dueDate.slice(0, 10);
-          const today = localDateStr();
-          if (dueDate === today && due > nowTime) return false; // postponed to later today
-        }
-        return true;
-      });
+      // Filter: pending only, no inbox, no cancelled
+      const pending = all.filter(t => t.status !== "Completed" && t.status !== "Inbox" && t.status !== "Cancelled");
       // Sort: overdue first → today → tomorrow → future → no date last
       pending.sort((a, b) => {
         const da = a.dueDate?.slice(0, 10) ?? "9999";
