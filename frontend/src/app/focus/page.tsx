@@ -25,6 +25,8 @@ export default function FocusPage() {
   const [sessionCtx, setSessionCtx] = useState<"office" | "outside" | "haram">("outside");
   const [nextPrayer, setNextPrayer] = useState<{ name: string; mins: number } | null>(null);
   const [sessionCounts, setSessionCounts] = useState<Record<string, number>>({});
+  const [inactiveTasks, setInactiveTasks] = useState<SmartTask[]>([]);
+  const [showInactive, setShowInactive] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [pickTime, setPickTime] = useState("");
@@ -56,12 +58,27 @@ export default function FocusPage() {
         const ctxMap: Record<string, string[]> = {
           outside: ["Outside", "Phone", "Anywhere", "Haram", "Home"],
           office: ["Office", "Computer", "Anywhere"],
-          haram: ["Haram", "Anywhere"],
+          haram: ["Haram"],
         };
         if (!ctxMap[sessionCtx]?.includes(ctx)) return false;
         return true;
       });
       setStats({ total: all.length, completed, cancelled });
+      // Inactive: future + no-date + hour-postponed (same session context)
+      const inactive = all.filter(t => {
+        if (t.status === "Completed" || t.status === "Cancelled") return false;
+        if (pending.some(p => p.id === t.id)) return false; // already in active
+        const ctx = (t.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
+        const ctxMap2: Record<string, string[]> = { outside: ["Outside","Phone","Anywhere","Haram","Home"], office: ["Office","Computer","Anywhere"], haram: ["Haram","Anywhere"] };
+        if (!ctxMap2[sessionCtx]?.includes(ctx)) return false;
+        return true;
+      });
+      inactive.sort((a, b) => {
+        const da = a.dueDate?.slice(0, 10) ?? "9999";
+        const db = b.dueDate?.slice(0, 10) ?? "9999";
+        return da.localeCompare(db);
+      });
+      setInactiveTasks(inactive);
       // Count tasks per session (before session filter)
       const allPending = all.filter(t => t.status !== "Completed" && t.status !== "Cancelled");
       const ctxMapAll: Record<string, string[]> = {
@@ -286,19 +303,26 @@ export default function FocusPage() {
     </main>
   );
 
-  if (tasks.length === 0) {
+  if (tasks.length === 0 && !showInactive) {
     const sessionLabels: Record<string, string> = { office: "مكتبي", outside: "غير مكتبي", haram: "الحرم" };
     return (
       <main className="flex-1 flex flex-col items-center justify-center gap-4 px-6" style={{ background: "var(--bg)" }}>
         <p className="text-5xl">🎉</p>
-        <p className="font-black text-lg" style={{ color: "var(--text)" }}>لا توجد مهام!</p>
-        <p className="text-xs" style={{ color: "var(--muted)" }}>لا توجد مهام في جلسة "{sessionLabels[sessionCtx]}" — جرّب تغيير الجلسة</p>
+        <p className="font-black text-lg" style={{ color: "var(--text)" }}>أنجزت المهام المستحقة!</p>
+        <p className="text-xs" style={{ color: "var(--muted)" }}>لا توجد مهام مستحقة في جلسة "{sessionLabels[sessionCtx]}"</p>
+        {inactiveTasks.length > 0 && (
+          <button onClick={() => { setTasks(inactiveTasks); setShowInactive(true); setIdx(0); }}
+            className="px-6 py-3 rounded-xl text-sm font-bold text-white transition active:scale-95"
+            style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>
+            📋 عرض المهام القادمة ({inactiveTasks.length} مهمة)
+          </button>
+        )}
         <div className="flex gap-2">
           {(["outside", "office", "haram"] as const).map(s => {
             const count = sessionCounts[s] ?? 0;
             const label = s === "outside" ? "🚶 غير مكتبي" : s === "office" ? "💻 مكتبي" : "🕌 الحرم";
             return (
-              <button key={s} onClick={() => { setSessionCtx(s); }}
+              <button key={s} onClick={() => { setSessionCtx(s); setShowInactive(false); }}
                 className="px-4 py-2.5 rounded-xl text-xs font-bold transition"
                 style={{ background: sessionCtx === s ? "#5E5495" : "var(--card)", color: sessionCtx === s ? "#fff" : "var(--muted)", border: `1px solid ${sessionCtx === s ? "#5E5495" : "var(--card-border)"}` }}>
                 {label} {count > 0 && <span className="mr-1 px-1.5 py-0.5 rounded-full text-[9px]" style={{ background: sessionCtx === s ? "rgba(255,255,255,0.2)" : "#3D8C5A20", color: sessionCtx === s ? "#fff" : "#3D8C5A" }}>{count}</span>}
