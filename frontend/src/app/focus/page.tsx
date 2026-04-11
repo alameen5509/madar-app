@@ -37,9 +37,11 @@ export default function FocusPage() {
         if (da !== db) return da.localeCompare(db);
         return (b.userPriority ?? 0) - (a.userPriority ?? 0);
       });
+      // Log first task for debugging
+      if (pending.length > 0) console.log("[Focus] sample task:", JSON.stringify({ title: pending[0].title, root: pending[0].root, goal: pending[0].goal, lifeCircle: pending[0].lifeCircle }, null, 2));
       setTasks(pending);
       setIdx(0);
-    } catch {}
+    } catch (err) { console.error("[Focus] load error:", err); }
     setLoading(false);
   }, []);
 
