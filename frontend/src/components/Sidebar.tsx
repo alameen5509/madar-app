@@ -7,10 +7,10 @@ import { EightPointedStar, SidebarPattern } from "@/components/IslamicPattern";
 
 /* ─── Badge counts ─────────────────────────────────────────────── */
 
-interface BadgeCounts { tasks: number; inbox: number; habits: number; dues: number; }
+interface BadgeCounts { tasks: number; inbox: number; habits: number; dues: number; focus: number; }
 
 function loadBadgeCounts(): BadgeCounts {
-  if (typeof window === "undefined") return { tasks: 0, inbox: 0, habits: 0, dues: 0 };
+  if (typeof window === "undefined") return { tasks: 0, inbox: 0, habits: 0, dues: 0, focus: 0 };
   let habitsCount = 0;
   try {
     const habits = JSON.parse(localStorage.getItem("madar_habits") ?? "[]");
@@ -20,7 +20,7 @@ function loadBadgeCounts(): BadgeCounts {
       !h.isIdea && !(lastDate === today && h.todayDone)).length;
   } catch {}
   const duesCount = 0;
-  return { tasks: 0, inbox: 0, habits: habitsCount, dues: duesCount };
+  return { tasks: 0, inbox: 0, habits: habitsCount, dues: duesCount, focus: 0 };
 }
 
 /* ─── Nav items ───────────────────────────────────────────────── */
@@ -28,7 +28,7 @@ function loadBadgeCounts(): BadgeCounts {
 const NAV_GROUPS = [
   { group: null, items: [
     { icon: "↻", label: "عبادات وعادات",      href: "/habits",      badgeKey: "habits" as const, fixed: true },
-    { icon: "🎯", label: "التركيز",            href: "/focus",       badgeKey: null, fixed: true },
+    { icon: "🎯", label: "التركيز",            href: "/focus",       badgeKey: "focus" as const, fixed: true },
     { icon: "◻", label: "أعمال اليوم",        href: "/tasks",       badgeKey: "tasks" as const, fixed: true },
   ]},
   { group: "التخطيط", items: [
@@ -58,7 +58,7 @@ const NAV_GROUPS = [
   ]},
 ];
 
-type BadgeKey = "tasks" | "habits" | "inbox" | "dues" | null;
+type BadgeKey = "tasks" | "habits" | "inbox" | "dues" | "focus" | null;
 type NavItem = { icon: string; label: string; href: string; badgeKey: BadgeKey; fixed: boolean };
 const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap(g => g.items as NavItem[]);
 
@@ -68,9 +68,10 @@ const DEFAULT_ORDER = NAV_ITEMS.map(i => i.href);
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [badges, setBadges] = useState<BadgeCounts>({ tasks: 0, inbox: 0, habits: 0, dues: 0 });
+  const [badges, setBadges] = useState<BadgeCounts>({ tasks: 0, inbox: 0, habits: 0, dues: 0, focus: 0 });
   const [apiTasks, setApiTasks] = useState(0);
   const [apiInbox, setApiInbox] = useState(0);
+  const [apiFocus, setApiFocus] = useState(0);
 
   // ترتيب القائمة
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
@@ -86,7 +87,9 @@ export default function Sidebar() {
     import("@/lib/api").then(({ api }) => {
       api.get("/api/tasks").then((r) => {
         const all = r.data as { status: string }[];
-        setApiTasks(all.filter((t) => t.status !== "Completed" && t.status !== "Cancelled").length);
+        const pending = all.filter((t) => t.status !== "Completed" && t.status !== "Cancelled" && t.status !== "Inbox");
+        setApiTasks(pending.length);
+        setApiFocus(pending.length);
         setApiInbox(all.filter((t) => t.status === "Inbox").length);
       }).catch(() => {});
     });
@@ -102,7 +105,7 @@ export default function Sidebar() {
     });
   }, []);
 
-  const counts: BadgeCounts = { ...badges, tasks: apiTasks, inbox: apiInbox };
+  const counts: BadgeCounts = { ...badges, tasks: apiTasks, inbox: apiInbox, focus: apiFocus };
 
   useEffect(() => { const h = () => refresh(); window.addEventListener("storage", h); return () => window.removeEventListener("storage", h); }, [refresh]);
   useEffect(() => { const h = () => refresh(); window.addEventListener("madar-update", h); return () => window.removeEventListener("madar-update", h); }, [refresh]);

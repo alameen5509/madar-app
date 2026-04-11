@@ -390,6 +390,7 @@ function PrayerSection() {
   const [showSettings, setShowSettings] = useState(false);
   const [tasbih, setTasbih] = useState<{ penaltyId: string } | null>(null);
   const [sunnahDone, setSunnahDone] = useState<Record<string, boolean>>({});
+  const [sunnahLoaded, setSunnahLoaded] = useState(false);
   const [sunnahWaiting, setSunnahWaiting] = useState<Record<string, boolean>>({});
   const [sunnahSkipped, setSunnahSkipped] = useState<Record<string, boolean>>({});
   const [celebrateSunnah, setCelebrateSunnah] = useState<string | null>(null);
@@ -468,6 +469,7 @@ function PrayerSection() {
       }
       setPrayerState(state);
       setSunnahDone(sd);
+      setSunnahLoaded(true);
     }).catch(() => {});
   }, []);
 
@@ -721,7 +723,7 @@ function PrayerSection() {
       })()}
 
       {/* ═══ Sunnah Tracking — card-based like prayers ═══ */}
-      {(() => {
+      {sunnahLoaded && (() => {
         // Time-based filtering: only show sunnah when its time has come
         const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
         const startMap: Record<string, number> = salahTimes ? {
