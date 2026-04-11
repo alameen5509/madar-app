@@ -188,7 +188,8 @@ export default function FocusPage() {
     if (!t) return;
     const d = new Date();
     d.setDate(d.getDate() + days);
-    try { await api.post(`/api/tasks/${t.id}/update`, { dueDate: d.toISOString() }); } catch {}
+    const localISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T00:00:00`;
+    try { await api.post(`/api/tasks/${t.id}/update`, { dueDate: localISO }); } catch {}
     removeCurrentTask();
   }
 
@@ -197,9 +198,9 @@ export default function FocusPage() {
     if (!t) return;
     const d = new Date();
     d.setHours(d.getHours() + hours);
-    const timeStr = `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-    try { await api.post(`/api/tasks/${t.id}/update`, { dueDate: d.toISOString() }); } catch {}
-    // No confirmation — instant action
+    // Send as local datetime string (no UTC conversion) so backend stores it as-is
+    const localISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}:00`;
+    try { await api.post(`/api/tasks/${t.id}/update`, { dueDate: localISO }); } catch {}
     removeCurrentTask();
   }
 
@@ -250,11 +251,11 @@ export default function FocusPage() {
     const [h, m] = pickTime.split(":").map(Number);
     const d = new Date();
     d.setHours(h, m, 0, 0);
-    // If time is past today, set for tomorrow
     if (d < new Date()) d.setDate(d.getDate() + 1);
+    const localISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}:00`;
     try {
-      await api.post(`/api/tasks/${t.id}/update`, { dueDate: d.toISOString() });
-      setTasks(prev => prev.map((tk, i) => i === idx ? { ...tk, dueDate: d.toISOString() } : tk));
+      await api.post(`/api/tasks/${t.id}/update`, { dueDate: localISO });
+      setTasks(prev => prev.map((tk, i) => i === idx ? { ...tk, dueDate: localISO } : tk));
     } catch {}
     setShowTimePicker(false); setPickTime("");
   }
