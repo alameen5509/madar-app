@@ -32,10 +32,22 @@ export default function FocusPage() {
     try {
       const { data } = await api.get("/api/tasks");
       const all = (data ?? []) as SmartTask[];
-      // Filter: pending only, no inbox, no cancelled
+      const nowTime = new Date();
       const completed = all.filter(t => t.status === "Completed").length;
       const cancelled = all.filter(t => t.status === "Cancelled").length;
-      const pending = all.filter(t => t.status !== "Completed" && t.status !== "Inbox" && t.status !== "Cancelled");
+      // Filter: pending, hide hour-postponed tasks until their time arrives
+      const pending = all.filter(t => {
+        if (t.status === "Completed" || t.status === "Inbox" || t.status === "Cancelled") return false;
+        // Tasks postponed by hours have a specific time in dueDate (not midnight)
+        // Hide them until their time arrives
+        if (t.dueDate && t.dueDate.includes("T")) {
+          const timePart = t.dueDate.split("T")[1] ?? "";
+          if (timePart && !timePart.startsWith("00:00")) {
+            if (new Date(t.dueDate) > nowTime) return false;
+          }
+        }
+        return true;
+      });
       setStats({ total: all.length, completed, cancelled });
       // Sort: overdue first → today → tomorrow → future → no date last
       pending.sort((a, b) => {
