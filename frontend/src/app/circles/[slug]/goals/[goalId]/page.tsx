@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { calcGoalProgress, type RoleDim, type RoleGoalData } from "@/components/RoleTree";
 import { NewTaskDialog } from "@/app/tasks/page";
+import { NewProjectDialog } from "@/app/projects/page";
 
 interface ProjectInfo { id: string; title: string; description?: string; status?: string; targetDate?: string; progressPercent?: number; }
 interface TaskInfo { id: string; title: string; status: string; description?: string; dueDate?: string; userPriority?: number; }
@@ -231,13 +232,15 @@ export default function RoleGoalPage({ params }: { params: Promise<{ slug: strin
           </div>
         )}
         {showAdd === "newproject" && (
-          <div className="p-5 rounded-2xl border-2 fade-up space-y-3" style={{ background: "var(--card)", borderColor: "#5E549540" }}>
-            <p className="text-xs font-bold" style={{ color: "#5E5495" }}>مشروع جديد</p>
-            <input value={fTitle} onChange={e => setFTitle(e.target.value)} placeholder="اسم المشروع *" autoFocus className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none" style={IS} />
-            <input value={fDesc} onChange={e => setFDesc(e.target.value)} placeholder="وصف (اختياري)" className="w-full px-3 py-2 rounded-xl border text-xs focus:outline-none" style={IS} />
-            <input type="date" value={fDate} onChange={e => setFDate(e.target.value)} className="w-full px-3 py-2 rounded-xl border text-xs focus:outline-none" style={IS} />
-            <div className="flex gap-2"><button onClick={createProject} className="px-4 py-2 rounded-xl text-xs font-bold text-white" style={{ background: "#5E5495" }}>إنشاء وربط</button><button onClick={resetForm} className="px-3 py-2 rounded-xl text-xs text-[#6B7280] bg-gray-100">إلغاء</button></div>
-          </div>
+          <NewProjectDialog circles={[]} works={[]} onClose={() => setShowAdd(null)}
+            onCreated={async () => {
+              try {
+                const { data: allGoals } = await api.get("/api/goals");
+                const sorted = (allGoals ?? []).sort((a: { id: string }, b: { id: string }) => b.id.localeCompare(a.id));
+                if (sorted[0]?.id) await api.post(`/api/role-goals/${goalId}/link-project`, { id: sorted[0].id });
+              } catch {}
+              load();
+            }} />
         )}
         {showAdd === "linkproject" && (
           <div className="p-5 rounded-2xl border-2 fade-up space-y-2" style={{ background: "var(--card)", borderColor: "#5E549540" }}>

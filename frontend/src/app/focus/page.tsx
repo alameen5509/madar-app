@@ -12,14 +12,22 @@ function localDateStr(d?: Date): string {
 export default function FocusPage() {
   const [tasks, setTasks] = useState<SmartTask[]>([]);
   const [loading, setLoading] = useState(true);
-  const [idx, setIdx] = useState(0);
+  const [idx, setIdxRaw] = useState(() => {
+    if (typeof window === "undefined") return 0;
+    return parseInt(sessionStorage.getItem("focus_idx") ?? "0") || 0;
+  });
+  function setIdx(n: number) { setIdxRaw(n); sessionStorage.setItem("focus_idx", String(n)); }
   const [showDone, setShowDone] = useState(false);
   const [showUrgent, setShowUrgent] = useState(false);
   const [urgentTitle, setUrgentTitle] = useState("");
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newPriority, setNewPriority] = useState(3);
-  const [timerSecs, setTimerSecs] = useState(0);
+  const [timerSecs, setTimerSecs] = useState(() => {
+    if (typeof window === "undefined") return 0;
+    const saved = sessionStorage.getItem("focus_timer");
+    return saved ? parseInt(saved) || 0 : 0;
+  });
   const [stats, setStats] = useState({ total: 0, completed: 0, cancelled: 0 });
   const [sessionCtx, setSessionCtx] = useState<"all" | "office" | "outside" | "haram">("all");
   const [showEdit, setShowEdit] = useState(false);
@@ -73,15 +81,34 @@ export default function FocusPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Auto-start timer when task changes
+  // Auto-start timer when task changes (only reset if different task)
+  const [lastTaskId, setLastTaskId] = useState("");
   useEffect(() => {
-    setTimerSecs(0);
-  }, [idx]);
+    const currentId = tasks[idx]?.id ?? "";
+    if (currentId && currentId !== lastTaskId) {
+      // New task — check if we had a saved timer for it
+      const savedId = sessionStorage.getItem("focus_task_id");
+      if (savedId === currentId) {
+        // Same task as before refresh — keep timer
+      } else {
+        setTimerSecs(0);
+        sessionStorage.setItem("focus_timer", "0");
+      }
+      setLastTaskId(currentId);
+      sessionStorage.setItem("focus_task_id", currentId);
+    }
+  }, [idx, tasks, lastTaskId]);
 
-  // Timer always running
+  // Timer always running — save every 5 seconds
   useEffect(() => {
     if (tasks.length === 0) return;
-    const t = setInterval(() => setTimerSecs(s => s + 1), 1000);
+    const t = setInterval(() => {
+      setTimerSecs(s => {
+        const next = s + 1;
+        if (next % 5 === 0) sessionStorage.setItem("focus_timer", String(next));
+        return next;
+      });
+    }, 1000);
     return () => clearInterval(t);
   }, [tasks.length]);
 
@@ -126,7 +153,8 @@ export default function FocusPage() {
   }
 
   function removeCurrentTask() {
-    setTimerSecs(0);
+    setTimerSecs(0); sessionStorage.setItem("focus_timer", "0");
+    sessionStorage.removeItem("focus_task_id");
     setTasks(prev => prev.filter((_, i) => i !== idx));
     if (idx >= tasks.length - 1) setIdx(Math.max(0, idx - 1));
   }

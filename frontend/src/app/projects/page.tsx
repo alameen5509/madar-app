@@ -534,7 +534,7 @@ function ProjectCard({ goal, circleMap, prefs, onTogglePin, onClick, daysLeft, i
    NEW PROJECT DIALOG
    ═══════════════════════════════════════════════════════════════════════ */
 
-function NewProjectDialog({ circles, works, onClose, onCreated }: {
+export function NewProjectDialog({ circles, works, onClose, onCreated }: {
   circles: LifeCircle[]; works: { id: string; name: string; type: string }[];
   onClose: () => void; onCreated: () => void;
 }) {
