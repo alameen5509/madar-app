@@ -373,12 +373,17 @@ export default function FocusPage() {
                 {task.root ? (() => {
                   const r = task.root;
                   if (r.kind === "legacy") {
-                    // Old system: show circle + goal without dimension
+                    const eid = String(r.entityId ?? "");
+                    const gid = String(r.goalId ?? "");
                     return (
                       <div className="flex items-center justify-center gap-1.5 flex-wrap text-[11px]">
-                        {r.entityName && <span className="font-bold" style={{ color: "#5E5495" }}>{r.entityName}</span>}
+                        {r.entityName && (
+                          <Link href={eid ? `/circles/${eid}` : "/circles"} className="font-bold hover:underline" style={{ color: "#5E5495" }}>{r.entityName}</Link>
+                        )}
                         {r.entityName && r.goalTitle && <span style={{ color: "var(--muted)" }}>←</span>}
-                        {r.goalTitle && <span style={{ color: "#D4AF37" }}>🎯 {r.goalTitle}</span>}
+                        {r.goalTitle && (
+                          <Link href={gid ? `/projects?id=${gid}` : "/projects"} className="hover:underline" style={{ color: "#D4AF37" }}>🎯 {r.goalTitle}</Link>
+                        )}
                       </div>
                     );
                   }
