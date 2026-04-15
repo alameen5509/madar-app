@@ -3219,15 +3219,15 @@ export default function TasksPage() {
           </button>
         </div>
         {/* Session filter */}
-        <div className="flex gap-1 mt-2 flex-wrap">
+        <div className="grid grid-cols-4 gap-1 mt-2">
           <button onClick={() => setSessionFilter("all")}
-            className="px-2 py-1 rounded-lg text-[10px] font-bold transition"
+            className="py-1 rounded-lg text-[10px] font-bold transition"
             style={{ background: sessionFilter === "all" ? "#5E5495" : "transparent", color: sessionFilter === "all" ? "#fff" : "#7C7A8E", border: `1px solid ${sessionFilter === "all" ? "#5E5495" : "#E2D5B0"}` }}>
             🔄 الكل
           </button>
           {FOCUS_SESSIONS.map(s => (
             <button key={s.key} onClick={() => setSessionFilter(s.key)}
-              className="px-2 py-1 rounded-lg text-[10px] font-bold transition"
+              className="py-1 rounded-lg text-[10px] font-bold transition"
               style={{ background: sessionFilter === s.key ? "#5E5495" : "transparent", color: sessionFilter === s.key ? "#fff" : "#7C7A8E", border: `1px solid ${sessionFilter === s.key ? "#5E5495" : "#E2D5B0"}` }}>
               {s.icon} {s.label}
             </button>

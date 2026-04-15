@@ -431,7 +431,7 @@ export default function FocusPage() {
           </div>
         </div>
         {/* Session context */}
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="grid grid-cols-3 gap-1.5">
           {([
             { key: "outside", label: "عام", icon: "🚶" },
             { key: "office", label: "مكتبي", icon: "💻" },
@@ -439,13 +439,17 @@ export default function FocusPage() {
             { key: "mobile", label: "الجوال", icon: "📱" },
             { key: "dev", label: "التطوير", icon: "🛠️" },
             { key: "home", label: "المنزل", icon: "🏠" },
-          ] as const).map(s => (
-            <button key={s.key} onClick={() => { setSessionCtx(s.key); load(); }}
-              className="px-3 py-1.5 rounded-lg text-[10px] font-bold transition"
-              style={{ background: sessionCtx === s.key ? "#5E5495" : "var(--bg)", color: sessionCtx === s.key ? "#fff" : "var(--muted)", border: `1px solid ${sessionCtx === s.key ? "#5E5495" : "var(--card-border)"}` }}>
-              {s.icon} {s.label}
-            </button>
-          ))}
+          ] as const).map(s => {
+            const count = sessionCounts[s.key] ?? 0;
+            return (
+              <button key={s.key} onClick={() => { setSessionCtx(s.key); load(); }}
+                className="flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold transition"
+                style={{ background: sessionCtx === s.key ? "#5E5495" : "var(--bg)", color: sessionCtx === s.key ? "#fff" : "var(--muted)", border: `1px solid ${sessionCtx === s.key ? "#5E5495" : "var(--card-border)"}` }}>
+                {s.icon} {s.label}
+                {count > 0 && <span className="min-w-[16px] h-4 flex items-center justify-center rounded-full text-[8px] font-bold px-1" style={{ background: sessionCtx === s.key ? "rgba(255,255,255,0.25)" : "#5E549520", color: sessionCtx === s.key ? "#fff" : "#5E5495" }}>{count}</span>}
+              </button>
+            );
+          })}
         </div>
       </header>
 
@@ -559,7 +563,7 @@ export default function FocusPage() {
                 })()}
               </div>
               {/* Change task session */}
-              <div className="flex items-center justify-center gap-1.5 flex-wrap">
+              <div className="grid grid-cols-3 gap-1.5">
                 {[
                   { key: "outside", icon: "🚶", label: "عام" },
                   { key: "office", icon: "💻", label: "مكتبي" },
@@ -574,7 +578,7 @@ export default function FocusPage() {
                       try { await api.post(`/api/tasks/${task.id}/update`, { session: c.key === "outside" ? "" : c.key }); } catch {}
                       load();
                     }}
-                      className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition"
+                      className="py-1.5 rounded-xl text-[10px] font-bold transition"
                       style={{ background: currentSession === c.key ? "#5E5495" : "var(--bg)", color: currentSession === c.key ? "#fff" : "var(--muted)", border: `1px solid ${currentSession === c.key ? "#5E5495" : "var(--card-border)"}` }}>
                       {c.icon} {c.label}
                     </button>
