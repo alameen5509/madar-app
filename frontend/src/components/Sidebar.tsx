@@ -7,10 +7,10 @@ import { EightPointedStar, SidebarPattern } from "@/components/IslamicPattern";
 
 /* ─── Badge counts ─────────────────────────────────────────────── */
 
-interface BadgeCounts { tasks: number; inbox: number; habits: number; dues: number; focus: number; }
+interface BadgeCounts { tasks: number; inbox: number; habits: number; dues: number; focus: number; warRoom: number; }
 
 function loadBadgeCounts(): BadgeCounts {
-  if (typeof window === "undefined") return { tasks: 0, inbox: 0, habits: 0, dues: 0, focus: 0 };
+  if (typeof window === "undefined") return { tasks: 0, inbox: 0, habits: 0, dues: 0, focus: 0, warRoom: 0 };
   let habitsCount = 0;
   try {
     const habits = JSON.parse(localStorage.getItem("kv_habits") ?? localStorage.getItem("madar_habits") ?? "[]");
@@ -18,7 +18,7 @@ function loadBadgeCounts(): BadgeCounts {
       !h.isIdea && !h.todayDone).length;
   } catch {}
   const duesCount = 0;
-  return { tasks: 0, inbox: 0, habits: habitsCount, dues: duesCount, focus: 0 };
+  return { tasks: 0, inbox: 0, habits: habitsCount, dues: duesCount, focus: 0, warRoom: 0 };
 }
 
 /* ─── Nav items ───────────────────────────────────────────────── */
@@ -26,7 +26,7 @@ function loadBadgeCounts(): BadgeCounts {
 const NAV_GROUPS = [
   { group: null, items: [
     { icon: "↻", label: "عبادات وعادات",      href: "/habits",      badgeKey: "habits" as const, fixed: true },
-    { icon: "🎖️", label: "غرفة القيادة",       href: "/war-room",    badgeKey: null, fixed: true },
+    { icon: "🎖️", label: "غرفة القيادة",       href: "/war-room",    badgeKey: "warRoom" as const, fixed: true },
     { icon: "🌐", label: "إدارة المواقع",      href: "/web-projects", badgeKey: null, fixed: true },
     { icon: "🎯", label: "التركيز",            href: "/focus",       badgeKey: "focus" as const, fixed: true },
     { icon: "📜", label: "التاريخ",            href: "/history",     badgeKey: null, fixed: true },
@@ -56,7 +56,7 @@ const NAV_GROUPS = [
   ]},
 ];
 
-type BadgeKey = "tasks" | "habits" | "inbox" | "dues" | "focus" | null;
+type BadgeKey = "tasks" | "habits" | "inbox" | "dues" | "focus" | "warRoom" | null;
 type NavItem = { icon: string; label: string; href: string; badgeKey: BadgeKey; fixed: boolean };
 const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap(g => g.items as NavItem[]);
 
@@ -66,10 +66,11 @@ const DEFAULT_ORDER = NAV_ITEMS.map(i => i.href);
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [badges, setBadges] = useState<BadgeCounts>({ tasks: 0, inbox: 0, habits: 0, dues: 0, focus: 0 });
+  const [badges, setBadges] = useState<BadgeCounts>({ tasks: 0, inbox: 0, habits: 0, dues: 0, focus: 0, warRoom: 0 });
   const [apiTasks, setApiTasks] = useState(0);
   const [apiInbox, setApiInbox] = useState(0);
   const [apiFocus, setApiFocus] = useState(0);
+  const [apiWarRoom, setApiWarRoom] = useState(0);
 
   // ترتيب القائمة
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
@@ -100,6 +101,11 @@ export default function Sidebar() {
         setApiFocus(focusTasks.length);
         setApiInbox(all.filter((t) => t.status === "Inbox").length);
       }).catch(() => {});
+      // War-room: count critical (red) roles
+      api.get("/api/war-room/roles").then((r) => {
+        const roles = (r.data ?? []) as { pulseStatus?: string }[];
+        setApiWarRoom(roles.filter(r => r.pulseStatus === "red").length);
+      }).catch(() => {});
     });
   }, [pathname]);
 
@@ -113,7 +119,7 @@ export default function Sidebar() {
     });
   }, []);
 
-  const counts: BadgeCounts = { ...badges, tasks: apiTasks, inbox: apiInbox, focus: apiFocus };
+  const counts: BadgeCounts = { ...badges, tasks: apiTasks, inbox: apiInbox, focus: apiFocus, warRoom: apiWarRoom };
 
   useEffect(() => { const h = () => refresh(); window.addEventListener("storage", h); return () => window.removeEventListener("storage", h); }, [refresh]);
   useEffect(() => { const h = () => refresh(); window.addEventListener("madar-update", h); return () => window.removeEventListener("madar-update", h); }, [refresh]);
@@ -223,7 +229,12 @@ export default function Sidebar() {
                       {counts.tasks}
                     </span>
                   )}
-                </>) : count > 0 ? (
+                </>) : count > 0 && item.badgeKey === "warRoom" ? (
+                  <span className="min-w-[20px] h-5 flex items-center justify-center rounded-full text-[10px] font-bold px-1.5"
+                    style={{ background: "#DC2626", color: "#fff" }}>
+                    {count > 99 ? "99+" : count}
+                  </span>
+                ) : count > 0 ? (
                   <span className="min-w-[20px] h-5 flex items-center justify-center rounded-full text-[10px] font-bold px-1.5"
                     style={{ background: "#D4AF37", color: "#1A1A2E" }}>
                     {count > 99 ? "99+" : count}

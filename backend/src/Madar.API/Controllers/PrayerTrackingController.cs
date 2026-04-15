@@ -155,6 +155,10 @@ public class PrayerTrackingController : BaseController
             _db.PrayerLogs.Add(log);
         }
 
+        // السنن والنوافل: عقوبة واحدة فقط على عدم الأداء (بدون وقت أو مسجد)
+        var sunnahKeys = new HashSet<string> { "Duha", "Witr", "SunnahFajr", "Rawatib" };
+        var isSunnah = sunnahKeys.Contains(req.Prayer);
+
         // Penalty 1: not prayed at all (only if prayer was never logged)
         if (notLoggedAtAll)
         {
@@ -172,37 +176,41 @@ public class PrayerTrackingController : BaseController
             }
         }
 
-        // Penalty 2: not on time
-        if (!prayedOnTime)
+        // الفرائض فقط: عقوبات إضافية على الوقت والمسجد
+        if (!isSunnah)
         {
-            var exists = await _db.PrayerPenalties.AnyAsync(p =>
-                p.OwnerId == UserId && p.Date == date && p.Prayer == req.Prayer && p.Reason == "not_on_time", ct);
-            if (!exists)
+            // Penalty 2: not on time
+            if (!prayedOnTime)
             {
-                _db.PrayerPenalties.Add(new PrayerPenalty
+                var exists = await _db.PrayerPenalties.AnyAsync(p =>
+                    p.OwnerId == UserId && p.Date == date && p.Prayer == req.Prayer && p.Reason == "not_on_time", ct);
+                if (!exists)
                 {
-                    Id = Guid.NewGuid(), OwnerId = UserId,
-                    Date = date, Prayer = req.Prayer,
-                    Reason = "not_on_time",
-                    PenaltyType = GetPenaltyType(req.Prayer, "time"),
-                });
+                    _db.PrayerPenalties.Add(new PrayerPenalty
+                    {
+                        Id = Guid.NewGuid(), OwnerId = UserId,
+                        Date = date, Prayer = req.Prayer,
+                        Reason = "not_on_time",
+                        PenaltyType = GetPenaltyType(req.Prayer, "time"),
+                    });
+                }
             }
-        }
 
-        // Penalty 3: not in mosque
-        if (!prayedInMosque)
-        {
-            var exists = await _db.PrayerPenalties.AnyAsync(p =>
-                p.OwnerId == UserId && p.Date == date && p.Prayer == req.Prayer && p.Reason == "not_in_mosque", ct);
-            if (!exists)
+            // Penalty 3: not in mosque
+            if (!prayedInMosque)
             {
-                _db.PrayerPenalties.Add(new PrayerPenalty
+                var exists = await _db.PrayerPenalties.AnyAsync(p =>
+                    p.OwnerId == UserId && p.Date == date && p.Prayer == req.Prayer && p.Reason == "not_in_mosque", ct);
+                if (!exists)
                 {
-                    Id = Guid.NewGuid(), OwnerId = UserId,
-                    Date = date, Prayer = req.Prayer,
-                    Reason = "not_in_mosque",
-                    PenaltyType = GetPenaltyType(req.Prayer, "mosque"),
-                });
+                    _db.PrayerPenalties.Add(new PrayerPenalty
+                    {
+                        Id = Guid.NewGuid(), OwnerId = UserId,
+                        Date = date, Prayer = req.Prayer,
+                        Reason = "not_in_mosque",
+                        PenaltyType = GetPenaltyType(req.Prayer, "mosque"),
+                    });
+                }
             }
         }
 

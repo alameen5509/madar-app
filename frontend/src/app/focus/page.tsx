@@ -200,6 +200,32 @@ export default function FocusPage() {
     }, 1200);
   }
 
+  async function completeAndRepeat() {
+    const t = tasks[idx];
+    if (!t) return;
+    setShowDone(true);
+    try {
+      // 1. Mark current task as completed
+      await api.patch(`/api/tasks/${t.id}/status`, { status: "Completed" });
+      // 2. Create new task for tomorrow with same details
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth()+1).padStart(2,"0")}-${String(tomorrow.getDate()).padStart(2,"0")}T00:00:00`;
+      await api.post("/api/tasks", {
+        title: t.title,
+        description: t.description,
+        userPriority: t.userPriority,
+        dueDate: tomorrowStr,
+        contextNote: t.contextNote,
+      });
+    } catch {}
+    setTimeout(() => {
+      setShowDone(false);
+      removeCurrentTask();
+      load();
+    }, 1200);
+  }
+
   async function postponeTo(days: number) {
     const t = tasks[idx];
     if (!t) return;
@@ -552,9 +578,16 @@ export default function FocusPage() {
                   style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)" }}>
                   أنجزتها ✅ {timerSecs >= 60 ? `(${Math.floor(timerSecs / 60)} د)` : ""}
                 </button>
-                <button onClick={markFrog}
+                <button onClick={completeAndRepeat}
                   className="py-4 rounded-2xl text-sm font-black transition-all active:scale-95"
-                  style={{ background: "#F59E0B15", color: "#F59E0B", border: "2px solid #F59E0B40" }}>
+                  style={{ background: "#3D8C5A15", color: "#3D8C5A", border: "2px solid #3D8C5A40" }}>
+                  أنجز وأعد غداً 🔁
+                </button>
+              </div>
+              <div className="grid grid-cols-1">
+                <button onClick={markFrog}
+                  className="py-2.5 rounded-xl text-[11px] font-bold transition-all active:scale-95"
+                  style={{ background: "#F59E0B15", color: "#F59E0B", border: "1px solid #F59E0B30" }}>
                   🐸 ضفدع
                 </button>
               </div>
