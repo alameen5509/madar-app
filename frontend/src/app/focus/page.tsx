@@ -369,13 +369,31 @@ export default function FocusPage() {
     </main>
   );
 
+  // Auto-switch to next session with tasks when current session is empty
+  useEffect(() => {
+    if (tasks.length === 0 && !showInactive && !loading) {
+      const order: typeof sessionCtx[] = ["outside", "office", "haram", "mobile", "dev", "home"];
+      const next = order.find(s => s !== sessionCtx && (sessionCounts[s] ?? 0) > 0);
+      if (next) {
+        // Show brief notification then switch
+        const toast = document.createElement("div");
+        toast.textContent = `✅ أنجزت مهام الجلسة — الانتقال للجلسة التالية`;
+        toast.style.cssText = "position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#3D8C5A;color:#fff;padding:8px 16px;border-radius:12px;font-size:12px;font-weight:bold;z-index:100;transition:opacity 0.3s";
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.style.opacity = "0"; setTimeout(() => toast.remove(), 300); }, 1500);
+        setSessionCtx(next);
+        load();
+      }
+    }
+  }, [tasks.length, showInactive, loading, sessionCtx, sessionCounts]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (tasks.length === 0 && !showInactive) {
-    const sessionLabels: Record<string, string> = { office: "مكتبي", outside: "عام", haram: "الحرم", mobile: "الجوال", dev: "التطوير", home: "المنزل" };
+    // All sessions empty — show completion screen
     return (
       <main className="flex-1 flex flex-col items-center justify-center gap-4 px-6" style={{ background: "var(--bg)" }}>
         <p className="text-5xl">🎉</p>
-        <p className="font-black text-lg" style={{ color: "var(--text)" }}>أنجزت المهام المستحقة!</p>
-        <p className="text-xs" style={{ color: "var(--muted)" }}>لا توجد مهام مستحقة في جلسة "{sessionLabels[sessionCtx]}"</p>
+        <p className="font-black text-lg" style={{ color: "var(--text)" }}>أنجزت جميع المهام المستحقة!</p>
+        <p className="text-xs" style={{ color: "var(--muted)" }}>لا توجد مهام مستحقة في أي جلسة</p>
         {inactiveTasks.length > 0 && (
           <button onClick={() => { setTasks(inactiveTasks); setShowInactive(true); setIdx(0); }}
             className="px-6 py-3 rounded-xl text-sm font-bold text-white transition active:scale-95"
@@ -383,20 +401,6 @@ export default function FocusPage() {
             📋 عرض المهام القادمة ({inactiveTasks.length} مهمة)
           </button>
         )}
-        <div className="flex gap-2">
-          {(["outside", "office", "haram", "mobile", "dev", "home"] as const).map(s => {
-            const count = sessionCounts[s] ?? 0;
-            const labels: Record<string, string> = { outside: "🚶 عام", office: "💻 مكتبي", haram: "🕌 الحرم", mobile: "📱 الجوال", dev: "🛠️ التطوير", home: "🏠 المنزل" };
-            const label = labels[s];
-            return (
-              <button key={s} onClick={() => { setSessionCtx(s); setShowInactive(false); }}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold transition"
-                style={{ background: sessionCtx === s ? "#5E5495" : "var(--card)", color: sessionCtx === s ? "#fff" : "var(--muted)", border: `1px solid ${sessionCtx === s ? "#5E5495" : "var(--card-border)"}` }}>
-                {label} {count > 0 && <span className="mr-1 px-1.5 py-0.5 rounded-full text-[9px]" style={{ background: sessionCtx === s ? "rgba(255,255,255,0.2)" : "#3D8C5A20", color: sessionCtx === s ? "#fff" : "#3D8C5A" }}>{count}</span>}
-              </button>
-            );
-          })}
-        </div>
         <Link href="/tasks" className="text-xs hover:underline mt-2" style={{ color: "#5E5495" }}>← العودة للمهام</Link>
       </main>
     );
