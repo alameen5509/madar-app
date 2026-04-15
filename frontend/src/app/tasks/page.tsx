@@ -2048,11 +2048,9 @@ function TodaySummary() {
   useEffect(() => {
     function load() {
       try {
-        const h = JSON.parse(localStorage.getItem("madar_habits") ?? "[]");
-        const lastDate = localStorage.getItem("madar_habits_date");
-        const today = new Date().toDateString();
+        const h = JSON.parse(localStorage.getItem("kv_habits") ?? localStorage.getItem("madar_habits") ?? "[]");
         const active = h.filter((x: { isIdea: boolean }) => !x.isIdea);
-        const done = active.filter((x: { todayDone: boolean }) => lastDate === today && x.todayDone).length;
+        const done = active.filter((x: { todayDone: boolean }) => x.todayDone).length;
         setHabitsLocal({ total: active.length, done });
       } catch {}
       import("@/lib/api").then(({ api: a }) => {
@@ -2433,20 +2431,20 @@ export default function TasksPage() {
       // Load ALL habits from localStorage (general + hygiene)
       let allLocalHabits: { id: string; title: string; icon: string; category?: string; isIdea?: boolean; streak: number; todayDone: boolean; enabled?: boolean }[] = [];
       try {
-        // General habits
-        const gh = JSON.parse(localStorage.getItem("madar_habits") ?? "[]");
-        const ghDate = localStorage.getItem("madar_habits_date");
+        // General habits — try synced KV first, fall back to legacy key
+        const ghRaw = localStorage.getItem("kv_habits") ?? localStorage.getItem("madar_habits") ?? "[]";
+        const gh = JSON.parse(ghRaw);
         const today = new Date().toDateString();
         for (const h of gh) {
           if (h.isIdea) continue;
-          allLocalHabits.push({ ...h, todayDone: ghDate === today ? h.todayDone : false });
+          allLocalHabits.push({ ...h });
         }
-        // Hygiene habits
-        const hh = JSON.parse(localStorage.getItem("madar_hygiene") ?? "[]");
-        const hhDate = localStorage.getItem("madar_hygiene_date");
+        // Hygiene habits — try synced KV first, fall back to legacy key
+        const hhRaw = localStorage.getItem("kv_hygiene") ?? localStorage.getItem("madar_hygiene") ?? "[]";
+        const hh = JSON.parse(hhRaw);
         for (const h of hh) {
           if (h.enabled === false) continue;
-          allLocalHabits.push({ ...h, id: "hyg_" + h.id, todayDone: hhDate === today ? h.todayDone : false });
+          allLocalHabits.push({ ...h, id: "hyg_" + h.id });
         }
       } catch {}
       const activeHabits = allLocalHabits;

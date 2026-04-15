@@ -13,11 +13,9 @@ function loadBadgeCounts(): BadgeCounts {
   if (typeof window === "undefined") return { tasks: 0, inbox: 0, habits: 0, dues: 0, focus: 0 };
   let habitsCount = 0;
   try {
-    const habits = JSON.parse(localStorage.getItem("madar_habits") ?? "[]");
-    const lastDate = localStorage.getItem("madar_habits_date");
-    const today = new Date().toDateString();
+    const habits = JSON.parse(localStorage.getItem("kv_habits") ?? localStorage.getItem("madar_habits") ?? "[]");
     habitsCount = habits.filter((h: { isIdea: boolean; todayDone: boolean }) =>
-      !h.isIdea && !(lastDate === today && h.todayDone)).length;
+      !h.isIdea && !h.todayDone).length;
   } catch {}
   const duesCount = 0;
   return { tasks: 0, inbox: 0, habits: habitsCount, dues: duesCount, focus: 0 };
