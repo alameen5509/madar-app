@@ -2266,6 +2266,7 @@ export default function TasksPage() {
   const [tasks, setTasks]       = useState<TaskRow[]>([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState("");
+  const [sessionFilter, setSessionFilter] = useState<string>("all");
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
   const [subTasks, setSubTasks] = useState<Record<string, { id: string; title: string; status: string; userPriority: number }[]>>({});
   const [showDialog, setShowDialog] = useState(false);
@@ -2579,7 +2580,19 @@ export default function TasksPage() {
   const inAdhan      = isInAdhanWindow(prayers, nowMinState);
   const weekend      = isWeekend();
   // لا نخفي مهام العمل — نعرض الكل دائماً
-  const baseTasks    = tasks;
+  const SESSION_CTX_MAP: Record<string, string[]> = {
+    outside: ["Outside", "Phone", "Anywhere", "Haram", "Home"],
+    office: ["Office", "Computer", "Anywhere"],
+    haram: ["Haram", "Anywhere"],
+    mobile: ["Phone", "Online", "Anywhere"],
+    dev: ["Computer", "Online", "Anywhere"],
+    home: ["Home", "Phone", "Online", "Anywhere"],
+  };
+  const baseTasks    = sessionFilter === "all" ? tasks : tasks.filter(t => {
+    if (t.context === "habit" || t.context === "meeting") return true;
+    const allowed = SESSION_CTX_MAP[sessionFilter];
+    return allowed ? allowed.includes(t.context) : true;
+  });
   const visibleTasks = taskFilter === "all" ? baseTasks
     : taskFilter === "pending" ? baseTasks.filter((t) => !t.done)
     : taskFilter === "done" ? baseTasks.filter((t) => t.done)
@@ -3200,6 +3213,21 @@ export default function TasksPage() {
             className="px-2 py-1.5 rounded-lg text-[11px] font-semibold transition border border-gray-200 text-[#6B7280] hover:bg-gray-50 flex-shrink-0">
             ⚙
           </button>
+        </div>
+        {/* Session filter */}
+        <div className="flex gap-1 mt-2 flex-wrap">
+          <button onClick={() => setSessionFilter("all")}
+            className="px-2 py-1 rounded-lg text-[10px] font-bold transition"
+            style={{ background: sessionFilter === "all" ? "#5E5495" : "transparent", color: sessionFilter === "all" ? "#fff" : "#7C7A8E", border: `1px solid ${sessionFilter === "all" ? "#5E5495" : "#E2D5B0"}` }}>
+            🔄 الكل
+          </button>
+          {FOCUS_SESSIONS.map(s => (
+            <button key={s.key} onClick={() => setSessionFilter(s.key)}
+              className="px-2 py-1 rounded-lg text-[10px] font-bold transition"
+              style={{ background: sessionFilter === s.key ? "#5E5495" : "transparent", color: sessionFilter === s.key ? "#fff" : "#7C7A8E", border: `1px solid ${sessionFilter === s.key ? "#5E5495" : "#E2D5B0"}` }}>
+              {s.icon} {s.label}
+            </button>
+          ))}
         </div>
       </header>
 

@@ -3,9 +3,14 @@
 .next
 backend
 wear
+mobile
 *.zip
 *.pdf
+*.exe
+*.msi
+*.docx
 app_logs*
+app_logs_debug
 latest_logs
 azure_logs*
 node_modules
