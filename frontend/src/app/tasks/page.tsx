@@ -438,22 +438,7 @@ export function NewTaskDialog({
             <input id="dueDatePickerTop" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition" />
           </div>
-          <div>
-            <label className="block text-sm font-semibold text-[#1A1830] mb-2">الفترة المناسبة</label>
-            <div className="flex gap-1.5 flex-wrap">
-              {SUITABLE_PERIODS.map((sp) => (
-                <button key={sp.key} type="button" onClick={() => setSuitablePeriod(sp.key)}
-                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all"
-                  style={{
-                    background: suitablePeriod === sp.key ? "#2C2C54" : "#F8F6F0",
-                    color: suitablePeriod === sp.key ? "#fff" : "#7C7A8E",
-                    border: `1px solid ${suitablePeriod === sp.key ? "#2C2C54" : "#E2D5B0"}`,
-                  }}>
-                  {sp.icon} {sp.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* الفترة المناسبة — hidden */}
           <div>
             <label className="block text-sm font-semibold text-[#1A1830] mb-2">الأولوية</label>
             <div className="flex gap-2 flex-wrap">
@@ -470,22 +455,7 @@ export function NewTaskDialog({
               ))}
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-semibold text-[#1A1830] mb-2">مستوى التركيز</label>
-            <div className="flex gap-2 flex-wrap">
-              {LOAD_OPTIONS.map((l) => (
-                <button key={l.value} type="button" onClick={() => setLoad(l.value)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                  style={{
-                    background: cognitiveLoad === l.value ? "#C9A84C" : "#F8F6F0",
-                    color:      cognitiveLoad === l.value ? "#fff"     : "#7C7A8E",
-                    border:     `1px solid ${cognitiveLoad === l.value ? "#C9A84C" : "#E2D5B0"}`,
-                  }}>
-                  {l.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* مستوى التركيز — hidden */}
           <div>
             <label className="block text-sm font-semibold text-[#1A1830] mb-2">جلسة التركيز</label>
             <div className="flex gap-1.5 flex-wrap">
@@ -502,33 +472,7 @@ export function NewTaskDialog({
               ))}
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-semibold text-[#1A1830] mb-2">بيئة المهمة</label>
-            <div className="flex gap-1.5 flex-wrap">
-              {TASK_CONTEXTS.map((c) => (
-                <button key={c.key} type="button" onClick={() => setTaskContext(c.key)}
-                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all"
-                  style={{
-                    background: taskContext === c.key ? "#5E5495" : "#F8F6F0",
-                    color: taskContext === c.key ? "#fff" : "#7C7A8E",
-                    border: `1px solid ${taskContext === c.key ? "#5E5495" : "#E2D5B0"}`,
-                  }}>
-                  {c.icon} {c.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            {/* Assign to user */}
-            <div className="mt-3">
-              <label className="block text-sm font-semibold text-[#1A1830] mb-1.5">إسناد لشخص <span className="text-[#7C7A8E] font-normal">(اختياري)</span></label>
-              <select value={assignTo} onChange={(e) => setAssignTo(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition">
-                <option value="">أنا (بدون إسناد)</option>
-                {platformUsers.map((u) => <option key={u.id} value={u.email}>{u.fullName}</option>)}
-              </select>
-            </div>
-          </div>
+          {/* بيئة المهمة + إسناد — hidden */}
           {/* Recurrence */}
           <div>
             <label className="flex items-center gap-3 cursor-pointer select-none mb-2">
@@ -599,16 +543,7 @@ export function NewTaskDialog({
             })()}
           </div>
 
-          {/* Work task toggle */}
-          <label className="flex items-center gap-3 cursor-pointer select-none">
-            <div onClick={() => setIsWorkTask(!isWorkTask)}
-              className="relative w-10 h-5 rounded-full transition-all flex-shrink-0"
-              style={{ background: isWorkTask ? "#2D6B9E" : "#E2D5B0" }}>
-              <div className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all"
-                style={{ right: isWorkTask ? "0.125rem" : "1.25rem" }} />
-            </div>
-            <span className="text-sm text-[#1A1830]">مهمة عمل <span className="text-[#7C7A8E] text-xs">(لا تظهر الجمعة والسبت)</span></span>
-          </label>
+          {/* مهمة عمل — hidden */}
 
           {/* Urgent */}
           <label className="flex items-center gap-3 cursor-pointer select-none">
