@@ -120,6 +120,15 @@ const TASK_CONTEXTS = [
   { key: "Car",      label: "مشوار",  icon: "🚗" },
 ] as const;
 
+const FOCUS_SESSIONS = [
+  { key: "outside", label: "غير مكتبي", icon: "🚶", defaultCtx: "Outside" },
+  { key: "office",  label: "مكتبي",     icon: "💻", defaultCtx: "Office" },
+  { key: "haram",   label: "الحرم",     icon: "🕌", defaultCtx: "Anywhere" },
+  { key: "mobile",  label: "الجوال",    icon: "📱", defaultCtx: "Phone" },
+  { key: "dev",     label: "التطوير",   icon: "🛠️", defaultCtx: "Online" },
+  { key: "home",    label: "المنزل",   icon: "🏠", defaultCtx: "Home" },
+] as const;
+
 interface TaskRow {
   id: string;
   title: string;
@@ -469,6 +478,22 @@ export function NewTaskDialog({
                     border:     `1px solid ${cognitiveLoad === l.value ? "#C9A84C" : "#E2D5B0"}`,
                   }}>
                   {l.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-[#1A1830] mb-2">جلسة التركيز</label>
+            <div className="flex gap-1.5 flex-wrap">
+              {FOCUS_SESSIONS.map((s) => (
+                <button key={s.key} type="button" onClick={() => setTaskContext(s.defaultCtx)}
+                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all"
+                  style={{
+                    background: s.defaultCtx === taskContext ? "#5E5495" : "#F8F6F0",
+                    color: s.defaultCtx === taskContext ? "#fff" : "#7C7A8E",
+                    border: `1px solid ${s.defaultCtx === taskContext ? "#5E5495" : "#E2D5B0"}`,
+                  }}>
+                  {s.icon} {s.label}
                 </button>
               ))}
             </div>

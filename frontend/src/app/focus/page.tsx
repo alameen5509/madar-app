@@ -22,7 +22,7 @@ export default function FocusPage() {
   const [showAddTask, setShowAddTask] = useState(false);
   const [timerSecs, setTimerSecs] = useState(0);
   const [stats, setStats] = useState({ total: 0, completed: 0, cancelled: 0 });
-  const [sessionCtx, setSessionCtx] = useState<"office" | "outside" | "haram">("outside");
+  const [sessionCtx, setSessionCtx] = useState<"office" | "outside" | "haram" | "mobile" | "dev" | "home">("outside");
   const [nextPrayer, setNextPrayer] = useState<{ name: string; mins: number } | null>(null);
   const [sessionCounts, setSessionCounts] = useState<Record<string, number>>({});
   const [inactiveTasks, setInactiveTasks] = useState<SmartTask[]>([]);
@@ -59,6 +59,9 @@ export default function FocusPage() {
           outside: ["Outside", "Phone", "Anywhere", "Haram", "Home"],
           office: ["Office", "Computer", "Anywhere"],
           haram: ["Haram"],
+          mobile: ["Phone", "Online", "Anywhere"],
+          dev: ["Computer", "Online", "Anywhere"],
+          home: ["Home", "Phone", "Online", "Anywhere"],
         };
         if (!ctxMap[sessionCtx]?.includes(ctx)) return false;
         return true;
@@ -69,7 +72,7 @@ export default function FocusPage() {
         if (t.status === "Completed" || t.status === "Cancelled") return false;
         if (pending.some(p => p.id === t.id)) return false; // already in active
         const ctx = (t.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
-        const ctxMap2: Record<string, string[]> = { outside: ["Outside","Phone","Anywhere","Haram","Home"], office: ["Office","Computer","Anywhere"], haram: ["Haram","Anywhere"] };
+        const ctxMap2: Record<string, string[]> = { outside: ["Outside","Phone","Anywhere","Haram","Home"], office: ["Office","Computer","Anywhere"], haram: ["Haram","Anywhere"], mobile: ["Phone","Online","Anywhere"], dev: ["Computer","Online","Anywhere"], home: ["Home","Phone","Online","Anywhere"] };
         if (!ctxMap2[sessionCtx]?.includes(ctx)) return false;
         return true;
       });
@@ -85,9 +88,12 @@ export default function FocusPage() {
         outside: ["Outside", "Phone", "Anywhere", "Haram", "Home"],
         office: ["Office", "Computer", "Anywhere"],
         haram: ["Haram", "Anywhere"],
+        mobile: ["Phone", "Online", "Anywhere"],
+        dev: ["Computer", "Online", "Anywhere"],
+        home: ["Home", "Phone", "Online", "Anywhere"],
       };
       const counts: Record<string, number> = {};
-      for (const s of ["outside", "office", "haram"]) {
+      for (const s of ["outside", "office", "haram", "mobile", "dev", "home"]) {
         counts[s] = allPending.filter(t => {
           const ctx = (t.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
           return ctxMapAll[s]?.includes(ctx);
@@ -304,7 +310,7 @@ export default function FocusPage() {
   );
 
   if (tasks.length === 0 && !showInactive) {
-    const sessionLabels: Record<string, string> = { office: "مكتبي", outside: "غير مكتبي", haram: "الحرم" };
+    const sessionLabels: Record<string, string> = { office: "مكتبي", outside: "غير مكتبي", haram: "الحرم", mobile: "الجوال", dev: "التطوير", home: "المنزل" };
     return (
       <main className="flex-1 flex flex-col items-center justify-center gap-4 px-6" style={{ background: "var(--bg)" }}>
         <p className="text-5xl">🎉</p>
@@ -318,9 +324,10 @@ export default function FocusPage() {
           </button>
         )}
         <div className="flex gap-2">
-          {(["outside", "office", "haram"] as const).map(s => {
+          {(["outside", "office", "haram", "mobile", "dev", "home"] as const).map(s => {
             const count = sessionCounts[s] ?? 0;
-            const label = s === "outside" ? "🚶 غير مكتبي" : s === "office" ? "💻 مكتبي" : "🕌 الحرم";
+            const labels: Record<string, string> = { outside: "🚶 غير مكتبي", office: "💻 مكتبي", haram: "🕌 الحرم", mobile: "📱 الجوال", dev: "🛠️ التطوير", home: "🏠 المنزل" };
+            const label = labels[s];
             return (
               <button key={s} onClick={() => { setSessionCtx(s); setShowInactive(false); }}
                 className="px-4 py-2.5 rounded-xl text-xs font-bold transition"
@@ -369,6 +376,9 @@ export default function FocusPage() {
             { key: "outside", label: "غير مكتبي", icon: "🚶" },
             { key: "office", label: "مكتبي", icon: "💻" },
             { key: "haram", label: "الحرم", icon: "🕌" },
+            { key: "mobile", label: "الجوال", icon: "📱" },
+            { key: "dev", label: "التطوير", icon: "🛠️" },
+            { key: "home", label: "المنزل", icon: "🏠" },
           ] as const).map(s => (
             <button key={s.key} onClick={() => { setSessionCtx(s.key); load(); }}
               className="flex-1 py-2 rounded-lg text-[10px] font-bold transition"

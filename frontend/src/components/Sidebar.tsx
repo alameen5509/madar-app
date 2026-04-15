@@ -28,14 +28,16 @@ function loadBadgeCounts(): BadgeCounts {
 const NAV_GROUPS = [
   { group: null, items: [
     { icon: "↻", label: "عبادات وعادات",      href: "/habits",      badgeKey: "habits" as const, fixed: true },
+    { icon: "🎖️", label: "غرفة القيادة",       href: "/war-room",    badgeKey: null, fixed: true },
+    { icon: "🌐", label: "إدارة المواقع",      href: "/web-projects", badgeKey: null, fixed: true },
     { icon: "🎯", label: "التركيز",            href: "/focus",       badgeKey: "focus" as const, fixed: true },
-    { icon: "◻", label: "أعمال اليوم",        href: "/tasks",       badgeKey: "tasks" as const, fixed: true },
+    { icon: "📜", label: "التاريخ",            href: "/history",     badgeKey: null, fixed: true },
+    { icon: "◇", label: "الإدارة المالية",    href: "/finance",     badgeKey: "dues" as const, fixed: true },
   ]},
   { group: "التخطيط", items: [
+    { icon: "◻", label: "أعمال اليوم",        href: "/tasks",       badgeKey: "tasks" as const, fixed: false },
     { icon: "▣", label: "المشاريع",           href: "/projects",    badgeKey: null, fixed: false },
     { icon: "◈", label: "الأعمال",            href: "/works",       badgeKey: null, fixed: false },
-    { icon: "🎖️", label: "غرفة القيادة",       href: "/war-room",    badgeKey: null, fixed: false },
-    { icon: "🌐", label: "إدارة المواقع",      href: "/web-projects", badgeKey: null, fixed: false },
     { icon: "📅", label: "الاجتماعات",         href: "/meetings",    badgeKey: null, fixed: false },
     { icon: "✦", label: "صندوق الوارد",      href: "/inbox",       badgeKey: "inbox" as const, fixed: false },
   ]},
@@ -44,11 +46,9 @@ const NAV_GROUPS = [
     { icon: "📵", label: "إدمان الجوال",      href: "/phone-addiction", badgeKey: null, fixed: false },
   ]},
   { group: "الإدارة", items: [
-    { icon: "◇", label: "الإدارة المالية",    href: "/finance",     badgeKey: "dues" as const, fixed: false },
     { icon: "🍽️", label: "التغذية",            href: "/nutrition",   badgeKey: null, fixed: false },
   ]},
   { group: "المعرفة", items: [
-    { icon: "📜", label: "التاريخ",            href: "/history",     badgeKey: null, fixed: false },
     { icon: "◑", label: "الإحصائيات",         href: "/energy",      badgeKey: null, fixed: false },
   ]},
   { group: "النظام", items: [
