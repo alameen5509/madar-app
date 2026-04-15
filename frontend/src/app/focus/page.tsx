@@ -545,36 +545,37 @@ export default function FocusPage() {
                   {priorityLabel}
                 </span>
                 {(() => {
-                  const ctx = (task.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
-                  const ctxLabels: Record<string, { label: string; icon: string; color: string }> = {
-                    Office: { label: "مكتبي", icon: "💻", color: "#2D6B9E" },
-                    Computer: { label: "حاسوب", icon: "🖥️", color: "#5E5495" },
-                    Home: { label: "منزلي", icon: "🏠", color: "#D4AF37" },
-                    Outside: { label: "خارجي", icon: "🚶", color: "#3D8C5A" },
-                    Haram: { label: "الحرم", icon: "🕌", color: "#2C8C4A" },
-                    Phone: { label: "جوال", icon: "📱", color: "#F59E0B" },
-                    Anywhere: { label: "أي مكان", icon: "📋", color: "#9CA3AF" },
+                  const sessionTag = (task.contextNote ?? "").match(/session:(\w+)/)?.[1];
+                  const sessionLabels: Record<string, { label: string; icon: string; color: string }> = {
+                    outside: { label: "عام", icon: "🚶", color: "#3D8C5A" },
+                    office: { label: "مكتبي", icon: "💻", color: "#2D6B9E" },
+                    haram: { label: "الحرم", icon: "🕌", color: "#2C8C4A" },
+                    mobile: { label: "الجوال", icon: "📱", color: "#F59E0B" },
+                    dev: { label: "التطوير", icon: "🛠️", color: "#5E5495" },
+                    home: { label: "المنزل", icon: "🏠", color: "#D4AF37" },
                   };
-                  const c = ctxLabels[ctx] ?? ctxLabels.Anywhere;
-                  return <span className="text-[10px] px-2.5 py-1 rounded-full font-semibold" style={{ background: c.color + "15", color: c.color }}>{c.icon} {c.label}</span>;
+                  const s = sessionLabels[sessionTag ?? "outside"] ?? sessionLabels.outside;
+                  return <span className="text-[10px] px-2.5 py-1 rounded-full font-semibold" style={{ background: s.color + "15", color: s.color }}>{s.icon} {s.label}</span>;
                 })()}
               </div>
-              {/* Change task context */}
-              <div className="flex items-center justify-center gap-2">
+              {/* Change task session */}
+              <div className="flex items-center justify-center gap-1.5 flex-wrap">
                 {[
-                  { key: "Office", icon: "💻", label: "مكتبي" },
-                  { key: "Anywhere", icon: "🚶", label: "عام" },
-                  { key: "Haram", icon: "🕌", label: "الحرم" },
+                  { key: "outside", icon: "🚶", label: "عام" },
+                  { key: "office", icon: "💻", label: "مكتبي" },
+                  { key: "haram", icon: "🕌", label: "الحرم" },
+                  { key: "mobile", icon: "📱", label: "الجوال" },
+                  { key: "dev", icon: "🛠️", label: "التطوير" },
+                  { key: "home", icon: "🏠", label: "المنزل" },
                 ].map(c => {
-                  const current = (task.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
+                  const currentSession = (task.contextNote ?? "").match(/session:(\w+)/)?.[1] ?? "outside";
                   return (
                     <button key={c.key} onClick={async () => {
-                      try { await api.post(`/api/tasks/${task.id}/update`, { taskContext: c.key }); } catch {}
-                      // Reload to re-apply session filter
+                      try { await api.post(`/api/tasks/${task.id}/update`, { session: c.key === "outside" ? "" : c.key }); } catch {}
                       load();
                     }}
-                      className="px-3 py-2 rounded-xl text-[10px] font-bold transition"
-                      style={{ background: current === c.key ? "#5E5495" : "var(--bg)", color: current === c.key ? "#fff" : "var(--muted)", border: `1px solid ${current === c.key ? "#5E5495" : "var(--card-border)"}` }}>
+                      className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition"
+                      style={{ background: currentSession === c.key ? "#5E5495" : "var(--bg)", color: currentSession === c.key ? "#fff" : "var(--muted)", border: `1px solid ${currentSession === c.key ? "#5E5495" : "var(--card-border)"}` }}>
                       {c.icon} {c.label}
                     </button>
                   );
