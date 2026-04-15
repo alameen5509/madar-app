@@ -147,6 +147,7 @@ interface TaskRow {
   dueDate?: string;
   hasSubtasks: boolean;
   context: string;
+  sessionTag?: string;
   suitablePeriod: string; // all, fajr, duha, dhuhr, asr, maghrib, isha
   createdAt?: string;
   goalId?: string;
@@ -184,6 +185,7 @@ function toRow(t: SmartTask, circleOrderMap?: Map<string, number>): TaskRow {
     dueDate:  t.dueDate,
     hasSubtasks: false,
     context: (t.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere",
+    sessionTag: (t.contextNote ?? "").match(/session:(\w+)/)?.[1],
     suitablePeriod: (t.contextNote ?? "").match(/period:(\w+)/)?.[1] ?? "all",
     createdAt: t.createdAt,
     goalId: t.goal?.id,
@@ -299,6 +301,7 @@ export function NewTaskDialog({
   const [userPriority, setPriority] = useState<number>(3);
   const [cognitiveLoad, setLoad]    = useState<CreateTaskPayload["cognitiveLoad"]>("Medium");
   const [taskContext, setTaskContext] = useState("Anywhere");
+  const [taskSession, setTaskSession] = useState("");
   const [suitablePeriod, setSuitablePeriod] = useState("all");
   const [dueDate, setDueDate]       = useState(() => localDateStr());
   const [goalId, setGoalId]         = useState(defaultGoalId ?? "");
@@ -365,6 +368,7 @@ export function NewTaskDialog({
         waitingFor: waitingFor.trim() || undefined,
         taskContext: taskContext !== "Anywhere" ? taskContext : undefined,
         suitablePeriod: suitablePeriod !== "all" ? suitablePeriod : undefined,
+        session: taskSession || undefined,
         assignedToEmail: assignTo || undefined,
       });
       onCreated(toRow(task));
@@ -486,12 +490,12 @@ export function NewTaskDialog({
             <label className="block text-sm font-semibold text-[#1A1830] mb-2">جلسة التركيز</label>
             <div className="flex gap-1.5 flex-wrap">
               {FOCUS_SESSIONS.map((s) => (
-                <button key={s.key} type="button" onClick={() => setTaskContext(s.defaultCtx)}
+                <button key={s.key} type="button" onClick={() => { setTaskSession(taskSession === s.key ? "" : s.key); }}
                   className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all"
                   style={{
-                    background: s.defaultCtx === taskContext ? "#5E5495" : "#F8F6F0",
-                    color: s.defaultCtx === taskContext ? "#fff" : "#7C7A8E",
-                    border: `1px solid ${s.defaultCtx === taskContext ? "#5E5495" : "#E2D5B0"}`,
+                    background: taskSession === s.key ? "#5E5495" : "#F8F6F0",
+                    color: taskSession === s.key ? "#fff" : "#7C7A8E",
+                    border: `1px solid ${taskSession === s.key ? "#5E5495" : "#E2D5B0"}`,
                   }}>
                   {s.icon} {s.label}
                 </button>
@@ -2588,6 +2592,8 @@ export default function TasksPage() {
   };
   const baseTasks    = sessionFilter === "all" ? tasks : tasks.filter(t => {
     if (t.context === "habit" || t.context === "meeting") return true;
+    // Check explicit session tag first
+    if (t.sessionTag) return sessionFilter === "outside" || t.sessionTag === sessionFilter;
     const allowed = SESSION_CTX_MAP[sessionFilter];
     return allowed ? allowed.includes(t.context) : true;
   });

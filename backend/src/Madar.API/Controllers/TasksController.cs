@@ -324,6 +324,7 @@ public class TasksController : BaseController
                 req.WaitingFor != null ? $"waiting:{req.WaitingFor}" : null,
                 req.TaskContext != null ? $"ctx:{req.TaskContext}" : null,
                 req.SuitablePeriod != null && req.SuitablePeriod != "all" ? $"period:{req.SuitablePeriod}" : null,
+                req.Session != null ? $"session:{req.Session}" : null,
             }.Where(x => x != null)),
             Cost                   = req.Cost,
             CostCurrency           = req.CostCurrency ?? "SAR",
@@ -441,6 +442,14 @@ public class TasksController : BaseController
                 .Where(p => !p.StartsWith("period:")).ToList();
             if (req.SuitablePeriod != "all")
                 parts.Add($"period:{req.SuitablePeriod}");
+            task.ContextNote = string.Join("|", parts);
+        }
+        if (req.Session is not null)
+        {
+            var parts = (task.ContextNote ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries)
+                .Where(p => !p.StartsWith("session:")).ToList();
+            if (!string.IsNullOrEmpty(req.Session))
+                parts.Add($"session:{req.Session}");
             task.ContextNote = string.Join("|", parts);
         }
         task.UpdatedAt = DateTime.UtcNow;
@@ -633,6 +642,7 @@ public class CreateTaskRequest
     public string? WaitingFor { get; set; }
     public string? TaskContext { get; set; }
     public string? SuitablePeriod { get; set; }
+    public string? Session { get; set; }
     // Phase 3 fields
     public decimal? Cost { get; set; }
     public string? CostCurrency { get; set; }
@@ -652,6 +662,7 @@ public class UpdateTaskRequest
     public int? UserPriority { get; set; }
     public string? TaskContext { get; set; }
     public string? SuitablePeriod { get; set; }
+    public string? Session { get; set; }
     public Guid? LifeCircleId { get; set; }
     public Guid? GoalId { get; set; }
     public DateTime? DueDate { get; set; }

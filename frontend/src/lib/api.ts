@@ -314,6 +314,7 @@ export interface CreateTaskPayload {
   waitingFor?: string;
   taskContext?: string;
   suitablePeriod?: string;
+  session?: string;
   cost?: number;
   costCurrency?: string;
   assignedToEmail?: string;

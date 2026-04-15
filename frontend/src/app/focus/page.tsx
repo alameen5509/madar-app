@@ -64,17 +64,25 @@ export default function FocusPage() {
           const h = due.getHours(), m = due.getMinutes();
           if ((h !== 0 || m !== 0) && due > nowTime) return false;
         }
-        // Session context filter
-        const ctx = (t.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
-        const ctxMap: Record<string, string[]> = {
-          outside: ["Outside", "Phone", "Anywhere", "Haram", "Home"],
-          office: ["Office", "Computer"],
-          haram: ["Haram"],
-          mobile: ["Phone", "Online"],
-          dev: ["Computer", "Online"],
-          home: ["Home"],
-        };
-        if (!ctxMap[sessionCtx]?.includes(ctx)) return false;
+        // Session context filter — check explicit session tag first, then fall back to context
+        const note = t.contextNote ?? "";
+        const taskSessionTag = note.match(/session:(\w+)/)?.[1];
+        const ctx = note.match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
+        if (taskSessionTag) {
+          // Task has explicit session — only show in that session or عام
+          if (sessionCtx !== "outside" && taskSessionTag !== sessionCtx) return false;
+        } else {
+          // No session tag — filter by context
+          const ctxMap: Record<string, string[]> = {
+            outside: ["Outside", "Phone", "Anywhere", "Haram", "Home"],
+            office: ["Office", "Computer"],
+            haram: ["Haram"],
+            mobile: ["Phone", "Online"],
+            dev: ["Computer", "Online"],
+            home: ["Home"],
+          };
+          if (!ctxMap[sessionCtx]?.includes(ctx)) return false;
+        }
         return true;
       });
       setStats({ total: all.length, completed, cancelled });
@@ -82,9 +90,15 @@ export default function FocusPage() {
       const inactive = all.filter(t => {
         if (t.status === "Completed" || t.status === "Cancelled") return false;
         if (pending.some(p => p.id === t.id)) return false; // already in active
-        const ctx = (t.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
-        const ctxMap2: Record<string, string[]> = { outside: ["Outside","Phone","Anywhere","Haram","Home"], office: ["Office","Computer"], haram: ["Haram"], mobile: ["Phone","Online"], dev: ["Computer","Online"], home: ["Home"] };
-        if (!ctxMap2[sessionCtx]?.includes(ctx)) return false;
+        const note2 = t.contextNote ?? "";
+        const tSession = note2.match(/session:(\w+)/)?.[1];
+        const ctx = note2.match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
+        if (tSession) {
+          if (sessionCtx !== "outside" && tSession !== sessionCtx) return false;
+        } else {
+          const ctxMap2: Record<string, string[]> = { outside: ["Outside","Phone","Anywhere","Haram","Home"], office: ["Office","Computer"], haram: ["Haram"], mobile: ["Phone","Online"], dev: ["Computer","Online"], home: ["Home"] };
+          if (!ctxMap2[sessionCtx]?.includes(ctx)) return false;
+        }
         return true;
       });
       inactive.sort((a, b) => {
@@ -106,7 +120,10 @@ export default function FocusPage() {
       const counts: Record<string, number> = {};
       for (const s of ["outside", "office", "haram", "mobile", "dev", "home"]) {
         counts[s] = allPending.filter(t => {
-          const ctx = (t.contextNote ?? "").match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
+          const n = t.contextNote ?? "";
+          const ts = n.match(/session:(\w+)/)?.[1];
+          const ctx = n.match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
+          if (ts) return s === "outside" || ts === s;
           return ctxMapAll[s]?.includes(ctx);
         }).length;
       }
