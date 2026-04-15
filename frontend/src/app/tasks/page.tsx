@@ -121,7 +121,7 @@ const TASK_CONTEXTS = [
 ] as const;
 
 const FOCUS_SESSIONS = [
-  { key: "outside", label: "غير مكتبي", icon: "🚶", defaultCtx: "Outside" },
+  { key: "outside", label: "عام", icon: "🚶", defaultCtx: "Outside" },
   { key: "office",  label: "مكتبي",     icon: "💻", defaultCtx: "Office" },
   { key: "haram",   label: "الحرم",     icon: "🕌", defaultCtx: "Anywhere" },
   { key: "mobile",  label: "الجوال",    icon: "📱", defaultCtx: "Phone" },
@@ -2580,11 +2580,11 @@ export default function TasksPage() {
   // لا نخفي مهام العمل — نعرض الكل دائماً
   const SESSION_CTX_MAP: Record<string, string[]> = {
     outside: ["Outside", "Phone", "Anywhere", "Haram", "Home"],
-    office: ["Office", "Computer", "Anywhere"],
-    haram: ["Haram", "Anywhere"],
-    mobile: ["Phone", "Online", "Anywhere"],
-    dev: ["Computer", "Online", "Anywhere"],
-    home: ["Home", "Phone", "Online", "Anywhere"],
+    office: ["Office", "Computer"],
+    haram: ["Haram"],
+    mobile: ["Phone", "Online"],
+    dev: ["Computer", "Online"],
+    home: ["Home"],
   };
   const baseTasks    = sessionFilter === "all" ? tasks : tasks.filter(t => {
     if (t.context === "habit" || t.context === "meeting") return true;
