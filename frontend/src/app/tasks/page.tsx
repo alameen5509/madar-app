@@ -2593,7 +2593,7 @@ export default function TasksPage() {
   const baseTasks    = sessionFilter === "all" ? tasks : tasks.filter(t => {
     if (t.context === "habit" || t.context === "meeting") return true;
     // Check explicit session tag first
-    if (t.sessionTag) return sessionFilter === "outside" || t.sessionTag === sessionFilter;
+    if (t.sessionTag) return t.sessionTag === sessionFilter;
     const allowed = SESSION_CTX_MAP[sessionFilter];
     return allowed ? allowed.includes(t.context) : true;
   });

@@ -25,6 +25,7 @@ export default function FocusPage() {
   const [sessionCtx, setSessionCtx] = useState<"office" | "outside" | "haram" | "mobile" | "dev" | "home">("outside");
   const [nextPrayer, setNextPrayer] = useState<{ name: string; mins: number } | null>(null);
   const [sessionCounts, setSessionCounts] = useState<Record<string, number>>({});
+  const [sessionActiveCounts, setSessionActiveCounts] = useState<Record<string, number>>({});
   const [inactiveTasks, setInactiveTasks] = useState<SmartTask[]>([]);
   const [showInactive, setShowInactive] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -69,8 +70,8 @@ export default function FocusPage() {
         const taskSessionTag = note.match(/session:(\w+)/)?.[1];
         const ctx = note.match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
         if (taskSessionTag) {
-          // Task has explicit session — only show in that session or عام
-          if (sessionCtx !== "outside" && taskSessionTag !== sessionCtx) return false;
+          // Task has explicit session — only show in that session (NOT in عام)
+          if (taskSessionTag !== sessionCtx) return false;
         } else {
           // No session tag — filter by context
           const ctxMap: Record<string, string[]> = {
@@ -94,7 +95,7 @@ export default function FocusPage() {
         const tSession = note2.match(/session:(\w+)/)?.[1];
         const ctx = note2.match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
         if (tSession) {
-          if (sessionCtx !== "outside" && tSession !== sessionCtx) return false;
+          if (tSession !== sessionCtx) return false;
         } else {
           const ctxMap2: Record<string, string[]> = { outside: ["Outside","Phone","Anywhere","Haram","Home"], office: ["Office","Computer"], haram: ["Haram"], mobile: ["Phone","Online"], dev: ["Computer","Online"], home: ["Home"] };
           if (!ctxMap2[sessionCtx]?.includes(ctx)) return false;
@@ -118,16 +119,28 @@ export default function FocusPage() {
         home: ["Home"],
       };
       const counts: Record<string, number> = {};
+      const activeCounts: Record<string, number> = {};
       for (const s of ["outside", "office", "haram", "mobile", "dev", "home"]) {
-        counts[s] = allPending.filter(t => {
+        const sessionTasks = allPending.filter(t => {
           const n = t.contextNote ?? "";
           const ts = n.match(/session:(\w+)/)?.[1];
           const ctx = n.match(/ctx:(\w+)/)?.[1] ?? "Anywhere";
-          if (ts) return s === "outside" || ts === s;
+          if (ts) return ts === s;
           return ctxMapAll[s]?.includes(ctx);
+        });
+        counts[s] = sessionTasks.length;
+        activeCounts[s] = sessionTasks.filter(t => {
+          if (!t.dueDate) return false;
+          const ds = t.dueDate.slice(0, 10);
+          if (ds > todayStr) return false;
+          const due = new Date(t.dueDate);
+          const h = due.getHours(), m = due.getMinutes();
+          if ((h !== 0 || m !== 0) && due > nowTime) return false;
+          return true;
         }).length;
       }
       setSessionCounts(counts);
+      setSessionActiveCounts(activeCounts);
       // Sort: overdue first → today → tomorrow → future → no date last
       pending.sort((a, b) => {
         const da = a.dueDate?.slice(0, 10) ?? "9999";
@@ -369,38 +382,35 @@ export default function FocusPage() {
     </main>
   );
 
-  // Auto-switch to next session with tasks when current session is empty
-  useEffect(() => {
-    if (tasks.length === 0 && !showInactive && !loading) {
-      const order: typeof sessionCtx[] = ["outside", "office", "haram", "mobile", "dev", "home"];
-      const next = order.find(s => s !== sessionCtx && (sessionCounts[s] ?? 0) > 0);
-      if (next) {
-        // Show brief notification then switch
-        const toast = document.createElement("div");
-        toast.textContent = `✅ أنجزت مهام الجلسة — الانتقال للجلسة التالية`;
-        toast.style.cssText = "position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#3D8C5A;color:#fff;padding:8px 16px;border-radius:12px;font-size:12px;font-weight:bold;z-index:100;transition:opacity 0.3s";
-        document.body.appendChild(toast);
-        setTimeout(() => { toast.style.opacity = "0"; setTimeout(() => toast.remove(), 300); }, 1500);
-        setSessionCtx(next);
-        load();
-      }
-    }
-  }, [tasks.length, showInactive, loading, sessionCtx, sessionCounts]); // eslint-disable-line react-hooks/exhaustive-deps
-
   if (tasks.length === 0 && !showInactive) {
-    // All sessions empty — show completion screen
+    const sessionLabels: Record<string, { label: string; icon: string }> = { outside: { label: "عام", icon: "🚶" }, office: { label: "مكتبي", icon: "💻" }, haram: { label: "الحرم", icon: "🕌" }, mobile: { label: "الجوال", icon: "📱" }, dev: { label: "التطوير", icon: "🛠️" }, home: { label: "المنزل", icon: "🏠" } };
+    const otherSessions = (["outside", "office", "haram", "mobile", "dev", "home"] as const).filter(s => s !== sessionCtx);
     return (
       <main className="flex-1 flex flex-col items-center justify-center gap-4 px-6" style={{ background: "var(--bg)" }}>
-        <p className="text-5xl">🎉</p>
-        <p className="font-black text-lg" style={{ color: "var(--text)" }}>أنجزت جميع المهام المستحقة!</p>
-        <p className="text-xs" style={{ color: "var(--muted)" }}>لا توجد مهام مستحقة في أي جلسة</p>
+        <p className="text-5xl">✅</p>
+        <p className="font-black text-lg" style={{ color: "var(--text)" }}>أنجزت مهام جلسة {sessionLabels[sessionCtx].label}!</p>
         {inactiveTasks.length > 0 && (
           <button onClick={() => { setTasks(inactiveTasks); setShowInactive(true); setIdx(0); }}
-            className="px-6 py-3 rounded-xl text-sm font-bold text-white transition active:scale-95"
+            className="w-full max-w-xs px-5 py-3 rounded-xl text-sm font-bold text-white transition active:scale-95"
             style={{ background: "linear-gradient(135deg, #5E5495, #D4AF37)" }}>
-            📋 عرض المهام القادمة ({inactiveTasks.length} مهمة)
+            📋 المهام غير النشطة ({inactiveTasks.length})
           </button>
         )}
+        <p className="text-xs font-bold mt-2" style={{ color: "var(--muted)" }}>أو انتقل لجلسة أخرى:</p>
+        <div className="grid grid-cols-3 gap-2 w-full max-w-xs">
+          {otherSessions.map(s => {
+            const count = sessionCounts[s] ?? 0;
+            const info = sessionLabels[s];
+            return (
+              <button key={s} onClick={() => { setSessionCtx(s); setShowInactive(false); load(); }}
+                className="flex flex-col items-center gap-1 py-3 rounded-xl text-[11px] font-bold transition active:scale-95"
+                style={{ background: count > 0 ? "#5E549510" : "var(--bg)", color: count > 0 ? "#5E5495" : "var(--muted)", border: `1px solid ${count > 0 ? "#5E5495" : "var(--card-border)"}` }}>
+                <span>{info.icon} {info.label}</span>
+                <span className="text-[9px] font-semibold" style={{ color: count > 0 ? "#3D8C5A" : "var(--muted)" }}>{count} مهمة</span>
+              </button>
+            );
+          })}
+        </div>
         <Link href="/tasks" className="text-xs hover:underline mt-2" style={{ color: "#5E5495" }}>← العودة للمهام</Link>
       </main>
     );
@@ -420,7 +430,8 @@ export default function FocusPage() {
           <div>
             <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>🎯 التركيز</h2>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              <span className="text-[10px]" style={{ color: "var(--muted)" }}>{idx + 1} من {tasks.length} نشطة</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "#5E549515", color: "#5E5495" }}>📋 {stats.total}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "#D4AF3715", color: "#D4AF37" }}>⏳ {tasks.length} نشطة</span>
               {stats.completed > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>✅ {stats.completed}</span>}
               {nextPrayer && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: nextPrayer.mins <= 15 ? "#DC262615" : "#D4AF3715", color: nextPrayer.mins <= 15 ? "#DC2626" : "#D4AF37" }}>
@@ -444,13 +455,17 @@ export default function FocusPage() {
             { key: "dev", label: "التطوير", icon: "🛠️" },
             { key: "home", label: "المنزل", icon: "🏠" },
           ] as const).map(s => {
-            const count = sessionCounts[s.key] ?? 0;
+            const active = sessionActiveCounts[s.key] ?? 0;
+            const total = sessionCounts[s.key] ?? 0;
             return (
               <button key={s.key} onClick={() => { setSessionCtx(s.key); load(); }}
                 className="flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold transition"
                 style={{ background: sessionCtx === s.key ? "#5E5495" : "var(--bg)", color: sessionCtx === s.key ? "#fff" : "var(--muted)", border: `1px solid ${sessionCtx === s.key ? "#5E5495" : "var(--card-border)"}` }}>
                 {s.icon} {s.label}
-                {count > 0 && <span className="min-w-[16px] h-4 flex items-center justify-center rounded-full text-[8px] font-bold px-1" style={{ background: sessionCtx === s.key ? "rgba(255,255,255,0.25)" : "#5E549520", color: sessionCtx === s.key ? "#fff" : "#5E5495" }}>{count}</span>}
+                {(active > 0 || total > 0) && <span className="flex items-center gap-0.5">
+                  {active > 0 && <span className="min-w-[14px] h-3.5 flex items-center justify-center rounded-full text-[8px] font-bold px-0.5" style={{ background: sessionCtx === s.key ? "rgba(255,255,255,0.3)" : "#D4AF3730", color: sessionCtx === s.key ? "#fff" : "#D4AF37" }}>{active}</span>}
+                  {total > active && <span className="min-w-[14px] h-3.5 flex items-center justify-center rounded-full text-[8px] font-bold px-0.5" style={{ background: sessionCtx === s.key ? "rgba(255,255,255,0.15)" : "#9CA3AF20", color: sessionCtx === s.key ? "rgba(255,255,255,0.7)" : "#9CA3AF" }}>{total}</span>}
+                </span>}
               </button>
             );
           })}
@@ -598,22 +613,20 @@ export default function FocusPage() {
                   {`${Math.floor(timerSecs / 3600).toString().padStart(2, "0")}:${Math.floor((timerSecs % 3600) / 60).toString().padStart(2, "0")}:${(timerSecs % 60).toString().padStart(2, "0")}`}
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button onClick={complete}
-                  className="py-4 rounded-2xl text-sm font-black text-white transition-all active:scale-95"
+                  className="py-3.5 rounded-2xl text-[11px] font-black text-white transition-all active:scale-95"
                   style={{ background: "linear-gradient(135deg, #3D8C5A, #2C8C4A)" }}>
-                  أنجزتها ✅ {timerSecs >= 60 ? `(${Math.floor(timerSecs / 60)} د)` : ""}
+                  ✅ أنجزتها
                 </button>
                 <button onClick={completeAndRepeat}
-                  className="py-4 rounded-2xl text-sm font-black transition-all active:scale-95"
+                  className="py-3.5 rounded-2xl text-[11px] font-black transition-all active:scale-95"
                   style={{ background: "#3D8C5A15", color: "#3D8C5A", border: "2px solid #3D8C5A40" }}>
-                  أنجز وأعد غداً 🔁
+                  🔁 أنجز وأعد
                 </button>
-              </div>
-              <div className="grid grid-cols-1">
                 <button onClick={markFrog}
-                  className="py-2.5 rounded-xl text-[11px] font-bold transition-all active:scale-95"
-                  style={{ background: "#F59E0B15", color: "#F59E0B", border: "1px solid #F59E0B30" }}>
+                  className="py-3.5 rounded-2xl text-[11px] font-black transition-all active:scale-95"
+                  style={{ background: "#F59E0B15", color: "#F59E0B", border: "2px solid #F59E0B40" }}>
                   🐸 ضفدع
                 </button>
               </div>
