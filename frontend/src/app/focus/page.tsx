@@ -39,9 +39,20 @@ export default function FocusPage() {
       const nowTime = new Date();
       const completed = all.filter(t => t.status === "Completed").length;
       const cancelled = all.filter(t => t.status === "Cancelled").length;
-      // Filter: overdue + today + no date only (not future), hide hour-postponed, apply session
+      // Clean up old skipped entries (keep only today's)
       const todayStr = localDateStr();
+      const skippedRaw = JSON.parse(localStorage.getItem("focus_skipped") ?? "{}");
+      const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+      const cleanSkipped: Record<string, number> = {};
+      for (const [id, ts] of Object.entries(skippedRaw)) {
+        if (typeof ts === "number" && ts >= todayStart.getTime()) cleanSkipped[id] = ts;
+      }
+      localStorage.setItem("focus_skipped", JSON.stringify(cleanSkipped));
+
+      // Filter: overdue + today + no date only (not future), hide hour-postponed, skipped, apply session
       const pending = all.filter(t => {
+        // Hide skipped tasks
+        if (cleanSkipped[t.id]) return false;
         if (t.status === "Completed" || t.status === "Cancelled") return false;
         // Only show: overdue + today — exclude future and no-date
         if (!t.dueDate) return false; // no date — not due now
@@ -269,8 +280,14 @@ export default function FocusPage() {
   function openEdit() { setShowEdit(true); }
 
   function skip() {
-    if (idx < tasks.length - 1) setIdx(idx + 1);
-    else setIdx(0);
+    // Save skipped task ID with timestamp so it stays skipped for this session
+    const t = tasks[idx];
+    if (t) {
+      const skipped = JSON.parse(localStorage.getItem("focus_skipped") ?? "{}");
+      skipped[t.id] = Date.now();
+      localStorage.setItem("focus_skipped", JSON.stringify(skipped));
+    }
+    removeCurrentTask();
   }
 
   function skipToAfterNext() {
@@ -371,7 +388,7 @@ export default function FocusPage() {
           </div>
         </div>
         {/* Session context */}
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 flex-wrap">
           {([
             { key: "outside", label: "غير مكتبي", icon: "🚶" },
             { key: "office", label: "مكتبي", icon: "💻" },
@@ -381,7 +398,7 @@ export default function FocusPage() {
             { key: "home", label: "المنزل", icon: "🏠" },
           ] as const).map(s => (
             <button key={s.key} onClick={() => { setSessionCtx(s.key); load(); }}
-              className="flex-1 py-2 rounded-lg text-[10px] font-bold transition"
+              className="px-3 py-1.5 rounded-lg text-[10px] font-bold transition"
               style={{ background: sessionCtx === s.key ? "#5E5495" : "var(--bg)", color: sessionCtx === s.key ? "#fff" : "var(--muted)", border: `1px solid ${sessionCtx === s.key ? "#5E5495" : "var(--card-border)"}` }}>
               {s.icon} {s.label}
             </button>

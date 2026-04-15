@@ -19,6 +19,20 @@ public class WarRoomController : ControllerBase
     [HttpGet("roles")]
     public async Task<IActionResult> GetRoles(CancellationToken ct)
     {
+        // تنظيف الأدوار اليتيمة المرتبطة بأعمال محذوفة
+        var uid = Guid.Parse(Uid);
+        var existingWorkIds = await _db.Works.Where(w => w.OwnerId == uid).Select(w => w.Id.ToString()).ToListAsync(ct);
+        var orphanRoles = await Q(@"SELECT Id FROM LeadershipRoles WHERE UserId=@uid AND WorkId IS NOT NULL AND WorkId != '' AND WorkId NOT IN (SELECT CAST(Id AS CHAR) FROM Works WHERE OwnerId=@uid2)",
+            [P("@uid", Uid), P("@uid2", Uid)], ct);
+        foreach (var orphan in orphanRoles)
+        {
+            var oid = orphan["id"]?.ToString();
+            if (oid == null) continue;
+            await E("DELETE FROM LeadershipNotes WHERE RoleId=@rid", Ps("@rid", oid), ct);
+            await E("DELETE FROM LeadershipDevRequests WHERE RoleId=@rid", Ps("@rid", oid), ct);
+            await E("DELETE FROM LeadershipRoles WHERE Id=@id", Ps("@id", oid), ct);
+        }
+
         // المناصب اليدوية
         var roles = await Q(@"SELECT r.*,
             (SELECT COUNT(*) FROM LeadershipNotes n WHERE n.RoleId=r.Id) as NotesCount,
@@ -32,7 +46,6 @@ public class WarRoomController : ControllerBase
                  .Select(r => r["workId"]!.ToString()!),
             StringComparer.OrdinalIgnoreCase);
 
-        var uid = Guid.Parse(Uid);
         var works = await _db.Works
             .Where(w => w.OwnerId == uid)
             .Include(w => w.Jobs)
