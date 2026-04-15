@@ -299,10 +299,7 @@ export function NewTaskDialog({
   const [title, setTitle]           = useState("");
   const [description, setDesc]      = useState("");
   const [userPriority, setPriority] = useState<number>(3);
-  const [cognitiveLoad, setLoad]    = useState<CreateTaskPayload["cognitiveLoad"]>("Medium");
-  const [taskContext, setTaskContext] = useState("Anywhere");
   const [taskSession, setTaskSession] = useState("");
-  const [suitablePeriod, setSuitablePeriod] = useState("all");
   const [dueDate, setDueDate]       = useState(() => localDateStr());
   const [goalId, setGoalId]         = useState(defaultGoalId ?? "");
   const [linkType, setLinkType]     = useState<"none" | "circle" | "job">("none");
@@ -316,12 +313,9 @@ export function NewTaskDialog({
   const [recurrenceType, setRecurrenceType] = useState<"daily"|"weekly"|"monthly"|"yearly"|"custom">("daily");
   const [customInterval, setCustomInterval] = useState(2);
   const [customUnit, setCustomUnit] = useState<"minute"|"hour"|"day"|"week"|"month">("day");
-  const [isWorkTask, setIsWorkTask] = useState(true);
   const [totalBal, setTotalBal] = useState(0);
   const [isUrgent, setIsUrgent]     = useState(false);
   const [waitingFor, setWaitingFor] = useState("");
-  const [assignTo, setAssignTo]     = useState("");
-  const [platformUsers, setPUsers]  = useState<{id: string; fullName: string; email: string}[]>([]);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState("");
   const titleRef                    = useRef<HTMLInputElement>(null);
@@ -333,7 +327,6 @@ export function NewTaskDialog({
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
   useEffect(() => {
-    import("@/lib/api").then(m => m.api.get("/api/users")).then(r => setPUsers(r.data)).catch(() => {});
     import("@/lib/api").then(m => m.getCircles()).then(c => setCircles(c.map(x => ({ id: x.id, name: x.name, iconKey: x.iconKey, tier: x.tier })))).catch(() => {});
     import("@/lib/api").then(m => m.api.get("/api/works")).then(r => setWorksList((r.data ?? []).map((w: { id: string; name: string; type: string }) => ({ id: w.id, name: w.name, type: w.type })))).catch(() => {});
     import("@/lib/api").then(m => m.api.get("/api/finance/snapshot")).then(r => {
@@ -358,18 +351,13 @@ export function NewTaskDialog({
         title: title.trim(),
         description: desc,
         userPriority,
-        cognitiveLoad,
         dueDate: dueDate || undefined,
         goalId: goalId || undefined,
         isRecurring: isRecurring || undefined,
         recurrenceRule: rule,
-        isWorkTask: isWorkTask || undefined,
         isUrgent: isUrgent || undefined,
         waitingFor: waitingFor.trim() || undefined,
-        taskContext: taskContext !== "Anywhere" ? taskContext : undefined,
-        suitablePeriod: suitablePeriod !== "all" ? suitablePeriod : undefined,
         session: taskSession || undefined,
-        assignedToEmail: assignTo || undefined,
       });
       onCreated(toRow(task));
       onClose();
@@ -438,7 +426,6 @@ export function NewTaskDialog({
             <input id="dueDatePickerTop" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-[#E2D5B0] text-sm bg-[#FDFAF6] focus:outline-none focus:border-[#5E5495] transition" />
           </div>
-          {/* الفترة المناسبة — hidden */}
           <div>
             <label className="block text-sm font-semibold text-[#1A1830] mb-2">الأولوية</label>
             <div className="flex gap-2 flex-wrap">
@@ -455,7 +442,6 @@ export function NewTaskDialog({
               ))}
             </div>
           </div>
-          {/* مستوى التركيز — hidden */}
           <div>
             <label className="block text-sm font-semibold text-[#1A1830] mb-2">جلسة التركيز</label>
             <div className="flex gap-1.5 flex-wrap">
@@ -472,7 +458,6 @@ export function NewTaskDialog({
               ))}
             </div>
           </div>
-          {/* بيئة المهمة + إسناد — hidden */}
           {/* Recurrence */}
           <div>
             <label className="flex items-center gap-3 cursor-pointer select-none mb-2">
@@ -543,7 +528,6 @@ export function NewTaskDialog({
             })()}
           </div>
 
-          {/* مهمة عمل — hidden */}
 
           {/* Urgent */}
           <label className="flex items-center gap-3 cursor-pointer select-none">
