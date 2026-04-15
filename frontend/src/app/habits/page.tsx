@@ -12,21 +12,29 @@ function useSyncedKV<T>(key: string, fallback: T): [T, (v: T) => void, boolean] 
 
   useEffect(() => {
     // Load from localStorage first (instant), then API (authoritative)
-    try { const cached = localStorage.getItem("kv_" + key); if (cached) setData(JSON.parse(cached)); } catch {}
+    // Try kv_ key first, fall back to legacy madar_ key
+    try {
+      const cached = localStorage.getItem("kv_" + key) ?? localStorage.getItem("madar_" + key);
+      if (cached) setData(JSON.parse(cached));
+    } catch {}
     api.get(`/api/users/me/kv/${key}`).then(({ data: r }) => {
       if (r?.value) { try { const parsed = JSON.parse(r.value); setData(parsed); localStorage.setItem("kv_" + key, r.value); } catch {} }
       setLoaded(true);
     }).catch(() => setLoaded(true));
   }, [key]);
 
+  const pendingValue = useRef<string | null>(null);
   function save(v: T) {
     setData(v);
     const json = JSON.stringify(v);
     localStorage.setItem("kv_" + key, json);
+    pendingValue.current = json;
     if (!saving.current) {
       saving.current = true;
       setTimeout(() => {
-        api.put(`/api/users/me/kv/${key}`, { value: json }).catch(() => {}).finally(() => { saving.current = false; });
+        const val = pendingValue.current;
+        pendingValue.current = null;
+        api.put(`/api/users/me/kv/${key}`, { value: val }).catch(() => {}).finally(() => { saving.current = false; });
       }, 300); // debounce
     }
   }
