@@ -65,18 +65,7 @@ builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
 });
-var connStr = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? Environment.GetEnvironmentVariable("DATABASE_URL")
-    ?? "";
-if (!string.IsNullOrEmpty(connStr))
-{
-    builder.Services.AddHealthChecks()
-        .AddNpgSql(connStr, name: "supabase", tags: new[] { "db", "postgres" });
-}
-else
-{
-    builder.Services.AddHealthChecks();
-}
+builder.Services.AddHealthChecks();
 
 builder.Services.AddControllers()
     .AddJsonOptions(o =>
