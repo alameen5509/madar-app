@@ -125,7 +125,7 @@ public class TasksController : BaseController
                 {
                     using var cmd = conn.CreateCommand();
                     var paramNames = roleIds.Select((_, i) => $"@r{i}").ToList();
-                    cmd.CommandText = $"SELECT \"Id\", \"DisplayName\", \"Slug\" FROM \"UserCircles\" WHERE \"UserId\"=@uid AND \"Id\" IN ({string.Join(",", paramNames)})";
+                    cmd.CommandText = $"SELECT \"Id\"::text, \"DisplayName\", \"Slug\" FROM \"UserCircles\" WHERE \"UserId\"::text=@uid AND \"Id\"::text IN ({string.Join(",", paramNames)})";
                     cmd.Parameters.Add(new NpgsqlParameter("@uid", userId.ToString()));
                     for (int i = 0; i < roleIds.Count; i++)
                         cmd.Parameters.Add(new NpgsqlParameter(paramNames[i], roleIds[i]));
@@ -195,7 +195,7 @@ public class TasksController : BaseController
                     using (var cmd3 = conn2.CreateCommand())
                     {
                         var pNames2 = unlinkedCircleIds.Select((_, i) => $"@uc{i}").ToList();
-                        cmd3.CommandText = $"SELECT \"Id\", \"DisplayName\" FROM \"UserCircles\" WHERE \"Id\" IN ({string.Join(",", pNames2)})";
+                        cmd3.CommandText = $"SELECT \"Id\"::text, \"DisplayName\" FROM \"UserCircles\" WHERE \"Id\"::text IN ({string.Join(",", pNames2)})";
                         int ci2 = 0;
                         foreach (var cid in unlinkedCircleIds) cmd3.Parameters.Add(new NpgsqlParameter(pNames2[ci2++], cid));
                         using var rr2 = await cmd3.ExecuteReaderAsync(ct);
