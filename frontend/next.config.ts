@@ -43,6 +43,13 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // SW — never cache so updates are instant
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        ],
+      },
+      {
         // manifest, robots, sitemap — cache 1 day
         source: "/(manifest.json|robots.txt|sitemap.xml)",
         headers: [
