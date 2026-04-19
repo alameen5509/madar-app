@@ -561,105 +561,105 @@ using (var scope = app.Services.CreateScope())
     try
     {
         await db.Database.ExecuteSqlRawAsync(@"
-            CREATE TABLE IF NOT EXISTS WebProjects (
-                Id CHAR(36) NOT NULL PRIMARY KEY,
-                OwnerId CHAR(36) NOT NULL,
-                Title VARCHAR(300) NOT NULL,
-                ClientName VARCHAR(200) NULL,
-                Description TEXT NULL,
-                CurrentPhase INT NOT NULL DEFAULT 1,
-                `Status` VARCHAR(30) NOT NULL DEFAULT 'active',
-                Priority VARCHAR(20) NOT NULL DEFAULT 'medium',
-                DueDate VARCHAR(20) NULL,
-                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-                UpdatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-                INDEX IX_WebProjects_Owner (OwnerId)
+            CREATE TABLE IF NOT EXISTS ""WebProjects"" (
+                ""Id"" VARCHAR(36) NOT NULL PRIMARY KEY,
+                ""OwnerId"" VARCHAR(36) NOT NULL,
+                ""Title"" VARCHAR(300) NOT NULL,
+                ""ClientName"" VARCHAR(200) NULL,
+                ""Description"" TEXT NULL,
+                ""CurrentPhase"" INT NOT NULL DEFAULT 1,
+                ""Status"" VARCHAR(30) NOT NULL DEFAULT 'active',
+                ""Priority"" VARCHAR(20) NOT NULL DEFAULT 'medium',
+                ""DueDate"" VARCHAR(20) NULL,
+                ""CreatedAt"" TIMESTAMP NOT NULL DEFAULT NOW(),
+                ""UpdatedAt"" TIMESTAMP NOT NULL DEFAULT NOW()
             );
-            CREATE TABLE IF NOT EXISTS WebProjectMembers (
-                Id CHAR(36) NOT NULL PRIMARY KEY,
-                ProjectId CHAR(36) NOT NULL,
-                UserId CHAR(36) NULL,
-                `Name` VARCHAR(200) NOT NULL,
-                Email VARCHAR(200) NULL,
-                `Role` VARCHAR(30) NOT NULL DEFAULT 'employee',
-                AddedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-                INDEX IX_WebProjectMembers_Project (ProjectId),
-                INDEX IX_WebProjectMembers_User (UserId)
+            CREATE INDEX IF NOT EXISTS ""IX_WebProjects_Owner"" ON ""WebProjects"" (""OwnerId"");
+            CREATE TABLE IF NOT EXISTS ""WebProjectMembers"" (
+                ""Id"" VARCHAR(36) NOT NULL PRIMARY KEY,
+                ""ProjectId"" VARCHAR(36) NOT NULL,
+                ""UserId"" VARCHAR(36) NULL,
+                ""Name"" VARCHAR(200) NOT NULL,
+                ""Email"" VARCHAR(200) NULL,
+                ""Role"" VARCHAR(30) NOT NULL DEFAULT 'employee',
+                ""AddedAt"" TIMESTAMP NOT NULL DEFAULT NOW()
             );
-            CREATE TABLE IF NOT EXISTS WebProjectTeams (
-                Id CHAR(36) NOT NULL PRIMARY KEY,
-                OwnerId CHAR(36) NOT NULL,
-                UserId CHAR(36) NULL,
-                `Name` VARCHAR(200) NOT NULL,
-                Email VARCHAR(200) NULL,
-                `Role` VARCHAR(30) NOT NULL DEFAULT 'employee',
-                AddedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-                INDEX IX_WebProjectTeams_Owner (OwnerId),
-                INDEX IX_WebProjectTeams_User (UserId),
-                INDEX IX_WebProjectTeams_Email (Email)
+            CREATE INDEX IF NOT EXISTS ""IX_WebProjectMembers_Project"" ON ""WebProjectMembers"" (""ProjectId"");
+            CREATE INDEX IF NOT EXISTS ""IX_WebProjectMembers_User"" ON ""WebProjectMembers"" (""UserId"");
+            CREATE TABLE IF NOT EXISTS ""WebProjectTeams"" (
+                ""Id"" VARCHAR(36) NOT NULL PRIMARY KEY,
+                ""OwnerId"" VARCHAR(36) NOT NULL,
+                ""UserId"" VARCHAR(36) NULL,
+                ""Name"" VARCHAR(200) NOT NULL,
+                ""Email"" VARCHAR(200) NULL,
+                ""Role"" VARCHAR(30) NOT NULL DEFAULT 'employee',
+                ""AddedAt"" TIMESTAMP NOT NULL DEFAULT NOW()
             );
-            CREATE TABLE IF NOT EXISTS WebPhase1Docs (
-                Id CHAR(36) NOT NULL PRIMARY KEY,
-                ProjectId CHAR(36) NOT NULL,
-                Content LONGTEXT NULL,
-                UpdatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-                INDEX IX_WebPhase1Docs_Project (ProjectId)
+            CREATE INDEX IF NOT EXISTS ""IX_WebProjectTeams_Owner"" ON ""WebProjectTeams"" (""OwnerId"");
+            CREATE INDEX IF NOT EXISTS ""IX_WebProjectTeams_User"" ON ""WebProjectTeams"" (""UserId"");
+            CREATE INDEX IF NOT EXISTS ""IX_WebProjectTeams_Email"" ON ""WebProjectTeams"" (""Email"");
+            CREATE TABLE IF NOT EXISTS ""WebPhase1Docs"" (
+                ""Id"" VARCHAR(36) NOT NULL PRIMARY KEY,
+                ""ProjectId"" VARCHAR(36) NOT NULL,
+                ""Content"" TEXT NULL,
+                ""UpdatedAt"" TIMESTAMP NOT NULL DEFAULT NOW()
             );
-            CREATE TABLE IF NOT EXISTS WebPhase1Tasks (
-                Id CHAR(36) NOT NULL PRIMARY KEY,
-                ProjectId CHAR(36) NOT NULL,
-                Title VARCHAR(500) NOT NULL,
-                AssignedTo VARCHAR(200) NULL,
-                `Status` VARCHAR(30) NOT NULL DEFAULT 'pending',
-                `Order` INT NOT NULL DEFAULT 0,
-                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-                INDEX IX_WebPhase1Tasks_Project (ProjectId)
+            CREATE INDEX IF NOT EXISTS ""IX_WebPhase1Docs_Project"" ON ""WebPhase1Docs"" (""ProjectId"");
+            CREATE TABLE IF NOT EXISTS ""WebPhase1Tasks"" (
+                ""Id"" VARCHAR(36) NOT NULL PRIMARY KEY,
+                ""ProjectId"" VARCHAR(36) NOT NULL,
+                ""Title"" VARCHAR(500) NOT NULL,
+                ""AssignedTo"" VARCHAR(200) NULL,
+                ""Status"" VARCHAR(30) NOT NULL DEFAULT 'pending',
+                ""Order"" INT NOT NULL DEFAULT 0,
+                ""CreatedAt"" TIMESTAMP NOT NULL DEFAULT NOW()
             );
-            CREATE TABLE IF NOT EXISTS WebPhase3Commands (
-                Id CHAR(36) NOT NULL PRIMARY KEY,
-                ProjectId CHAR(36) NOT NULL,
-                Title VARCHAR(500) NOT NULL,
-                Command LONGTEXT NULL,
-                `Order` INT NOT NULL DEFAULT 0,
-                `Status` VARCHAR(30) NOT NULL DEFAULT 'pending',
-                DoneAt DATETIME(6) NULL,
-                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-                INDEX IX_WebPhase3Commands_Project (ProjectId)
+            CREATE INDEX IF NOT EXISTS ""IX_WebPhase1Tasks_Project"" ON ""WebPhase1Tasks"" (""ProjectId"");
+            CREATE TABLE IF NOT EXISTS ""WebPhase3Commands"" (
+                ""Id"" VARCHAR(36) NOT NULL PRIMARY KEY,
+                ""ProjectId"" VARCHAR(36) NOT NULL,
+                ""Title"" VARCHAR(500) NOT NULL,
+                ""Command"" TEXT NULL,
+                ""Order"" INT NOT NULL DEFAULT 0,
+                ""Status"" VARCHAR(30) NOT NULL DEFAULT 'pending',
+                ""DoneAt"" TIMESTAMP NULL,
+                ""CreatedAt"" TIMESTAMP NOT NULL DEFAULT NOW()
             );
-            CREATE TABLE IF NOT EXISTS WebPhase4Credentials (
-                Id CHAR(36) NOT NULL PRIMARY KEY,
-                ProjectId CHAR(36) NOT NULL,
-                `Type` VARCHAR(50) NOT NULL DEFAULT 'other',
-                Label VARCHAR(200) NOT NULL,
-                Value VARCHAR(1000) NOT NULL,
-                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-                INDEX IX_WebPhase4Credentials_Project (ProjectId)
+            CREATE INDEX IF NOT EXISTS ""IX_WebPhase3Commands_Project"" ON ""WebPhase3Commands"" (""ProjectId"");
+            CREATE TABLE IF NOT EXISTS ""WebPhase4Credentials"" (
+                ""Id"" VARCHAR(36) NOT NULL PRIMARY KEY,
+                ""ProjectId"" VARCHAR(36) NOT NULL,
+                ""Type"" VARCHAR(50) NOT NULL DEFAULT 'other',
+                ""Label"" VARCHAR(200) NOT NULL,
+                ""Value"" VARCHAR(1000) NOT NULL,
+                ""CreatedAt"" TIMESTAMP NOT NULL DEFAULT NOW()
             );
-            CREATE TABLE IF NOT EXISTS WebPhase5Commands (
-                Id CHAR(36) NOT NULL PRIMARY KEY,
-                ProjectId CHAR(36) NOT NULL,
-                Title VARCHAR(500) NOT NULL,
-                Command LONGTEXT NULL,
-                `Order` INT NOT NULL DEFAULT 0,
-                `Status` VARCHAR(30) NOT NULL DEFAULT 'pending',
-                AddedBy CHAR(36) NULL,
-                EmployeeDoneAt DATETIME(6) NULL,
-                OwnerApprovedAt DATETIME(6) NULL,
-                Notes TEXT NULL,
-                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-                INDEX IX_WebPhase5Commands_Project (ProjectId)
+            CREATE INDEX IF NOT EXISTS ""IX_WebPhase4Credentials_Project"" ON ""WebPhase4Credentials"" (""ProjectId"");
+            CREATE TABLE IF NOT EXISTS ""WebPhase5Commands"" (
+                ""Id"" VARCHAR(36) NOT NULL PRIMARY KEY,
+                ""ProjectId"" VARCHAR(36) NOT NULL,
+                ""Title"" VARCHAR(500) NOT NULL,
+                ""Command"" TEXT NULL,
+                ""Order"" INT NOT NULL DEFAULT 0,
+                ""Status"" VARCHAR(30) NOT NULL DEFAULT 'pending',
+                ""AddedBy"" VARCHAR(36) NULL,
+                ""EmployeeDoneAt"" TIMESTAMP NULL,
+                ""OwnerApprovedAt"" TIMESTAMP NULL,
+                ""Notes"" TEXT NULL,
+                ""CreatedAt"" TIMESTAMP NOT NULL DEFAULT NOW()
             );
-            CREATE TABLE IF NOT EXISTS WebPhase6Requests (
-                Id CHAR(36) NOT NULL PRIMARY KEY,
-                ProjectId CHAR(36) NOT NULL,
-                Title VARCHAR(500) NOT NULL,
-                Description TEXT NULL,
-                `Status` VARCHAR(30) NOT NULL DEFAULT 'new',
-                ClientNote TEXT NULL,
-                OwnerNote TEXT NULL,
-                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-                INDEX IX_WebPhase6Requests_Project (ProjectId)
-            );");
+            CREATE INDEX IF NOT EXISTS ""IX_WebPhase5Commands_Project"" ON ""WebPhase5Commands"" (""ProjectId"");
+            CREATE TABLE IF NOT EXISTS ""WebPhase6Requests"" (
+                ""Id"" VARCHAR(36) NOT NULL PRIMARY KEY,
+                ""ProjectId"" VARCHAR(36) NOT NULL,
+                ""Title"" VARCHAR(500) NOT NULL,
+                ""Description"" TEXT NULL,
+                ""Status"" VARCHAR(30) NOT NULL DEFAULT 'new',
+                ""ClientNote"" TEXT NULL,
+                ""OwnerNote"" TEXT NULL,
+                ""CreatedAt"" TIMESTAMP NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS ""IX_WebPhase6Requests_Project"" ON ""WebPhase6Requests"" (""ProjectId"");");
 
         // Idempotent migration: add UserId column to existing WebProjectMembers tables
         // and backfill from AspNetUsers using case-insensitive email match.
@@ -668,22 +668,22 @@ using (var scope = app.Services.CreateScope())
         try
         {
             using var check = conn.CreateCommand();
-            check.CommandText = @"SELECT COUNT(*) FROM information_schema.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='WebProjectMembers' AND COLUMN_NAME='UserId'";
+            check.CommandText = @"SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name='WebProjectMembers' AND column_name='UserId'";
             var hasCol = Convert.ToInt32(await check.ExecuteScalarAsync()) > 0;
             if (!hasCol)
             {
                 using var alter = conn.CreateCommand();
-                alter.CommandText = "ALTER TABLE WebProjectMembers ADD COLUMN UserId CHAR(36) NULL, ADD INDEX IX_WebProjectMembers_User (UserId)";
+                alter.CommandText = "ALTER TABLE \"WebProjectMembers\" ADD COLUMN \"UserId\" VARCHAR(36) NULL; CREATE INDEX IF NOT EXISTS \"IX_WebProjectMembers_User\" ON \"WebProjectMembers\" (\"UserId\")";
                 await alter.ExecuteNonQueryAsync();
                 Log.Information("Added UserId column to WebProjectMembers");
             }
             // Backfill UserId for any WebProjectMembers rows missing it
             using var fill = conn.CreateCommand();
-            fill.CommandText = @"UPDATE WebProjectMembers wm
-                JOIN AspNetUsers u ON LOWER(TRIM(u.Email)) = LOWER(TRIM(wm.Email))
-                SET wm.UserId = u.Id
-                WHERE wm.UserId IS NULL AND wm.Email IS NOT NULL AND wm.Email <> ''";
+            fill.CommandText = @"UPDATE ""WebProjectMembers"" SET ""UserId"" = u.""Id""
+                FROM ""AspNetUsers"" u
+                WHERE LOWER(TRIM(u.""Email"")) = LOWER(TRIM(""WebProjectMembers"".""Email""))
+                AND ""WebProjectMembers"".""UserId"" IS NULL AND ""WebProjectMembers"".""Email"" IS NOT NULL AND ""WebProjectMembers"".""Email"" <> ''";
             var filled = await fill.ExecuteNonQueryAsync();
             if (filled > 0) Log.Information("Backfilled UserId for {Count} WebProjectMembers rows", filled);
 
@@ -691,17 +691,17 @@ using (var scope = app.Services.CreateScope())
             // each (owner, member-email/userId) pair becomes a team row, deduped.
             using var seedTeams = conn.CreateCommand();
             seedTeams.CommandText = @"
-                INSERT INTO WebProjectTeams (Id, OwnerId, UserId, `Name`, Email, `Role`, AddedAt)
-                SELECT UUID(), wp.OwnerId, wm.UserId, wm.`Name`, wm.Email, wm.`Role`, NOW()
-                FROM WebProjectMembers wm
-                JOIN WebProjects wp ON wp.Id = wm.ProjectId
+                INSERT INTO ""WebProjectTeams"" (""Id"", ""OwnerId"", ""UserId"", ""Name"", ""Email"", ""Role"", ""AddedAt"")
+                SELECT gen_random_uuid()::VARCHAR(36), wp.""OwnerId"", wm.""UserId"", wm.""Name"", wm.""Email"", wm.""Role"", NOW()
+                FROM ""WebProjectMembers"" wm
+                JOIN ""WebProjects"" wp ON wp.""Id"" = wm.""ProjectId""
                 WHERE NOT EXISTS (
-                    SELECT 1 FROM WebProjectTeams wt
-                    WHERE wt.OwnerId = wp.OwnerId
+                    SELECT 1 FROM ""WebProjectTeams"" wt
+                    WHERE wt.""OwnerId"" = wp.""OwnerId""
                       AND (
-                          (wm.UserId IS NOT NULL AND wt.UserId = wm.UserId)
-                          OR (wm.UserId IS NULL AND wm.Email IS NOT NULL
-                              AND LOWER(TRIM(wt.Email)) = LOWER(TRIM(wm.Email)))
+                          (wm.""UserId"" IS NOT NULL AND wt.""UserId"" = wm.""UserId"")
+                          OR (wm.""UserId"" IS NULL AND wm.""Email"" IS NOT NULL
+                              AND LOWER(TRIM(wt.""Email"")) = LOWER(TRIM(wm.""Email"")))
                       )
                 )";
             var seeded = await seedTeams.ExecuteNonQueryAsync();
@@ -709,10 +709,10 @@ using (var scope = app.Services.CreateScope())
 
             // Backfill UserId on WebProjectTeams from AspNetUsers via email
             using var fillTeams = conn.CreateCommand();
-            fillTeams.CommandText = @"UPDATE WebProjectTeams wt
-                JOIN AspNetUsers u ON LOWER(TRIM(u.Email)) = LOWER(TRIM(wt.Email))
-                SET wt.UserId = u.Id
-                WHERE wt.UserId IS NULL AND wt.Email IS NOT NULL AND wt.Email <> ''";
+            fillTeams.CommandText = @"UPDATE ""WebProjectTeams"" SET ""UserId"" = u.""Id""
+                FROM ""AspNetUsers"" u
+                WHERE LOWER(TRIM(u.""Email"")) = LOWER(TRIM(""WebProjectTeams"".""Email""))
+                AND ""WebProjectTeams"".""UserId"" IS NULL AND ""WebProjectTeams"".""Email"" IS NOT NULL AND ""WebProjectTeams"".""Email"" <> ''";
             var filledT = await fillTeams.ExecuteNonQueryAsync();
             if (filledT > 0) Log.Information("Backfilled UserId for {Count} WebProjectTeams rows", filledT);
         }

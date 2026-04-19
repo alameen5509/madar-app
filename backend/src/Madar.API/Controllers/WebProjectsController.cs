@@ -149,7 +149,7 @@ public class WebProjectsController : ControllerBase
             if (rows.Count > 0) userId = rows[0]["id"]?.ToString();
         }
         // Per-project membership (legacy)
-        await E("INSERT INTO WebProjectMembers (Id,ProjectId,UserId,Name,Email,`Role`,AddedAt) VALUES(@mid,@pid,@uid,@n,@e,@r,NOW())",
+        await E("INSERT INTO \"WebProjectMembers\" (\"Id\",\"ProjectId\",\"UserId\",\"Name\",\"Email\",\"Role\",\"AddedAt\") VALUES(@mid,@pid,@uid,@n,@e,@r,NOW())",
             [P("@mid",mid),P("@pid",id),P("@uid",userId),P("@n",req.Name),P("@e",email),P("@r",req.Role??"employee")], ct);
 
         // Promote to owner-team membership so this user sees ALL my projects (the source of truth).
@@ -170,7 +170,7 @@ public class WebProjectsController : ControllerBase
                     [P("@oid", ownerId), P("@uid", userId), P("@e", email.ToLowerInvariant())], ct);
                 if (existing.Count == 0)
                 {
-                    await E(@"INSERT INTO WebProjectTeams (Id,OwnerId,UserId,Name,Email,`Role`,AddedAt)
+                    await E(@"INSERT INTO ""WebProjectTeams"" (""Id"",""OwnerId"",""UserId"",""Name"",""Email"",""Role"",""AddedAt"")
                               VALUES(@tid,@oid,@uid,@n,@e,@r,NOW())",
                         [P("@tid", NewId()), P("@oid", ownerId), P("@uid", userId),
                          P("@n", req.Name), P("@e", email), P("@r", req.Role ?? "employee")], ct);
@@ -220,15 +220,15 @@ public class WebProjectsController : ControllerBase
 
     [HttpGet("{id}/phase1/tasks")]
     public async Task<IActionResult> GetPhase1Tasks(string id, CancellationToken ct) =>
-        Ok(await Q("SELECT * FROM WebPhase1Tasks WHERE ProjectId=@id ORDER BY `Order`", Ps("@id",id), ct));
+        Ok(await Q("SELECT * FROM \"WebPhase1Tasks\" WHERE \"ProjectId\"=@id ORDER BY \"Order\"", Ps("@id",id), ct));
 
     [HttpPost("{id}/phase1/tasks")]
     public async Task<IActionResult> AddPhase1Task(string id, [FromBody] WpTaskReq req, CancellationToken ct)
     {
         var tid = NewId();
-        var maxOrder = await Q("SELECT MAX(`Order`) as m FROM WebPhase1Tasks WHERE ProjectId=@id", Ps("@id",id), ct);
+        var maxOrder = await Q("SELECT MAX(\"Order\") as m FROM \"WebPhase1Tasks\" WHERE \"ProjectId\"=@id", Ps("@id",id), ct);
         var order = Convert.ToInt32(maxOrder[0]["m"] ?? 0) + 1;
-        await E("INSERT INTO WebPhase1Tasks (Id,ProjectId,Title,AssignedTo,Status,`Order`,CreatedAt) VALUES(@tid,@pid,@t,@a,'pending',@o,NOW())",
+        await E("INSERT INTO \"WebPhase1Tasks\" (\"Id\",\"ProjectId\",\"Title\",\"AssignedTo\",\"Status\",\"Order\",\"CreatedAt\") VALUES(@tid,@pid,@t,@a,'pending',@o,NOW())",
             [P("@tid",tid),P("@pid",id),P("@t",req.Title),P("@a",req.AssignedTo),P("@o",order)], ct);
         return Ok(new { id = tid });
     }
@@ -251,15 +251,15 @@ public class WebProjectsController : ControllerBase
     // ═══ PHASE 3: Setup Commands ═══
     [HttpGet("{id}/phase3/commands")]
     public async Task<IActionResult> GetPhase3Cmds(string id, CancellationToken ct) =>
-        Ok(await Q("SELECT * FROM WebPhase3Commands WHERE ProjectId=@id ORDER BY `Order`", Ps("@id",id), ct));
+        Ok(await Q("SELECT * FROM \"WebPhase3Commands\" WHERE \"ProjectId\"=@id ORDER BY \"Order\"", Ps("@id",id), ct));
 
     [HttpPost("{id}/phase3/commands")]
     public async Task<IActionResult> AddPhase3Cmd(string id, [FromBody] CmdReq req, CancellationToken ct)
     {
         var cid = NewId();
-        var maxOrder = await Q("SELECT MAX(`Order`) as m FROM WebPhase3Commands WHERE ProjectId=@id", Ps("@id",id), ct);
+        var maxOrder = await Q("SELECT MAX(\"Order\") as m FROM \"WebPhase3Commands\" WHERE \"ProjectId\"=@id", Ps("@id",id), ct);
         var order = Convert.ToInt32(maxOrder[0]["m"] ?? 0) + 1;
-        await E("INSERT INTO WebPhase3Commands (Id,ProjectId,Title,Command,`Order`,Status,CreatedAt) VALUES(@cid,@pid,@t,@cmd,@o,'pending',NOW())",
+        await E("INSERT INTO \"WebPhase3Commands\" (\"Id\",\"ProjectId\",\"Title\",\"Command\",\"Order\",\"Status\",\"CreatedAt\") VALUES(@cid,@pid,@t,@cmd,@o,'pending',NOW())",
             [P("@cid",cid),P("@pid",id),P("@t",req.Title),P("@cmd",req.Command),P("@o",order)], ct);
         return Ok(new { id = cid });
     }
@@ -275,7 +275,7 @@ public class WebProjectsController : ControllerBase
     [HttpGet("{id}/phase3/next-command")]
     public async Task<IActionResult> GetNextPhase3Cmd(string id, CancellationToken ct)
     {
-        var r = await Q("SELECT * FROM WebPhase3Commands WHERE ProjectId=@id AND Status='pending' ORDER BY `Order` LIMIT 1", Ps("@id",id), ct);
+        var r = await Q("SELECT * FROM \"WebPhase3Commands\" WHERE \"ProjectId\"=@id AND \"Status\"='pending' ORDER BY \"Order\" LIMIT 1", Ps("@id",id), ct);
         return Ok(r.Count > 0 ? r[0] : null);
     }
 
@@ -303,15 +303,15 @@ public class WebProjectsController : ControllerBase
     // ═══ PHASE 5: Dev Commands ═══
     [HttpGet("{id}/phase5/commands")]
     public async Task<IActionResult> GetPhase5Cmds(string id, CancellationToken ct) =>
-        Ok(await Q("SELECT * FROM WebPhase5Commands WHERE ProjectId=@id ORDER BY `Order`", Ps("@id",id), ct));
+        Ok(await Q("SELECT * FROM \"WebPhase5Commands\" WHERE \"ProjectId\"=@id ORDER BY \"Order\"", Ps("@id",id), ct));
 
     [HttpPost("{id}/phase5/commands")]
     public async Task<IActionResult> AddPhase5Cmd(string id, [FromBody] CmdReq req, CancellationToken ct)
     {
         var cid = NewId();
-        var maxOrder = await Q("SELECT MAX(`Order`) as m FROM WebPhase5Commands WHERE ProjectId=@id", Ps("@id",id), ct);
+        var maxOrder = await Q("SELECT MAX(\"Order\") as m FROM \"WebPhase5Commands\" WHERE \"ProjectId\"=@id", Ps("@id",id), ct);
         var order = Convert.ToInt32(maxOrder[0]["m"] ?? 0) + 1;
-        await E("INSERT INTO WebPhase5Commands (Id,ProjectId,Title,Command,`Order`,Status,AddedBy,CreatedAt) VALUES(@cid,@pid,@t,@cmd,@o,'pending',@uid,NOW())",
+        await E("INSERT INTO \"WebPhase5Commands\" (\"Id\",\"ProjectId\",\"Title\",\"Command\",\"Order\",\"Status\",\"AddedBy\",\"CreatedAt\") VALUES(@cid,@pid,@t,@cmd,@o,'pending',@uid,NOW())",
             [P("@cid",cid),P("@pid",id),P("@t",req.Title),P("@cmd",req.Command),P("@o",order),P("@uid",Uid)], ct);
         return Ok(new { id = cid });
     }
@@ -373,8 +373,8 @@ public class WebProjectsController : ControllerBase
     public async Task<IActionResult> GetKV(string id, string key, CancellationToken ct)
     {
         // Ensure table exists
-        try { await E("CREATE TABLE IF NOT EXISTS WebProjectKV (ProjectId VARCHAR(36) NOT NULL, `Key` VARCHAR(100) NOT NULL, Value LONGTEXT, UpdatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), PRIMARY KEY (ProjectId, `Key`))", [], ct); } catch {}
-        var rows = await Q("SELECT Value FROM WebProjectKV WHERE ProjectId=@pid AND `Key`=@k LIMIT 1", [P("@pid", id), P("@k", key)], ct);
+        try { await E("CREATE TABLE IF NOT EXISTS \"WebProjectKV\" (\"ProjectId\" VARCHAR(36) NOT NULL, \"Key\" VARCHAR(100) NOT NULL, \"Value\" TEXT, \"UpdatedAt\" TIMESTAMP NOT NULL DEFAULT NOW(), PRIMARY KEY (\"ProjectId\", \"Key\"))", [], ct); } catch {}
+        var rows = await Q("SELECT \"Value\" FROM \"WebProjectKV\" WHERE \"ProjectId\"=@pid AND \"Key\"=@k LIMIT 1", [P("@pid", id), P("@k", key)], ct);
         if (rows.Count == 0) return Ok(new { value = (string?)null });
         return Ok(new { value = rows[0]["value"]?.ToString() });
     }
@@ -382,8 +382,8 @@ public class WebProjectsController : ControllerBase
     [HttpPut("{id}/kv/{key}")]
     public async Task<IActionResult> SetKV(string id, string key, [FromBody] KVReq req, CancellationToken ct)
     {
-        try { await E("CREATE TABLE IF NOT EXISTS WebProjectKV (ProjectId VARCHAR(36) NOT NULL, `Key` VARCHAR(100) NOT NULL, Value LONGTEXT, UpdatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), PRIMARY KEY (ProjectId, `Key`))", [], ct); } catch {}
-        await E("REPLACE INTO WebProjectKV (ProjectId, `Key`, Value, UpdatedAt) VALUES(@pid, @k, @v, NOW())",
+        try { await E("CREATE TABLE IF NOT EXISTS \"WebProjectKV\" (\"ProjectId\" VARCHAR(36) NOT NULL, \"Key\" VARCHAR(100) NOT NULL, \"Value\" TEXT, \"UpdatedAt\" TIMESTAMP NOT NULL DEFAULT NOW(), PRIMARY KEY (\"ProjectId\", \"Key\"))", [], ct); } catch {}
+        await E("INSERT INTO \"WebProjectKV\" (\"ProjectId\", \"Key\", \"Value\", \"UpdatedAt\") VALUES(@pid, @k, @v, NOW()) ON CONFLICT (\"ProjectId\", \"Key\") DO UPDATE SET \"Value\"=EXCLUDED.\"Value\", \"UpdatedAt\"=NOW()",
             [P("@pid", id), P("@k", key), P("@v", req.Value)], ct);
         return Ok(new { success = true });
     }

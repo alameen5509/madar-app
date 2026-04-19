@@ -217,13 +217,13 @@ public class UsersController : BaseController
     public async Task<IActionResult> GetKV(string key, CancellationToken ct)
     {
         var uid = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        try { _db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS UserKV (UserId VARCHAR(36) NOT NULL, `Key` VARCHAR(100) NOT NULL, Value LONGTEXT, UpdatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), PRIMARY KEY (UserId, `Key`))"); } catch {}
+        try { _db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS \"UserKV\" (\"UserId\" VARCHAR(36) NOT NULL, \"Key\" VARCHAR(100) NOT NULL, \"Value\" TEXT, \"UpdatedAt\" TIMESTAMP NOT NULL DEFAULT NOW(), PRIMARY KEY (\"UserId\", \"Key\"))"); } catch {}
         var conn = _db.Database.GetDbConnection();
         var wasOpen = conn.State == System.Data.ConnectionState.Open;
         if (!wasOpen) await conn.OpenAsync(ct);
         try {
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT Value FROM UserKV WHERE UserId=@uid AND `Key`=@k LIMIT 1";
+            cmd.CommandText = "SELECT \"Value\" FROM \"UserKV\" WHERE \"UserId\"=@uid AND \"Key\"=@k LIMIT 1";
             cmd.Parameters.Add(new NpgsqlParameter("@uid", uid));
             cmd.Parameters.Add(new NpgsqlParameter("@k", key));
             var result = await cmd.ExecuteScalarAsync(ct);
@@ -236,13 +236,13 @@ public class UsersController : BaseController
     {
         var uid = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
         var value = body.TryGetProperty("value", out var v) ? v.GetString() : body.GetRawText();
-        try { _db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS UserKV (UserId VARCHAR(36) NOT NULL, `Key` VARCHAR(100) NOT NULL, Value LONGTEXT, UpdatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), PRIMARY KEY (UserId, `Key`))"); } catch {}
+        try { _db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS \"UserKV\" (\"UserId\" VARCHAR(36) NOT NULL, \"Key\" VARCHAR(100) NOT NULL, \"Value\" TEXT, \"UpdatedAt\" TIMESTAMP NOT NULL DEFAULT NOW(), PRIMARY KEY (\"UserId\", \"Key\"))"); } catch {}
         var conn = _db.Database.GetDbConnection();
         var wasOpen = conn.State == System.Data.ConnectionState.Open;
         if (!wasOpen) await conn.OpenAsync(ct);
         try {
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "REPLACE INTO UserKV (UserId, `Key`, Value, UpdatedAt) VALUES(@uid, @k, @v, NOW())";
+            cmd.CommandText = "INSERT INTO \"UserKV\" (\"UserId\", \"Key\", \"Value\", \"UpdatedAt\") VALUES(@uid, @k, @v, NOW()) ON CONFLICT (\"UserId\", \"Key\") DO UPDATE SET \"Value\"=EXCLUDED.\"Value\", \"UpdatedAt\"=NOW()";
             cmd.Parameters.Add(new NpgsqlParameter("@uid", uid));
             cmd.Parameters.Add(new NpgsqlParameter("@k", key));
             cmd.Parameters.Add(new NpgsqlParameter("@v", value));
