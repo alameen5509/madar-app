@@ -113,8 +113,9 @@ builder.Services.AddSwaggerGen(c =>
 var app = builder.Build();
 
 // Seed roles on startup
-using (var scope = app.Services.CreateScope())
+try
 {
+    using var scope = app.Services.CreateScope();
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
     string[] roles = ["User", "BusinessOwner", "Admin"];
     foreach (var role in roles)
@@ -123,11 +124,17 @@ using (var scope = app.Services.CreateScope())
             await roleManager.CreateAsync(new IdentityRole<Guid> { Name = role });
     }
 }
-
-// Auto-create missing tables and columns
-using (var scope = app.Services.CreateScope())
+catch (Exception ex)
 {
-    var db = scope.ServiceProvider.GetRequiredService<Madar.Infrastructure.Persistence.MadarDbContext>();
+    Log.Warning(ex, "Role seeding skipped (roles may already exist)");
+}
+
+// Auto-create missing tables and columns — DISABLED for PostgreSQL (handled by EF Migrations + manual SQL)
+// Tables already created via create-missing-tables.mjs script
+#if MYSQL_LEGACY_DISABLED
+using (var scope_legacy = app.Services.CreateScope())
+{
+    var db_legacy = scope_legacy.ServiceProvider.GetRequiredService<Madar.Infrastructure.Persistence.MadarDbContext>();
     string[] sqls = [
         "ALTER TABLE WebProjects ADD COLUMN Priority VARCHAR(20) NOT NULL DEFAULT 'medium';",
         "ALTER TABLE WebProjects ADD COLUMN DueDate VARCHAR(20) NULL;",
@@ -263,9 +270,10 @@ using (var scope = app.Services.CreateScope())
     ];
     foreach (var sql in sqls)
     {
-        try { db.Database.ExecuteSqlRaw(sql); } catch { /* table/column may exist */ }
+        try { db_legacy.Database.ExecuteSqlRaw(sql); } catch { /* table/column may exist */ }
     }
 }
+#endif
 
 app.UseSwagger();
 app.UseSwaggerUI();
