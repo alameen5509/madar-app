@@ -16,6 +16,7 @@ public static class DependencyInjection
     {
         // Database
         var connectionString = config.GetConnectionString("DefaultConnection")
+            ?? Environment.GetEnvironmentVariable("DATABASE_URL")
             ?? throw new InvalidOperationException("DefaultConnection not configured.");
         services.AddDbContext<MadarDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql => {
