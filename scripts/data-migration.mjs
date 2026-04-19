@@ -3,12 +3,11 @@ import fs from 'fs';
 import path from 'path';
 
 const PG_CONFIG = {
-  host: 'db.yxprisuqztdxevxqgmmc.supabase.co',
-  port: 5432,
-  database: 'postgres',
+  host: 'roundhouse.proxy.rlwy.net',
+  port: 58156,
+  database: 'madar',
   user: 'postgres',
-  password: 'WOdD1PUu*0Z%bN6Bnp2YltxksfV&',
-  ssl: { rejectUnauthorized: false },
+  password: 'v2CU5NUZHOKlR1BZeyL5V6kzRBnZno9F',
   connectionTimeoutMillis: 30000,
 };
 
