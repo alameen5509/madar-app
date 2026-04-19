@@ -21,7 +21,7 @@ public class WarRoomController : ControllerBase
     {
         // تنظيف الأدوار اليتيمة المرتبطة بأعمال محذوفة
         var uid = Guid.Parse(Uid);
-        var orphanRoles = await Q(@"SELECT ""Id"" FROM ""LeadershipRoles"" WHERE ""UserId""=@uid AND ""WorkId"" IS NOT NULL AND ""WorkId"" != '' AND ""WorkId"" NOT IN (SELECT ""Id"" FROM ""Works"" WHERE ""OwnerId""=@uid2)",
+        var orphanRoles = await Q(@"SELECT ""Id"" FROM ""LeadershipRoles"" WHERE ""UserId""=@uid AND ""WorkId"" IS NOT NULL AND ""WorkId"" != '' AND ""WorkId"" NOT IN (SELECT ""Id""::text FROM ""Works"" WHERE ""OwnerId""::text=@uid2)",
             [P("@uid", Uid), P("@uid2", Uid)], ct);
         foreach (var orphan in orphanRoles)
         {
