@@ -11,7 +11,7 @@ public class ApplicationUser : IdentityUser<Guid>
     public string? Latitude { get; set; }
     public string? Longitude { get; set; }
     public CalculationMethod PrayerCalculationMethod { get; set; } = CalculationMethod.UmmAlQura;
-    public EnergyProfile EnergyProfile { get; set; } = new();
+    public EnergyProfile? EnergyProfile { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastLoginAt { get; set; }
     public bool IsActive { get; set; } = true;

@@ -58,10 +58,10 @@ public class ClaudeAiPriorityEngine : IAiPriorityEngine
             - المغرب: {{salahTimes.Maghrib}}، العشاء: {{salahTimes.Isha}}
 
             ملف طاقة المستخدم:
-            - الذروة الأولى: {{user.EnergyProfile.PeakEnergyBlock}}
-            - الذروة الثانية: {{user.EnergyProfile.SecondaryEnergyBlock}}
-            - فترة الانخفاض: {{user.EnergyProfile.LowEnergyBlock}}
-            - النمط: {{user.EnergyProfile.Chronotype}}
+            - الذروة الأولى: {{user.EnergyProfile?.PeakEnergyBlock}}
+            - الذروة الثانية: {{user.EnergyProfile?.SecondaryEnergyBlock}}
+            - فترة الانخفاض: {{user.EnergyProfile?.LowEnergyBlock}}
+            - النمط: {{user.EnergyProfile?.Chronotype}}
 
             أعطني JSON بهذا الشكل بالضبط:
             {
