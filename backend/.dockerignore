@@ -1,0 +1,15 @@
+**/bin
+**/obj
+**/out
+**/backups
+**/.vs
+**/.vscode
+**/.git
+**/node_modules
+**/*.md
+**/.dockerignore
+**/.migration-secrets.txt
+**/scripts/data-migration
+**/publish
+**/publish-sc
+**/deploy*.zip
