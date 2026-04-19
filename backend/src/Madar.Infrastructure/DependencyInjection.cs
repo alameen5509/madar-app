@@ -18,10 +18,10 @@ public static class DependencyInjection
         var connectionString = config.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("DefaultConnection not configured.");
         services.AddDbContext<MadarDbContext>(options =>
-            options.UseMySql(
-                connectionString,
-                new MySqlServerVersion(new Version(8, 0, 0)),
-                b => b.MigrationsAssembly(typeof(MadarDbContext).Assembly.FullName)));
+            options.UseNpgsql(connectionString, npgsql => {
+                npgsql.MigrationsAssembly(typeof(MadarDbContext).Assembly.FullName);
+                npgsql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(10), errorCodesToAdd: null);
+            }));
 
         // Identity
         services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>

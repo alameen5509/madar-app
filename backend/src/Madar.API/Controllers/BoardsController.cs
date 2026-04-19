@@ -3,6 +3,7 @@ using Madar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Madar.API.Controllers;
 
@@ -25,7 +26,7 @@ public class BoardsController : ControllerBase
         var q = _db.Database.GetDbConnection();
         // Use raw SQL since Boards is not in EF model
         var sql = "SELECT Id, Name, EntityType, EntityId, Data, CreatedAt, UpdatedAt FROM Boards WHERE UserId = @uid";
-        var parameters = new List<MySqlConnector.MySqlParameter>
+        var parameters = new List<NpgsqlParameter>
         {
             new("@uid", UserId.ToString()),
         };
@@ -81,8 +82,8 @@ public class BoardsController : ControllerBase
         {
             using var cmd = q.CreateCommand();
             cmd.CommandText = "SELECT Id, Name, EntityType, EntityId, Data, CreatedAt, UpdatedAt FROM Boards WHERE Id = @id AND UserId = @uid";
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@id", id.ToString()));
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@uid", UserId.ToString()));
+            cmd.Parameters.Add(new NpgsqlParameter("@id", id.ToString()));
+            cmd.Parameters.Add(new NpgsqlParameter("@uid", UserId.ToString()));
 
             using var reader = await cmd.ExecuteReaderAsync(ct);
             if (!await reader.ReadAsync(ct)) return NotFound();
@@ -114,13 +115,13 @@ public class BoardsController : ControllerBase
             using var cmd = q.CreateCommand();
             cmd.CommandText = @"INSERT INTO Boards (Id, UserId, Name, EntityType, EntityId, Data, CreatedAt, UpdatedAt)
                                 VALUES (@id, @uid, @name, @et, @eid, @data, @now, @now)";
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@id", id.ToString()));
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@uid", UserId.ToString()));
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@name", req.Name ?? "سبورة جديدة"));
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@et", req.EntityType ?? "personal"));
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@eid", req.EntityId ?? (object)DBNull.Value));
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@data", req.Data ?? (object)DBNull.Value));
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@now", now));
+            cmd.Parameters.Add(new NpgsqlParameter("@id", id.ToString()));
+            cmd.Parameters.Add(new NpgsqlParameter("@uid", UserId.ToString()));
+            cmd.Parameters.Add(new NpgsqlParameter("@name", req.Name ?? "سبورة جديدة"));
+            cmd.Parameters.Add(new NpgsqlParameter("@et", req.EntityType ?? "personal"));
+            cmd.Parameters.Add(new NpgsqlParameter("@eid", req.EntityId ?? (object)DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@data", req.Data ?? (object)DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@now", now));
             await cmd.ExecuteNonQueryAsync(ct);
         }
         finally { await q.CloseAsync(); }
@@ -139,11 +140,11 @@ public class BoardsController : ControllerBase
             using var cmd = q.CreateCommand();
             cmd.CommandText = @"UPDATE Boards SET Data = @data, Name = COALESCE(@name, Name), UpdatedAt = @now
                                 WHERE Id = @id AND UserId = @uid";
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@data", req.Data ?? (object)DBNull.Value));
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@name", req.Name ?? (object)DBNull.Value));
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@now", DateTime.UtcNow));
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@id", id.ToString()));
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@uid", UserId.ToString()));
+            cmd.Parameters.Add(new NpgsqlParameter("@data", req.Data ?? (object)DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@name", req.Name ?? (object)DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@now", DateTime.UtcNow));
+            cmd.Parameters.Add(new NpgsqlParameter("@id", id.ToString()));
+            cmd.Parameters.Add(new NpgsqlParameter("@uid", UserId.ToString()));
             var rows = await cmd.ExecuteNonQueryAsync(ct);
             if (rows == 0) return NotFound();
         }
@@ -162,8 +163,8 @@ public class BoardsController : ControllerBase
         {
             using var cmd = q.CreateCommand();
             cmd.CommandText = "DELETE FROM Boards WHERE Id = @id AND UserId = @uid";
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@id", id.ToString()));
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@uid", UserId.ToString()));
+            cmd.Parameters.Add(new NpgsqlParameter("@id", id.ToString()));
+            cmd.Parameters.Add(new NpgsqlParameter("@uid", UserId.ToString()));
             var rows = await cmd.ExecuteNonQueryAsync(ct);
             if (rows == 0) return NotFound();
         }

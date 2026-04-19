@@ -3,7 +3,7 @@ using Madar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using MySqlConnector;
+using Npgsql;
 
 namespace Madar.API.Controllers;
 
@@ -21,8 +21,7 @@ public class WarRoomController : ControllerBase
     {
         // تنظيف الأدوار اليتيمة المرتبطة بأعمال محذوفة
         var uid = Guid.Parse(Uid);
-        var existingWorkIds = await _db.Works.Where(w => w.OwnerId == uid).Select(w => w.Id.ToString()).ToListAsync(ct);
-        var orphanRoles = await Q(@"SELECT Id FROM LeadershipRoles WHERE UserId=@uid AND WorkId IS NOT NULL AND WorkId != '' AND WorkId NOT IN (SELECT CAST(Id AS CHAR) FROM Works WHERE OwnerId=@uid2)",
+        var orphanRoles = await Q(@"SELECT Id FROM LeadershipRoles WHERE UserId=@uid AND WorkId IS NOT NULL AND WorkId != '' AND WorkId NOT IN (SELECT Id FROM Works WHERE OwnerId=@uid2)",
             [P("@uid", Uid), P("@uid2", Uid)], ct);
         foreach (var orphan in orphanRoles)
         {
@@ -237,10 +236,10 @@ public class WarRoomController : ControllerBase
 
     // ═══ HELPERS ══════════════════════════════════════════════════════════
     static string NewId() => Guid.NewGuid().ToString();
-    static MySqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);
-    static List<MySqlParameter> Ps(string n, object? v) => [P(n, v)];
+    static NpgsqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);
+    static List<NpgsqlParameter> Ps(string n, object? v) => [P(n, v)];
 
-    private async Task<List<Dictionary<string, object?>>> Q(string sql, List<MySqlParameter> ps, CancellationToken ct)
+    private async Task<List<Dictionary<string, object?>>> Q(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection(); var w = conn.State == System.Data.ConnectionState.Open; if (!w) await conn.OpenAsync(ct);
         try { using var cmd = conn.CreateCommand(); cmd.CommandText = sql; foreach (var p in ps) cmd.Parameters.Add(p);
@@ -249,7 +248,7 @@ public class WarRoomController : ControllerBase
         } finally { if (!w) await conn.CloseAsync(); }
     }
 
-    private async Task<int> E(string sql, List<MySqlParameter> ps, CancellationToken ct)
+    private async Task<int> E(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection(); var w = conn.State == System.Data.ConnectionState.Open; if (!w) await conn.OpenAsync(ct);
         try { using var cmd = conn.CreateCommand(); cmd.CommandText = sql; foreach (var p in ps) cmd.Parameters.Add(p); return await cmd.ExecuteNonQueryAsync(ct);

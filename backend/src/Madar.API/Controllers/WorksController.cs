@@ -4,7 +4,7 @@ using Madar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using MySqlConnector;
+using Npgsql;
 
 namespace Madar.API.Controllers;
 
@@ -236,9 +236,9 @@ public class WorksController : ControllerBase
     }
 
     // ═══ Raw SQL helpers ═══
-    static MySqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);
+    static NpgsqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);
 
-    private async Task<int> Exec(string sql, List<MySqlParameter> ps, CancellationToken ct)
+    private async Task<int> Exec(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection();
         var wasOpen = conn.State == System.Data.ConnectionState.Open;
@@ -253,7 +253,7 @@ public class WorksController : ControllerBase
         finally { if (!wasOpen) await conn.CloseAsync(); }
     }
 
-    private async Task<List<Dictionary<string, object?>>> Query(string sql, List<MySqlParameter> ps, CancellationToken ct)
+    private async Task<List<Dictionary<string, object?>>> Query(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection();
         var wasOpen = conn.State == System.Data.ConnectionState.Open;

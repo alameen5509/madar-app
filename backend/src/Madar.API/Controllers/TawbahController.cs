@@ -3,7 +3,7 @@ using Madar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using MySqlConnector;
+using Npgsql;
 
 namespace Madar.API.Controllers;
 
@@ -152,15 +152,15 @@ public class TawbahController : ControllerBase
 
     // Helpers
     static string NewId() => Guid.NewGuid().ToString();
-    static MySqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);
-    static List<MySqlParameter> Ps(string n, object? v) => [P(n, v)];
-    private async Task<List<Dictionary<string, object?>>> Q(string sql, List<MySqlParameter> ps, CancellationToken ct)
+    static NpgsqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);
+    static List<NpgsqlParameter> Ps(string n, object? v) => [P(n, v)];
+    private async Task<List<Dictionary<string, object?>>> Q(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     { var conn = _db.Database.GetDbConnection(); var w = conn.State == System.Data.ConnectionState.Open; if (!w) await conn.OpenAsync(ct);
       try { using var cmd = conn.CreateCommand(); cmd.CommandText = sql; foreach (var p in ps) cmd.Parameters.Add(p);
           using var r = await cmd.ExecuteReaderAsync(ct); var rows = new List<Dictionary<string, object?>>();
           while (await r.ReadAsync(ct)) { var row = new Dictionary<string, object?>(); for (int i = 0; i < r.FieldCount; i++) row[char.ToLowerInvariant(r.GetName(i)[0]) + r.GetName(i)[1..]] = r.IsDBNull(i) ? null : r.GetValue(i); rows.Add(row); } return rows;
       } finally { if (!w) await conn.CloseAsync(); } }
-    private async Task<int> E(string sql, List<MySqlParameter> ps, CancellationToken ct)
+    private async Task<int> E(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     { var conn = _db.Database.GetDbConnection(); var w = conn.State == System.Data.ConnectionState.Open; if (!w) await conn.OpenAsync(ct);
       try { using var cmd = conn.CreateCommand(); cmd.CommandText = sql; foreach (var p in ps) cmd.Parameters.Add(p); return await cmd.ExecuteNonQueryAsync(ct);
       } finally { if (!w) await conn.CloseAsync(); } }

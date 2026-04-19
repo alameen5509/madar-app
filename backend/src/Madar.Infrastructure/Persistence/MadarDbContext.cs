@@ -75,8 +75,11 @@ public class MadarDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Gu
     {
         base.OnModelCreating(builder);
 
-        // TiDB has new collation enabled and doesn't support ascii_general_ci for GUIDs
-        builder.UseGuidCollation(string.Empty);
+        // Preserve table names for PostgreSQL (case-sensitive)
+        foreach (var entity in builder.Model.GetEntityTypes())
+        {
+            entity.SetTableName(entity.GetTableName());
+        }
 
         builder.Entity<ApplicationUser>(u =>
         {

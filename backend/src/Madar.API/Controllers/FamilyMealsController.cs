@@ -3,7 +3,7 @@ using Madar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using MySqlConnector;
+using Npgsql;
 
 namespace Madar.API.Controllers;
 
@@ -54,7 +54,7 @@ public class FamilyMealsController : ControllerBase
             JOIN FamilyMembers fm ON p.MemberId=fm.Id
             LEFT JOIN Meals m ON p.MealId=m.Id
             WHERE p.UserId=@uid";
-        var ps = new List<MySqlParameter> { P("@uid",Uid) };
+        var ps = new List<NpgsqlParameter> { P("@uid",Uid) };
         if (memberId != null) { sql += " AND p.MemberId=@mid"; ps.Add(P("@mid",memberId)); }
         if (date != null) { sql += " AND p.PlanDate=@d"; ps.Add(P("@d",date)); }
         sql += " ORDER BY p.PlanDate, fm.Name, FIELD(p.MealTime,'breakfast','lunch','dinner','snack')";
@@ -89,14 +89,14 @@ public class FamilyMealsController : ControllerBase
 
     // Helpers
     static string NewId() => Guid.NewGuid().ToString();
-    static MySqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);
-    static List<MySqlParameter> Ps(string n, object? v) => [P(n, v)];
-    private async Task<List<Dictionary<string, object?>>> Q(string sql, List<MySqlParameter> ps, CancellationToken ct)
+    static NpgsqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);
+    static List<NpgsqlParameter> Ps(string n, object? v) => [P(n, v)];
+    private async Task<List<Dictionary<string, object?>>> Q(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     { var c=_db.Database.GetDbConnection();var w=c.State==System.Data.ConnectionState.Open;if(!w)await c.OpenAsync(ct);
       try{using var cmd=c.CreateCommand();cmd.CommandText=sql;foreach(var p in ps)cmd.Parameters.Add(p);using var r=await cmd.ExecuteReaderAsync(ct);var rows=new List<Dictionary<string,object?>>();
         while(await r.ReadAsync(ct)){var row=new Dictionary<string,object?>();for(int i=0;i<r.FieldCount;i++)row[char.ToLowerInvariant(r.GetName(i)[0])+r.GetName(i)[1..]]=r.IsDBNull(i)?null:r.GetValue(i);rows.Add(row);}return rows;
       }finally{if(!w)await c.CloseAsync();}}
-    private async Task<int> E(string sql, List<MySqlParameter> ps, CancellationToken ct)
+    private async Task<int> E(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     { var c=_db.Database.GetDbConnection();var w=c.State==System.Data.ConnectionState.Open;if(!w)await c.OpenAsync(ct);
       try{using var cmd=c.CreateCommand();cmd.CommandText=sql;foreach(var p in ps)cmd.Parameters.Add(p);return await cmd.ExecuteNonQueryAsync(ct);
       }finally{if(!w)await c.CloseAsync();}}

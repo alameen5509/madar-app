@@ -3,7 +3,7 @@ using Madar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using MySqlConnector;
+using Npgsql;
 
 namespace Madar.API.Controllers;
 
@@ -388,10 +388,10 @@ public class WebProjectsController : ControllerBase
         return Ok(new { success = true });
     }
 
-    static MySqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);
-    static List<MySqlParameter> Ps(string n, object? v) => [P(n, v)];
+    static NpgsqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);
+    static List<NpgsqlParameter> Ps(string n, object? v) => [P(n, v)];
 
-    private async Task<List<Dictionary<string, object?>>> Q(string sql, List<MySqlParameter> ps, CancellationToken ct)
+    private async Task<List<Dictionary<string, object?>>> Q(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection(); var w = conn.State == System.Data.ConnectionState.Open; if (!w) await conn.OpenAsync(ct);
         try { using var cmd = conn.CreateCommand(); cmd.CommandText = sql; foreach (var p in ps) cmd.Parameters.Add(p);
@@ -400,7 +400,7 @@ public class WebProjectsController : ControllerBase
         } finally { if (!w) await conn.CloseAsync(); }
     }
 
-    private async Task<int> E(string sql, List<MySqlParameter> ps, CancellationToken ct)
+    private async Task<int> E(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection(); var w = conn.State == System.Data.ConnectionState.Open; if (!w) await conn.OpenAsync(ct);
         try { using var cmd = conn.CreateCommand(); cmd.CommandText = sql; foreach (var p in ps) cmd.Parameters.Add(p); return await cmd.ExecuteNonQueryAsync(ct);

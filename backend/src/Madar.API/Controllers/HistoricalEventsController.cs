@@ -3,7 +3,7 @@ using Madar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using MySqlConnector;
+using Npgsql;
 
 namespace Madar.API.Controllers;
 
@@ -20,7 +20,7 @@ public class HistoricalEventsController : ControllerBase
     public async Task<IActionResult> GetAll([FromQuery] string? category, CancellationToken ct)
     {
         var sql = "SELECT * FROM HistoricalEvents WHERE UserId=@uid";
-        var ps = new List<MySqlParameter> { new("@uid", Uid) };
+        var ps = new List<NpgsqlParameter> { new("@uid", Uid) };
         if (!string.IsNullOrEmpty(category)) { sql += " AND Category=@c"; ps.Add(new("@c", category)); }
         sql += " ORDER BY OrderIndex ASC, CreatedAt ASC";
         return Ok(await Query(sql, ps, ct));
@@ -226,7 +226,7 @@ public class HistoricalEventsController : ControllerBase
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────
-    private async Task<List<Dictionary<string, object?>>> Query(string sql, List<MySqlParameter> ps, CancellationToken ct)
+    private async Task<List<Dictionary<string, object?>>> Query(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection();
         var wasOpen = conn.State == System.Data.ConnectionState.Open;
@@ -250,7 +250,7 @@ public class HistoricalEventsController : ControllerBase
         finally { if (!wasOpen) await conn.CloseAsync(); }
     }
 
-    private async Task<int> Exec(string sql, List<MySqlParameter> ps, CancellationToken ct)
+    private async Task<int> Exec(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection();
         var wasOpen = conn.State == System.Data.ConnectionState.Open;

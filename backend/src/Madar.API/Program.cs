@@ -9,6 +9,9 @@ using Madar.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// PostgreSQL legacy timestamp behavior (allows DateTime.Kind = Unspecified)
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 // Serilog
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
@@ -62,6 +65,12 @@ builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
 });
+builder.Services.AddHealthChecks()
+    .AddNpgSql(
+        builder.Configuration.GetConnectionString("DefaultConnection")!,
+        name: "supabase",
+        tags: new[] { "db", "postgres" });
+
 builder.Services.AddControllers()
     .AddJsonOptions(o =>
     {
@@ -254,6 +263,7 @@ using (var scope = app.Services.CreateScope())
 app.UseSwagger();
 app.UseSwaggerUI();
 
+app.UseDeveloperExceptionPage();
 app.UseSerilogRequestLogging();
 app.UseCors("FrontendPolicy");
 // HTTPS redirection disabled on Azure (TLS termination handled by the load balancer)
@@ -261,15 +271,70 @@ if (!app.Environment.IsProduction()) app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHealthChecks("/health");
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions {
+    Predicate = check => check.Tags.Contains("db")
+});
 
-// Auto-create prayer tracking tables if missing
+// Auto-apply pending EF migrations on startup
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<Madar.Infrastructure.Persistence.MadarDbContext>();
     try
     {
+        await db.Database.MigrateAsync();
+        Log.Information("Database migrations applied successfully");
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Database migration skipped or failed");
+    }
+
+    // UserKV table (not in EF model, created manually)
+    try
+    {
         await db.Database.ExecuteSqlRawAsync(@"
-            CREATE TABLE IF NOT EXISTS Works (
+            CREATE TABLE IF NOT EXISTS ""UserKV"" (
+                ""UserId"" VARCHAR(36) NOT NULL,
+                ""Key"" VARCHAR(100) NOT NULL,
+                ""Value"" TEXT,
+                ""UpdatedAt"" TIMESTAMP NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (""UserId"", ""Key"")
+            )");
+        // LeadershipRoles + related tables (raw SQL managed)
+        await db.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS ""LeadershipRoles"" (
+                ""Id"" VARCHAR(36) NOT NULL PRIMARY KEY,
+                ""UserId"" VARCHAR(36) NOT NULL,
+                ""Title"" VARCHAR(300) NOT NULL,
+                ""Organization"" VARCHAR(300),
+                ""Sector"" VARCHAR(200),
+                ""Description"" TEXT,
+                ""StartDate"" TIMESTAMP,
+                ""WorkId"" VARCHAR(36),
+                ""ReviewFrequency"" VARCHAR(20) DEFAULT 'weekly',
+                ""Color"" VARCHAR(20) DEFAULT '#5E5495',
+                ""Icon"" VARCHAR(10) DEFAULT '🎯',
+                ""Priority"" INT DEFAULT 0,
+                ""PulseStatus"" VARCHAR(20) DEFAULT 'green',
+                ""PulseNote"" TEXT,
+                ""LastReviewDate"" TIMESTAMP,
+                ""NextReviewDate"" TIMESTAMP,
+                ""IsActive"" BOOLEAN DEFAULT TRUE,
+                ""SourceId"" VARCHAR(36),
+                ""CreatedAt"" TIMESTAMP DEFAULT NOW()
+            )");
+        await db.Database.ExecuteSqlRawAsync(@"CREATE TABLE IF NOT EXISTS ""LeadershipNotes"" (""Id"" VARCHAR(36) PRIMARY KEY, ""RoleId"" VARCHAR(36) NOT NULL, ""UserId"" VARCHAR(36) NOT NULL, ""Content"" TEXT, ""ConvertedTaskId"" VARCHAR(36), ""CreatedAt"" TIMESTAMP DEFAULT NOW())");
+        await db.Database.ExecuteSqlRawAsync(@"CREATE TABLE IF NOT EXISTS ""LeadershipDevRequests"" (""Id"" VARCHAR(36) PRIMARY KEY, ""RoleId"" VARCHAR(36) NOT NULL, ""UserId"" VARCHAR(36) NOT NULL, ""Title"" VARCHAR(500), ""Description"" TEXT, ""Status"" VARCHAR(20) DEFAULT 'new', ""NextReviewDate"" TIMESTAMP, ""ReviewFrequency"" VARCHAR(20), ""CreatedAt"" TIMESTAMP DEFAULT NOW())");
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Manual tables auto-create skipped");
+    }
+}
+// ═══ Legacy MySQL table auto-creation removed — handled by EF Migrations ═══
+
+#if MYSQL_LEGACY_DISABLED
                 Id CHAR(36) NOT NULL PRIMARY KEY,
                 OwnerId CHAR(36) NOT NULL,
                 `Type` VARCHAR(20) NOT NULL DEFAULT 'job',
@@ -656,6 +721,72 @@ using (var scope = app.Services.CreateScope())
     {
         Log.Warning(ex, "Web projects tables auto-create skipped");
     }
-}
+
+    // ═══ Meetings tables ═══
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS Meetings (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                OwnerId CHAR(36) NOT NULL,
+                Title VARCHAR(400) NOT NULL,
+                Description VARCHAR(2000) NULL,
+                MeetingType INT NOT NULL DEFAULT 0,
+                Platform VARCHAR(50) NULL,
+                Location VARCHAR(500) NULL,
+                MeetingLink VARCHAR(500) NULL,
+                StartTime DATETIME(6) NOT NULL,
+                EndTime DATETIME(6) NULL,
+                Status INT NOT NULL DEFAULT 0,
+                Recurrence INT NOT NULL DEFAULT 0,
+                ProjectId CHAR(36) NULL,
+                WorkId CHAR(36) NULL,
+                CircleId CHAR(36) NULL,
+                Notes VARCHAR(5000) NULL,
+                IsPrivate TINYINT(1) NOT NULL DEFAULT 0,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                UpdatedAt DATETIME(6) NULL,
+                INDEX IX_Meetings_OwnerId (OwnerId),
+                INDEX IX_Meetings_StartTime (StartTime)
+            );
+            CREATE TABLE IF NOT EXISTS MeetingAttendees (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                MeetingId CHAR(36) NOT NULL,
+                Name VARCHAR(200) NOT NULL,
+                Role INT NOT NULL DEFAULT 0,
+                Status INT NOT NULL DEFAULT 0,
+                Notes VARCHAR(500) NULL,
+                ContactId CHAR(36) NULL,
+                INDEX IX_MeetingAttendees_MeetingId (MeetingId)
+            );
+            CREATE TABLE IF NOT EXISTS MeetingAgenda (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                MeetingId CHAR(36) NOT NULL,
+                Title VARCHAR(400) NOT NULL,
+                Description VARCHAR(1000) NULL,
+                Duration INT NOT NULL DEFAULT 10,
+                DisplayOrder INT NOT NULL DEFAULT 0,
+                IsCompleted TINYINT(1) NOT NULL DEFAULT 0,
+                INDEX IX_MeetingAgenda_MeetingId (MeetingId)
+            );
+            CREATE TABLE IF NOT EXISTS MeetingMinutes (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                MeetingId CHAR(36) NOT NULL,
+                Content TEXT NOT NULL,
+                CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                INDEX IX_MeetingMinutes_MeetingId (MeetingId)
+            );
+            CREATE TABLE IF NOT EXISTS MeetingActionItems (
+                Id CHAR(36) NOT NULL PRIMARY KEY,
+                MeetingId CHAR(36) NOT NULL,
+                Title VARCHAR(400) NOT NULL,
+                AssignedTo VARCHAR(200) NULL,
+                DueDate DATETIME(6) NULL,
+                IsCompleted TINYINT(1) NOT NULL DEFAULT 0,
+                TaskId CHAR(36) NULL,
+                INDEX IX_MeetingActionItems_MeetingId (MeetingId)
+            );");
+    }
+#endif
 
 app.Run();

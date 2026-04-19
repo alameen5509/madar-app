@@ -4,7 +4,7 @@ using Madar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using MySqlConnector;
+using Npgsql;
 
 namespace Madar.API.Controllers;
 
@@ -249,13 +249,13 @@ public class NutritionController : ControllerBase
 
         // Get dish IDs from meals
         var ph = string.Join(",", mealIds.Select((_,i)=>$"@m{i}"));
-        var ps = mealIds.Select((m,i)=>new MySqlParameter($"@m{i}",m)).ToList();
+        var ps = mealIds.Select((m,i)=>new NpgsqlParameter($"@m{i}",m)).ToList();
         var dishIds = (await Q($"SELECT DISTINCT DishId FROM MealDishes WHERE MealId IN ({ph})", ps, ct)).Select(r=>r["dishId"]!.ToString()!).ToList();
         if (dishIds.Count == 0) return Ok(new { message = "لا توجد صحون" });
 
         // Aggregate ingredients
         var ph2 = string.Join(",", dishIds.Select((_,i)=>$"@d{i}"));
-        var ps2 = dishIds.Select((d,i)=>new MySqlParameter($"@d{i}",d)).ToList();
+        var ps2 = dishIds.Select((d,i)=>new NpgsqlParameter($"@d{i}",d)).ToList();
         var ings = await Q($@"SELECT di.IngredientId, i.Name, i.Unit, i.CurrentStock, SUM(di.Quantity) as TotalNeeded,
             (SELECT ib.Id FROM IngredientBrands ib WHERE ib.IngredientId=di.IngredientId AND ib.IsPreferred=1 LIMIT 1) as BrandId,
             (SELECT ip.Price FROM IngredientPrices ip WHERE ip.IngredientId=di.IngredientId ORDER BY ip.PurchaseDate DESC LIMIT 1) as LastPrice
@@ -300,10 +300,10 @@ public class NutritionController : ControllerBase
 
     static string NewId() => Guid.NewGuid().ToString();
     static DateTime StartOfWeek(DateTime dt) { int diff = ((int)dt.DayOfWeek + 1) % 7; return dt.AddDays(-diff).Date; }
-    static MySqlParameter P(string name, object? val) => new(name, val ?? DBNull.Value);
-    static List<MySqlParameter> Ps(string n, object? v) => [P(n, v)];
+    static NpgsqlParameter P(string name, object? val) => new(name, val ?? DBNull.Value);
+    static List<NpgsqlParameter> Ps(string n, object? v) => [P(n, v)];
 
-    private async Task<List<Dictionary<string, object?>>> Q(string sql, List<MySqlParameter> ps, CancellationToken ct)
+    private async Task<List<Dictionary<string, object?>>> Q(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection(); var w = conn.State == System.Data.ConnectionState.Open; if (!w) await conn.OpenAsync(ct);
         try { using var cmd = conn.CreateCommand(); cmd.CommandText = sql; foreach (var p in ps) cmd.Parameters.Add(p);
@@ -312,7 +312,7 @@ public class NutritionController : ControllerBase
         } finally { if (!w) await conn.CloseAsync(); }
     }
 
-    private async Task<int> E(string sql, List<MySqlParameter> ps, CancellationToken ct)
+    private async Task<int> E(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection(); var w = conn.State == System.Data.ConnectionState.Open; if (!w) await conn.OpenAsync(ct);
         try { using var cmd = conn.CreateCommand(); cmd.CommandText = sql; foreach (var p in ps) cmd.Parameters.Add(p); return await cmd.ExecuteNonQueryAsync(ct);

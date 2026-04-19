@@ -104,3 +104,5 @@ backend/migrations.sql
 copy_frontend.ps1
 
 chromeremotedesktophost.msi
+.migration-secrets.txt
+backups/

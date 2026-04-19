@@ -3,7 +3,7 @@ using Madar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using MySqlConnector;
+using Npgsql;
 
 namespace Madar.API.Controllers;
 
@@ -29,7 +29,7 @@ public class HistoryController : ControllerBase
         CancellationToken ct)
     {
         var sql = "SELECT * FROM HistoryRecords WHERE UserId=@uid";
-        var ps = new List<MySqlParameter> { new("@uid", Uid) };
+        var ps = new List<NpgsqlParameter> { new("@uid", Uid) };
         if (from.HasValue) { sql += " AND Year>=@f"; ps.Add(new("@f", from.Value)); }
         if (to.HasValue) { sql += " AND Year<=@t"; ps.Add(new("@t", to.Value)); }
         if (!string.IsNullOrEmpty(category)) { sql += " AND Category=@c"; ps.Add(new("@c", category)); }
@@ -132,7 +132,7 @@ public class HistoryController : ControllerBase
         CancellationToken ct)
     {
         var sql = "SELECT * FROM HistoryRecords WHERE UserId=@uid";
-        var ps = new List<MySqlParameter> { new("@uid", Uid) };
+        var ps = new List<NpgsqlParameter> { new("@uid", Uid) };
         if (!string.IsNullOrEmpty(q)) { sql += " AND (Title LIKE @q OR Description LIKE @q OR Figure LIKE @q)"; ps.Add(new("@q", $"%{q}%")); }
         if (year.HasValue) { sql += " AND (Year=@y OR HijriYear=@y)"; ps.Add(new("@y", year.Value)); }
         if (!string.IsNullOrEmpty(country)) { sql += " AND Country=@co"; ps.Add(new("@co", country)); }
@@ -182,7 +182,7 @@ public class HistoryController : ControllerBase
 
     // ─── Helpers ────────────────────────────────────────────────────────
 
-    private async Task<List<Dictionary<string, object?>>> Query(string sql, List<MySqlParameter> ps, CancellationToken ct)
+    private async Task<List<Dictionary<string, object?>>> Query(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection();
         await conn.OpenAsync(ct);
@@ -205,7 +205,7 @@ public class HistoryController : ControllerBase
         finally { await conn.CloseAsync(); }
     }
 
-    private async Task<int> Exec(string sql, List<MySqlParameter> ps, CancellationToken ct)
+    private async Task<int> Exec(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection();
         await conn.OpenAsync(ct);

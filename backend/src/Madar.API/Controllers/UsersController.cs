@@ -3,6 +3,7 @@ using Madar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Madar.API.Controllers;
 
@@ -223,8 +224,8 @@ public class UsersController : BaseController
         try {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT Value FROM UserKV WHERE UserId=@uid AND `Key`=@k LIMIT 1";
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@uid", uid));
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@k", key));
+            cmd.Parameters.Add(new NpgsqlParameter("@uid", uid));
+            cmd.Parameters.Add(new NpgsqlParameter("@k", key));
             var result = await cmd.ExecuteScalarAsync(ct);
             return Ok(new { value = result?.ToString() });
         } finally { if (!wasOpen) await conn.CloseAsync(); }
@@ -242,9 +243,9 @@ public class UsersController : BaseController
         try {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "REPLACE INTO UserKV (UserId, `Key`, Value, UpdatedAt) VALUES(@uid, @k, @v, NOW())";
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@uid", uid));
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@k", key));
-            cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@v", value));
+            cmd.Parameters.Add(new NpgsqlParameter("@uid", uid));
+            cmd.Parameters.Add(new NpgsqlParameter("@k", key));
+            cmd.Parameters.Add(new NpgsqlParameter("@v", value));
             await cmd.ExecuteNonQueryAsync(ct);
         } finally { if (!wasOpen) await conn.CloseAsync(); }
         return Ok(new { success = true });

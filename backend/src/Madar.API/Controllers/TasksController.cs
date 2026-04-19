@@ -6,7 +6,7 @@ using Madar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using MySqlConnector;
+using Npgsql;
 
 namespace Madar.API.Controllers;
 
@@ -126,9 +126,9 @@ public class TasksController : BaseController
                     using var cmd = conn.CreateCommand();
                     var paramNames = roleIds.Select((_, i) => $"@r{i}").ToList();
                     cmd.CommandText = $"SELECT Id, Name, Slug FROM UserCircles WHERE UserId=@uid AND Id IN ({string.Join(",", paramNames)})";
-                    cmd.Parameters.Add(new MySqlParameter("@uid", userId.ToString()));
+                    cmd.Parameters.Add(new NpgsqlParameter("@uid", userId.ToString()));
                     for (int i = 0; i < roleIds.Count; i++)
-                        cmd.Parameters.Add(new MySqlParameter(paramNames[i], roleIds[i]));
+                        cmd.Parameters.Add(new NpgsqlParameter(paramNames[i], roleIds[i]));
                     using var r = await cmd.ExecuteReaderAsync(ct);
                     while (await r.ReadAsync(ct))
                     {
@@ -187,7 +187,7 @@ public class TasksController : BaseController
                         var pNames = unlinkedCircleIds.Select((_, i) => $"@lc{i}").ToList();
                         cmd2.CommandText = $"SELECT Id, Name FROM LifeCircles WHERE Id IN ({string.Join(",", pNames)})";
                         int ci = 0;
-                        foreach (var cid in unlinkedCircleIds) cmd2.Parameters.Add(new MySqlParameter(pNames[ci++], cid));
+                        foreach (var cid in unlinkedCircleIds) cmd2.Parameters.Add(new NpgsqlParameter(pNames[ci++], cid));
                         using var rr = await cmd2.ExecuteReaderAsync(ct);
                         while (await rr.ReadAsync(ct)) allCircleNames[rr.GetString(0)] = rr.IsDBNull(1) ? "" : rr.GetString(1);
                     }
@@ -197,7 +197,7 @@ public class TasksController : BaseController
                         var pNames2 = unlinkedCircleIds.Select((_, i) => $"@uc{i}").ToList();
                         cmd3.CommandText = $"SELECT Id, Name FROM UserCircles WHERE Id IN ({string.Join(",", pNames2)})";
                         int ci2 = 0;
-                        foreach (var cid in unlinkedCircleIds) cmd3.Parameters.Add(new MySqlParameter(pNames2[ci2++], cid));
+                        foreach (var cid in unlinkedCircleIds) cmd3.Parameters.Add(new NpgsqlParameter(pNames2[ci2++], cid));
                         using var rr2 = await cmd3.ExecuteReaderAsync(ct);
                         while (await rr2.ReadAsync(ct))
                             if (!allCircleNames.ContainsKey(rr2.GetString(0)))
@@ -209,7 +209,7 @@ public class TasksController : BaseController
                         var pNames3 = unlinkedCircleIds.Select((_, i) => $"@wk{i}").ToList();
                         cmd4.CommandText = $"SELECT Id, Name FROM Works WHERE Id IN ({string.Join(",", pNames3)})";
                         int ci3 = 0;
-                        foreach (var cid in unlinkedCircleIds) cmd4.Parameters.Add(new MySqlParameter(pNames3[ci3++], cid));
+                        foreach (var cid in unlinkedCircleIds) cmd4.Parameters.Add(new NpgsqlParameter(pNames3[ci3++], cid));
                         using var rr3 = await cmd4.ExecuteReaderAsync(ct);
                         while (await rr3.ReadAsync(ct))
                             if (!allCircleNames.ContainsKey(rr3.GetString(0)))
