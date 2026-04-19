@@ -38,7 +38,7 @@ public class BackupController : ControllerBase
         {
             try
             {
-                var rows = await Q($"SELECT * FROM {table} WHERE {userCol}=@uid", Ps("@uid", Uid), ct);
+                var rows = await Q($"SELECT * FROM \"{table}\" WHERE \"{userCol}\"=@uid", Ps("@uid", Uid), ct);
                 data[table] = rows;
                 totalRecords += rows.Count;
             }
@@ -51,7 +51,7 @@ public class BackupController : ControllerBase
         try
         {
             var json = JsonSerializer.Serialize(data);
-            await E("INSERT INTO BackupLogs (Id,UserId,BackupType,Status,FileSize,Notes) VALUES(@id,@uid,'manual','success',@fs,@n)",
+            await E("INSERT INTO \"BackupLogs\" (\"Id\",\"UserId\",\"BackupType\",\"Status\",\"FileSize\",\"Notes\") VALUES(@id,@uid,'manual','success',@fs,@n)",
                 [P("@id", Guid.NewGuid().ToString()), P("@uid", Uid), P("@fs", Encoding.UTF8.GetByteCount(json)), P("@n", $"{data.Count - 1} tables, {totalRecords} records")], ct);
         }
         catch { }
@@ -62,7 +62,7 @@ public class BackupController : ControllerBase
     /// <summary>Get backup history</summary>
     [HttpGet("logs")]
     public async Task<IActionResult> GetLogs(CancellationToken ct) =>
-        Ok(await Q("SELECT * FROM BackupLogs WHERE UserId=@uid ORDER BY BackupDate DESC LIMIT 20", Ps("@uid", Uid), ct));
+        Ok(await Q("SELECT * FROM \"BackupLogs\" WHERE \"UserId\"=@uid ORDER BY \"BackupDate\" DESC LIMIT 20", Ps("@uid", Uid), ct));
 
     // Helpers
     static NpgsqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);

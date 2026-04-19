@@ -23,14 +23,14 @@ public class CircleGroupsController : ControllerBase
     {
         var uid = Uid;
         // Also try lowercase — TiDB may store GUIDs differently
-        var groups = await Q(@"SELECT * FROM CircleGroups
-            WHERE UserId=@uid OR UserId=@uidLower
-            ORDER BY Priority, CreatedAt",
+        var groups = await Q(@"SELECT * FROM ""CircleGroups""
+            WHERE ""UserId""=@uid OR ""UserId""=@uidLower
+            ORDER BY ""Priority"", ""CreatedAt""",
             [new("@uid", uid), new("@uidLower", uid.ToLowerInvariant())], ct);
 
-        var circles = await Q(@"SELECT * FROM UserCircles
-            WHERE UserId=@uid OR UserId=@uidLower
-            ORDER BY Priority, CreatedAt",
+        var circles = await Q(@"SELECT * FROM ""UserCircles""
+            WHERE ""UserId""=@uid OR ""UserId""=@uidLower
+            ORDER BY ""Priority"", ""CreatedAt""",
             [new("@uid", uid), new("@uidLower", uid.ToLowerInvariant())], ct);
 
         // Nest circles inside groups
@@ -49,7 +49,7 @@ public class CircleGroupsController : ControllerBase
     public async Task<IActionResult> CreateGroup([FromBody] GroupReq req, CancellationToken ct)
     {
         var id = Guid.NewGuid();
-        await E(@"INSERT INTO CircleGroups (Id,UserId,Name,Color,Icon,Priority)
+        await E(@"INSERT INTO ""CircleGroups"" (""Id"",""UserId"",""Name"",""Color"",""Icon"",""Priority"")
             VALUES(@id,@uid,@n,@c,@i,@p)",
             [new("@id",id.ToString()),new("@uid",Uid),new("@n",req.Name??""),
              new("@c",(object?)req.Color??DBNull.Value),new("@i",(object?)req.Icon??DBNull.Value),
@@ -60,8 +60,8 @@ public class CircleGroupsController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> UpdateGroup(Guid id, [FromBody] GroupReq req, CancellationToken ct)
     {
-        var rows = await E(@"UPDATE CircleGroups SET Name=COALESCE(@n,Name),Color=COALESCE(@c,Color),
-            Icon=COALESCE(@i,Icon),Priority=COALESCE(@p,Priority) WHERE Id=@id AND UserId=@uid",
+        var rows = await E(@"UPDATE ""CircleGroups"" SET ""Name""=COALESCE(@n,""Name""),""Color""=COALESCE(@c,""Color""),
+            ""Icon""=COALESCE(@i,""Icon""),""Priority""=COALESCE(@p,""Priority"") WHERE ""Id""=@id AND ""UserId""=@uid",
             [new("@id",id.ToString()),new("@uid",Uid),new("@n",(object?)req.Name??DBNull.Value),
              new("@c",(object?)req.Color??DBNull.Value),new("@i",(object?)req.Icon??DBNull.Value),
              new("@p",(object?)req.Priority??DBNull.Value)], ct);
@@ -71,9 +71,9 @@ public class CircleGroupsController : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteGroup(Guid id, CancellationToken ct)
     {
-        await E("DELETE FROM UserCircles WHERE GroupId=@gid AND UserId=@uid",
+        await E("DELETE FROM \"UserCircles\" WHERE \"GroupId\"=@gid AND \"UserId\"=@uid",
             [new("@gid",id.ToString()),new("@uid",Uid)], ct);
-        var rows = await E("DELETE FROM CircleGroups WHERE Id=@id AND UserId=@uid",
+        var rows = await E("DELETE FROM \"CircleGroups\" WHERE \"Id\"=@id AND \"UserId\"=@uid",
             [new("@id",id.ToString()),new("@uid",Uid)], ct);
         return rows > 0 ? NoContent() : NotFound();
     }
@@ -85,7 +85,7 @@ public class CircleGroupsController : ControllerBase
     {
         var id = Guid.NewGuid();
         var slug = (req.Slug ?? req.Name ?? "").Trim().ToLowerInvariant().Replace(" ", "-");
-        await E(@"INSERT INTO UserCircles (Id,UserId,GroupId,Name,Color,Icon,Slug,Priority)
+        await E(@"INSERT INTO ""UserCircles"" (""Id"",""UserId"",""GroupId"",""Name"",""Color"",""Icon"",""Slug"",""Priority"")
             VALUES(@id,@uid,@gid,@n,@c,@i,@s,@p)",
             [new("@id",id.ToString()),new("@uid",Uid),new("@gid",groupId.ToString()),
              new("@n",req.Name??""),new("@c",(object?)req.Color??DBNull.Value),
@@ -98,9 +98,9 @@ public class CircleGroupsController : ControllerBase
     public async Task<IActionResult> UpdateCircle(Guid id, [FromBody] CircleReq req, CancellationToken ct)
     {
         var slug = req.Slug != null ? req.Slug.Trim().ToLowerInvariant().Replace(" ", "-") : null;
-        var rows = await E(@"UPDATE UserCircles SET Name=COALESCE(@n,Name),Color=COALESCE(@c,Color),
-            Icon=COALESCE(@i,Icon),Slug=COALESCE(@s,Slug),Priority=COALESCE(@p,Priority)
-            WHERE Id=@id AND UserId=@uid",
+        var rows = await E(@"UPDATE ""UserCircles"" SET ""Name""=COALESCE(@n,""Name""),""Color""=COALESCE(@c,""Color""),
+            ""Icon""=COALESCE(@i,""Icon""),""Slug""=COALESCE(@s,""Slug""),""Priority""=COALESCE(@p,""Priority"")
+            WHERE ""Id""=@id AND ""UserId""=@uid",
             [new("@id",id.ToString()),new("@uid",Uid),new("@n",(object?)req.Name??DBNull.Value),
              new("@c",(object?)req.Color??DBNull.Value),new("@i",(object?)req.Icon??DBNull.Value),
              new("@s",(object?)slug??DBNull.Value),new("@p",(object?)req.Priority??DBNull.Value)], ct);
@@ -110,7 +110,7 @@ public class CircleGroupsController : ControllerBase
     [HttpDelete("circles/{id:guid}")]
     public async Task<IActionResult> DeleteCircle(Guid id, CancellationToken ct)
     {
-        var rows = await E("DELETE FROM UserCircles WHERE Id=@id AND UserId=@uid",
+        var rows = await E("DELETE FROM \"UserCircles\" WHERE \"Id\"=@id AND \"UserId\"=@uid",
             [new("@id",id.ToString()),new("@uid",Uid)], ct);
         return rows > 0 ? NoContent() : NotFound();
     }
@@ -121,7 +121,7 @@ public class CircleGroupsController : ControllerBase
         // Match by Slug OR Id (legacy circles created before the Slug column existed
         // have NULL slugs, so the frontend falls back to linking by Id).
         var rows = await Q(
-            "SELECT * FROM UserCircles WHERE (Slug=@s OR Id=@s) AND UserId=@uid LIMIT 1",
+            "SELECT * FROM \"UserCircles\" WHERE (\"Slug\"=@s OR \"Id\"=@s) AND \"UserId\"=@uid LIMIT 1",
             [new("@s", slugOrId), new("@uid", Uid)], ct);
         return rows.Count > 0 ? Ok(rows[0]) : NotFound();
     }

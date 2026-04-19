@@ -18,17 +18,17 @@ public class RemindersController : ControllerBase
     [HttpGet("due")]
     public async Task<IActionResult> GetDueReminders(CancellationToken ct)
     {
-        var rows = await Q(@"SELECT t.Id, t.Title, t.Description, t.Status,
-            t.ReminderFrequency, t.ReminderIntervalDays, t.NextReminderAt, t.LastRemindedAt,
-            t.SnoozedUntil, t.ReminderStatus, t.AssignedPersonName, t.AssignedPersonRelation
-            FROM SmartTasks t
-            WHERE t.OwnerId=@uid
-            AND t.ReminderFrequency IS NOT NULL AND t.ReminderFrequency != 'none'
-            AND t.ReminderStatus = 'active'
-            AND (t.SnoozedUntil IS NULL OR t.SnoozedUntil <= NOW())
-            AND (t.NextReminderAt IS NULL OR t.NextReminderAt <= NOW())
-            AND t.Status NOT IN (4, 6)
-            ORDER BY t.NextReminderAt",
+        var rows = await Q(@"SELECT t.""Id"", t.""Title"", t.""Description"", t.""Status"",
+            t.""ReminderFrequency"", t.""ReminderIntervalDays"", t.""NextReminderAt"", t.""LastRemindedAt"",
+            t.""SnoozedUntil"", t.""ReminderStatus"", t.""AssignedPersonName"", t.""AssignedPersonRelation""
+            FROM ""SmartTasks"" t
+            WHERE t.""OwnerId""=@uid
+            AND t.""ReminderFrequency"" IS NOT NULL AND t.""ReminderFrequency"" != 'none'
+            AND t.""ReminderStatus"" = 'active'
+            AND (t.""SnoozedUntil"" IS NULL OR t.""SnoozedUntil"" <= NOW())
+            AND (t.""NextReminderAt"" IS NULL OR t.""NextReminderAt"" <= NOW())
+            AND t.""Status"" NOT IN (4, 6)
+            ORDER BY t.""NextReminderAt""",
             Ps("@uid", Uid), ct);
         return Ok(rows);
     }
@@ -37,20 +37,20 @@ public class RemindersController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken ct)
     {
-        var rows = await Q(@"SELECT t.Id, t.Title, t.Description, t.Status,
-            t.ReminderFrequency, t.ReminderIntervalDays, t.NextReminderAt, t.LastRemindedAt,
-            t.SnoozedUntil, t.ReminderStatus, t.AssignedPersonName, t.AssignedPersonRelation,
-            t.ReminderStartDate,
-            (SELECT COUNT(*) FROM ReminderLogs rl WHERE rl.TaskId=t.Id) as LogCount
-            FROM SmartTasks t
-            WHERE t.OwnerId=@uid AND t.ReminderFrequency IS NOT NULL AND t.ReminderFrequency != 'none'
-            ORDER BY t.NextReminderAt",
+        var rows = await Q(@"SELECT t.""Id"", t.""Title"", t.""Description"", t.""Status"",
+            t.""ReminderFrequency"", t.""ReminderIntervalDays"", t.""NextReminderAt"", t.""LastRemindedAt"",
+            t.""SnoozedUntil"", t.""ReminderStatus"", t.""AssignedPersonName"", t.""AssignedPersonRelation"",
+            t.""ReminderStartDate"",
+            (SELECT COUNT(*) FROM ""ReminderLogs"" rl WHERE rl.""TaskId""=t.""Id"") as ""LogCount""
+            FROM ""SmartTasks"" t
+            WHERE t.""OwnerId""=@uid AND t.""ReminderFrequency"" IS NOT NULL AND t.""ReminderFrequency"" != 'none'
+            ORDER BY t.""NextReminderAt""",
             Ps("@uid", Uid), ct);
         // Add recent logs for each task
         foreach (var r in rows)
         {
             var tid = r["id"]?.ToString() ?? "";
-            r["recentLogs"] = await Q("SELECT RemindedAt, Notes FROM ReminderLogs WHERE TaskId=@tid ORDER BY RemindedAt DESC LIMIT 10",
+            r["recentLogs"] = await Q("SELECT \"RemindedAt\", \"Notes\" FROM \"ReminderLogs\" WHERE \"TaskId\"=@tid ORDER BY \"RemindedAt\" DESC LIMIT 10",
                 Ps("@tid", tid), ct);
         }
         return Ok(rows);
@@ -61,11 +61,11 @@ public class RemindersController : ControllerBase
     public async Task<IActionResult> SetReminder(string taskId, [FromBody] SetReminderReq req, CancellationToken ct)
     {
         var nextAt = CalculateNextReminder(req.Frequency ?? "none", req.IntervalDays, req.StartDate);
-        var rows = await E(@"UPDATE SmartTasks SET
-            ReminderFrequency=@f, ReminderIntervalDays=@i, ReminderStartDate=@sd,
-            NextReminderAt=@na, ReminderStatus='active',
-            AssignedPersonName=@pn, AssignedPersonRelation=@pr
-            WHERE Id=@id AND OwnerId=@uid",
+        var rows = await E(@"UPDATE ""SmartTasks"" SET
+            ""ReminderFrequency""=@f, ""ReminderIntervalDays""=@i, ""ReminderStartDate""=@sd,
+            ""NextReminderAt""=@na, ""ReminderStatus""='active',
+            ""AssignedPersonName""=@pn, ""AssignedPersonRelation""=@pr
+            WHERE ""Id""=@id AND ""OwnerId""=@uid",
             [P("@id",taskId),P("@uid",Uid),P("@f",req.Frequency??"none"),
              P("@i",req.IntervalDays),P("@sd",req.StartDate),P("@na",nextAt),
              P("@pn",req.PersonName),P("@pr",req.PersonRelation)], ct);
@@ -77,7 +77,7 @@ public class RemindersController : ControllerBase
     public async Task<IActionResult> MarkReminded(string taskId, [FromBody] MarkRemindedReq? req, CancellationToken ct)
     {
         // Get current task reminder info
-        var tasks = await Q("SELECT ReminderFrequency, ReminderIntervalDays, AssignedPersonName FROM SmartTasks WHERE Id=@id AND OwnerId=@uid",
+        var tasks = await Q("SELECT \"ReminderFrequency\", \"ReminderIntervalDays\", \"AssignedPersonName\" FROM \"SmartTasks\" WHERE \"Id\"=@id AND \"OwnerId\"=@uid",
             [P("@id",taskId),P("@uid",Uid)], ct);
         if (tasks.Count == 0) return NotFound();
 
@@ -86,13 +86,13 @@ public class RemindersController : ControllerBase
         var personName = tasks[0]["assignedPersonName"]?.ToString();
 
         // Log the reminder
-        await E("INSERT INTO ReminderLogs (Id,TaskId,PersonName,Notes,UserId) VALUES(@id,@tid,@pn,@n,@uid)",
+        await E("INSERT INTO \"ReminderLogs\" (\"Id\",\"TaskId\",\"PersonName\",\"Notes\",\"UserId\") VALUES(@id,@tid,@pn,@n,@uid)",
             [P("@id",Guid.NewGuid().ToString()),P("@tid",taskId),P("@pn",personName),P("@n",req?.Notes),P("@uid",Uid)], ct);
 
         // Calculate next reminder
         var nextAt = CalculateNextReminder(freq, interval, null);
 
-        await E("UPDATE SmartTasks SET LastRemindedAt=NOW(), NextReminderAt=@na, SnoozedUntil=NULL WHERE Id=@id AND OwnerId=@uid",
+        await E("UPDATE \"SmartTasks\" SET \"LastRemindedAt\"=NOW(), \"NextReminderAt\"=@na, \"SnoozedUntil\"=NULL WHERE \"Id\"=@id AND \"OwnerId\"=@uid",
             [P("@id",taskId),P("@uid",Uid),P("@na",nextAt)], ct);
 
         return Ok(new { taskId, nextReminderAt = nextAt });
@@ -103,7 +103,7 @@ public class RemindersController : ControllerBase
     public async Task<IActionResult> Snooze(string taskId, [FromBody] SnoozeReq req, CancellationToken ct)
     {
         var until = DateTime.UtcNow.AddHours(req.Hours ?? 1);
-        var rows = await E("UPDATE SmartTasks SET SnoozedUntil=@u WHERE Id=@id AND OwnerId=@uid",
+        var rows = await E("UPDATE \"SmartTasks\" SET \"SnoozedUntil\"=@u WHERE \"Id\"=@id AND \"OwnerId\"=@uid",
             [P("@id",taskId),P("@uid",Uid),P("@u",until)], ct);
         return rows > 0 ? Ok(new { taskId, snoozedUntil = until }) : NotFound();
     }
@@ -112,10 +112,10 @@ public class RemindersController : ControllerBase
     [HttpDelete("{taskId}")]
     public async Task<IActionResult> RemoveReminder(string taskId, CancellationToken ct)
     {
-        var rows = await E(@"UPDATE SmartTasks SET ReminderFrequency='none', ReminderIntervalDays=NULL,
-            ReminderStartDate=NULL, NextReminderAt=NULL, LastRemindedAt=NULL, SnoozedUntil=NULL,
-            ReminderStatus='active', AssignedPersonName=NULL, AssignedPersonRelation=NULL
-            WHERE Id=@id AND OwnerId=@uid",
+        var rows = await E(@"UPDATE ""SmartTasks"" SET ""ReminderFrequency""='none', ""ReminderIntervalDays""=NULL,
+            ""ReminderStartDate""=NULL, ""NextReminderAt""=NULL, ""LastRemindedAt""=NULL, ""SnoozedUntil""=NULL,
+            ""ReminderStatus""='active', ""AssignedPersonName""=NULL, ""AssignedPersonRelation""=NULL
+            WHERE ""Id""=@id AND ""OwnerId""=@uid",
             [P("@id",taskId),P("@uid",Uid)], ct);
         return rows > 0 ? Ok(new { taskId }) : NotFound();
     }
@@ -124,7 +124,7 @@ public class RemindersController : ControllerBase
     [HttpGet("{taskId}/logs")]
     public async Task<IActionResult> GetLogs(string taskId, CancellationToken ct)
     {
-        var rows = await Q("SELECT * FROM ReminderLogs WHERE TaskId=@tid AND UserId=@uid ORDER BY RemindedAt DESC LIMIT 50",
+        var rows = await Q("SELECT * FROM \"ReminderLogs\" WHERE \"TaskId\"=@tid AND \"UserId\"=@uid ORDER BY \"RemindedAt\" DESC LIMIT 50",
             [P("@tid",taskId),P("@uid",Uid)], ct);
         return Ok(rows);
     }

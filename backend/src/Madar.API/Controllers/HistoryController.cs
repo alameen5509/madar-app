@@ -28,13 +28,13 @@ public class HistoryController : ControllerBase
         [FromQuery] string? category, [FromQuery] string? country,
         CancellationToken ct)
     {
-        var sql = "SELECT * FROM HistoryRecords WHERE UserId=@uid";
+        var sql = "SELECT * FROM \"HistoryRecords\" WHERE \"UserId\"=@uid";
         var ps = new List<NpgsqlParameter> { new("@uid", Uid) };
-        if (from.HasValue) { sql += " AND Year>=@f"; ps.Add(new("@f", from.Value)); }
-        if (to.HasValue) { sql += " AND Year<=@t"; ps.Add(new("@t", to.Value)); }
-        if (!string.IsNullOrEmpty(category)) { sql += " AND Category=@c"; ps.Add(new("@c", category)); }
-        if (!string.IsNullOrEmpty(country)) { sql += " AND Country=@co"; ps.Add(new("@co", country)); }
-        sql += " ORDER BY Year ASC";
+        if (from.HasValue) { sql += " AND \"Year\">=@f"; ps.Add(new("@f", from.Value)); }
+        if (to.HasValue) { sql += " AND \"Year\"<=@t"; ps.Add(new("@t", to.Value)); }
+        if (!string.IsNullOrEmpty(category)) { sql += " AND \"Category\"=@c"; ps.Add(new("@c", category)); }
+        if (!string.IsNullOrEmpty(country)) { sql += " AND \"Country\"=@co"; ps.Add(new("@co", country)); }
+        sql += " ORDER BY \"Year\" ASC";
 
         return Ok(await Query(sql, ps, ct));
     }
@@ -42,7 +42,7 @@ public class HistoryController : ControllerBase
     [HttpGet("records/{id:guid}")]
     public async Task<IActionResult> GetRecord(Guid id, CancellationToken ct)
     {
-        var rows = await Query("SELECT * FROM HistoryRecords WHERE Id=@id AND UserId=@uid",
+        var rows = await Query("SELECT * FROM \"HistoryRecords\" WHERE \"Id\"=@id AND \"UserId\"=@uid",
             [new("@id", id.ToString()), new("@uid", Uid)], ct);
         return rows.Count > 0 ? Ok(rows[0]) : NotFound();
     }
@@ -63,7 +63,7 @@ public class HistoryController : ControllerBase
             hijriYear = GregorianToHijri(year);
         }
 
-        await Exec(@"INSERT INTO HistoryRecords (Id,UserId,Year,Month,Day,HijriYear,HijriMonth,HijriDay,InputType,Title,Description,Figure,Location,Country,Category,StrategicImportance,Importance,Source,Tags)
+        await Exec(@"INSERT INTO ""HistoryRecords"" (""Id"",""UserId"",""Year"",""Month"",""Day"",""HijriYear"",""HijriMonth"",""HijriDay"",""InputType"",""Title"",""Description"",""Figure"",""Location"",""Country"",""Category"",""StrategicImportance"",""Importance"",""Source"",""Tags"")
             VALUES(@id,@uid,@y,@mo,@da,@hy,@hm,@hd,@it,@ti,@de,@fi,@lo,@co,@ca,@si,@im,@so,@ta)",
             [new("@id",id.ToString()),new("@uid",Uid),new("@y",year),new("@mo",(object?)req.Month??DBNull.Value),new("@da",(object?)req.Day??DBNull.Value),
              new("@hy",hijriYear),new("@hm",(object?)req.HijriMonth??DBNull.Value),new("@hd",(object?)req.HijriDay??DBNull.Value),
@@ -91,9 +91,9 @@ public class HistoryController : ControllerBase
             hijriYear = GregorianToHijri(year);
         }
 
-        var rows = await Exec(@"UPDATE HistoryRecords SET Year=@y,Month=@mo,Day=@da,HijriYear=@hy,HijriMonth=@hm,HijriDay=@hd,InputType=@it,Title=@ti,Description=@de,
-            Figure=@fi,Location=@lo,Country=@co,Category=@ca,StrategicImportance=@si,Importance=@im,Source=@so,Tags=@ta
-            WHERE Id=@id AND UserId=@uid",
+        var rows = await Exec(@"UPDATE ""HistoryRecords"" SET ""Year""=@y,""Month""=@mo,""Day""=@da,""HijriYear""=@hy,""HijriMonth""=@hm,""HijriDay""=@hd,""InputType""=@it,""Title""=@ti,""Description""=@de,
+            ""Figure""=@fi,""Location""=@lo,""Country""=@co,""Category""=@ca,""StrategicImportance""=@si,""Importance""=@im,""Source""=@so,""Tags""=@ta
+            WHERE ""Id""=@id AND ""UserId""=@uid",
             [new("@id",id.ToString()),new("@uid",Uid),new("@y",year),new("@mo",(object?)req.Month??DBNull.Value),new("@da",(object?)req.Day??DBNull.Value),
              new("@hy",hijriYear),new("@hm",(object?)req.HijriMonth??DBNull.Value),new("@hd",(object?)req.HijriDay??DBNull.Value),
              new("@it",req.InputType??"gregorian"),new("@ti",req.Title??""),new("@de",(object?)req.Description??DBNull.Value),
@@ -107,7 +107,7 @@ public class HistoryController : ControllerBase
     [HttpDelete("records/{id:guid}")]
     public async Task<IActionResult> DeleteRecord(Guid id, CancellationToken ct)
     {
-        var rows = await Exec("DELETE FROM HistoryRecords WHERE Id=@id AND UserId=@uid",
+        var rows = await Exec("DELETE FROM \"HistoryRecords\" WHERE \"Id\"=@id AND \"UserId\"=@uid",
             [new("@id", id.ToString()), new("@uid", Uid)], ct);
         return rows > 0 ? NoContent() : NotFound();
     }
@@ -131,12 +131,12 @@ public class HistoryController : ControllerBase
         [FromQuery] string? q, [FromQuery] int? year, [FromQuery] string? country,
         CancellationToken ct)
     {
-        var sql = "SELECT * FROM HistoryRecords WHERE UserId=@uid";
+        var sql = "SELECT * FROM \"HistoryRecords\" WHERE \"UserId\"=@uid";
         var ps = new List<NpgsqlParameter> { new("@uid", Uid) };
-        if (!string.IsNullOrEmpty(q)) { sql += " AND (Title LIKE @q OR Description LIKE @q OR Figure LIKE @q)"; ps.Add(new("@q", $"%{q}%")); }
-        if (year.HasValue) { sql += " AND (Year=@y OR HijriYear=@y)"; ps.Add(new("@y", year.Value)); }
-        if (!string.IsNullOrEmpty(country)) { sql += " AND Country=@co"; ps.Add(new("@co", country)); }
-        sql += " ORDER BY Year ASC LIMIT 100";
+        if (!string.IsNullOrEmpty(q)) { sql += " AND (\"Title\" LIKE @q OR \"Description\" LIKE @q OR \"Figure\" LIKE @q)"; ps.Add(new("@q", $"%{q}%")); }
+        if (year.HasValue) { sql += " AND (\"Year\"=@y OR \"HijriYear\"=@y)"; ps.Add(new("@y", year.Value)); }
+        if (!string.IsNullOrEmpty(country)) { sql += " AND \"Country\"=@co"; ps.Add(new("@co", country)); }
+        sql += " ORDER BY \"Year\" ASC LIMIT 100";
         return Ok(await Query(sql, ps, ct));
     }
 
@@ -145,7 +145,7 @@ public class HistoryController : ControllerBase
     [HttpGet("figures")]
     public async Task<IActionResult> GetFigures(CancellationToken ct)
     {
-        return Ok(await Query("SELECT * FROM HistoryFigures WHERE UserId=@uid ORDER BY Name",
+        return Ok(await Query("SELECT * FROM \"HistoryFigures\" WHERE \"UserId\"=@uid ORDER BY \"Name\"",
             [new("@uid", Uid)], ct));
     }
 
@@ -153,7 +153,7 @@ public class HistoryController : ControllerBase
     public async Task<IActionResult> CreateFigure([FromBody] HistoryFigureReq req, CancellationToken ct)
     {
         var id = Guid.NewGuid();
-        await Exec(@"INSERT INTO HistoryFigures (Id,UserId,Name,BirthYear,DeathYear,Role,Nationality,Category,Bio)
+        await Exec(@"INSERT INTO ""HistoryFigures"" (""Id"",""UserId"",""Name"",""BirthYear"",""DeathYear"",""Role"",""Nationality"",""Category"",""Bio"")
             VALUES(@id,@uid,@n,@by,@dy,@r,@na,@ca,@bi)",
             [new("@id",id.ToString()),new("@uid",Uid),new("@n",req.Name??""),
              new("@by",(object?)req.BirthYear??DBNull.Value),new("@dy",(object?)req.DeathYear??DBNull.Value),
@@ -165,7 +165,7 @@ public class HistoryController : ControllerBase
     [HttpDelete("figures/{id:guid}")]
     public async Task<IActionResult> DeleteFigure(Guid id, CancellationToken ct)
     {
-        var rows = await Exec("DELETE FROM HistoryFigures WHERE Id=@id AND UserId=@uid",
+        var rows = await Exec("DELETE FROM \"HistoryFigures\" WHERE \"Id\"=@id AND \"UserId\"=@uid",
             [new("@id", id.ToString()), new("@uid", Uid)], ct);
         return rows > 0 ? NoContent() : NotFound();
     }

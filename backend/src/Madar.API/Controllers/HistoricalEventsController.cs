@@ -19,17 +19,17 @@ public class HistoricalEventsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? category, CancellationToken ct)
     {
-        var sql = "SELECT * FROM HistoricalEvents WHERE UserId=@uid";
+        var sql = "SELECT * FROM \"HistoricalEvents\" WHERE \"UserId\"=@uid";
         var ps = new List<NpgsqlParameter> { new("@uid", Uid) };
-        if (!string.IsNullOrEmpty(category)) { sql += " AND Category=@c"; ps.Add(new("@c", category)); }
-        sql += " ORDER BY OrderIndex ASC, CreatedAt ASC";
+        if (!string.IsNullOrEmpty(category)) { sql += " AND \"Category\"=@c"; ps.Add(new("@c", category)); }
+        sql += " ORDER BY \"OrderIndex\" ASC, \"CreatedAt\" ASC";
         return Ok(await Query(sql, ps, ct));
     }
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetOne(Guid id, CancellationToken ct)
     {
-        var rows = await Query("SELECT * FROM HistoricalEvents WHERE Id=@id AND UserId=@uid",
+        var rows = await Query("SELECT * FROM \"HistoricalEvents\" WHERE \"Id\"=@id AND \"UserId\"=@uid",
             [new("@id", id.ToString()), new("@uid", Uid)], ct);
         return rows.Count > 0 ? Ok(rows[0]) : NotFound();
     }
@@ -38,7 +38,7 @@ public class HistoricalEventsController : ControllerBase
     public async Task<IActionResult> Create([FromBody] HistoricalEventReq req, CancellationToken ct)
     {
         var id = Guid.NewGuid();
-        await Exec(@"INSERT INTO HistoricalEvents (Id,UserId,Title,GregorianDate,HijriDate,Location,Description,StrategicSignificance,OrderIndex,Category)
+        await Exec(@"INSERT INTO ""HistoricalEvents"" (""Id"",""UserId"",""Title"",""GregorianDate"",""HijriDate"",""Location"",""Description"",""StrategicSignificance"",""OrderIndex"",""Category"")
             VALUES(@id,@uid,@ti,@gd,@hd,@lo,@de,@ss,@oi,@ca)",
             [new("@id",id.ToString()),new("@uid",Uid),new("@ti",req.Title??""),
              new("@gd",(object?)req.GregorianDate??DBNull.Value),new("@hd",(object?)req.HijriDate??DBNull.Value),
@@ -55,7 +55,7 @@ public class HistoricalEventsController : ControllerBase
         foreach (var req in events)
         {
             var id = Guid.NewGuid();
-            await Exec(@"INSERT INTO HistoricalEvents (Id,UserId,Title,GregorianDate,HijriDate,Location,Description,StrategicSignificance,OrderIndex,Category)
+            await Exec(@"INSERT INTO ""HistoricalEvents"" (""Id"",""UserId"",""Title"",""GregorianDate"",""HijriDate"",""Location"",""Description"",""StrategicSignificance"",""OrderIndex"",""Category"")
                 VALUES(@id,@uid,@ti,@gd,@hd,@lo,@de,@ss,@oi,@ca)",
                 [new("@id",id.ToString()),new("@uid",Uid),new("@ti",req.Title??""),
                  new("@gd",(object?)req.GregorianDate??DBNull.Value),new("@hd",(object?)req.HijriDate??DBNull.Value),
@@ -70,8 +70,8 @@ public class HistoricalEventsController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] HistoricalEventReq req, CancellationToken ct)
     {
-        var rows = await Exec(@"UPDATE HistoricalEvents SET Title=@ti,GregorianDate=@gd,HijriDate=@hd,Location=@lo,
-            Description=@de,StrategicSignificance=@ss,OrderIndex=@oi,Category=@ca WHERE Id=@id AND UserId=@uid",
+        var rows = await Exec(@"UPDATE ""HistoricalEvents"" SET ""Title""=@ti,""GregorianDate""=@gd,""HijriDate""=@hd,""Location""=@lo,
+            ""Description""=@de,""StrategicSignificance""=@ss,""OrderIndex""=@oi,""Category""=@ca WHERE ""Id""=@id AND ""UserId""=@uid",
             [new("@id",id.ToString()),new("@uid",Uid),new("@ti",req.Title??""),
              new("@gd",(object?)req.GregorianDate??DBNull.Value),new("@hd",(object?)req.HijriDate??DBNull.Value),
              new("@lo",(object?)req.Location??DBNull.Value),new("@de",(object?)req.Description??DBNull.Value),
@@ -83,7 +83,7 @@ public class HistoricalEventsController : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        var rows = await Exec("DELETE FROM HistoricalEvents WHERE Id=@id AND UserId=@uid",
+        var rows = await Exec("DELETE FROM \"HistoricalEvents\" WHERE \"Id\"=@id AND \"UserId\"=@uid",
             [new("@id", id.ToString()), new("@uid", Uid)], ct);
         return rows > 0 ? NoContent() : NotFound();
     }
@@ -203,11 +203,11 @@ public class HistoricalEventsController : ControllerBase
         int count = 0;
         foreach (var e in events)
         {
-            var check = await Query("SELECT Id FROM HistoricalEvents WHERE UserId=@uid AND OrderIndex=@oi AND Category='الحرب العالمية الأولى' LIMIT 1",
+            var check = await Query("SELECT \"Id\" FROM \"HistoricalEvents\" WHERE \"UserId\"=@uid AND \"OrderIndex\"=@oi AND \"Category\"='الحرب العالمية الأولى' LIMIT 1",
                 [new("@uid", Uid), new("@oi", e.Order)], ct);
             if (check.Count > 0) continue;
 
-            await Exec(@"INSERT INTO HistoricalEvents (Id,UserId,Title,GregorianDate,HijriDate,Location,Description,StrategicSignificance,OrderIndex,Category)
+            await Exec(@"INSERT INTO ""HistoricalEvents"" (""Id"",""UserId"",""Title"",""GregorianDate"",""HijriDate"",""Location"",""Description"",""StrategicSignificance"",""OrderIndex"",""Category"")
                 VALUES(@id,@uid,@ti,@gd,@hd,@lo,@de,@ss,@oi,@ca)",
                 [new("@id",Guid.NewGuid().ToString()),new("@uid",Uid),new("@ti",e.Title),
                  new("@gd",e.GDate),new("@hd",e.HDate),new("@lo",e.Location),
@@ -221,7 +221,7 @@ public class HistoricalEventsController : ControllerBase
     [HttpGet("categories")]
     public async Task<IActionResult> GetCategories(CancellationToken ct)
     {
-        return Ok(await Query("SELECT DISTINCT Category FROM HistoricalEvents WHERE UserId=@uid AND Category!='' ORDER BY Category",
+        return Ok(await Query("SELECT DISTINCT \"Category\" FROM \"HistoricalEvents\" WHERE \"UserId\"=@uid AND \"Category\"!='' ORDER BY \"Category\"",
             [new("@uid", Uid)], ct));
     }
 

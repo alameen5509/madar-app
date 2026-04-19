@@ -197,42 +197,42 @@ public class WorksController : ControllerBase
     private async Task CreateLeadershipRole(string sourceId, string title, string? org, string icon, string color, CancellationToken ct, string? workId = null)
     {
         // تأكد من وجود عمود SourceId
-        try { await Exec("ALTER TABLE LeadershipRoles ADD COLUMN SourceId VARCHAR(36) NULL", [], ct); } catch { /* already exists */ }
+        try { await Exec("ALTER TABLE \"LeadershipRoles\" ADD COLUMN \"SourceId\" VARCHAR(36) NULL", [], ct); } catch { /* already exists */ }
 
         // تحقق هل المنصب موجود بالفعل
-        var existing = await Query("SELECT Id FROM LeadershipRoles WHERE SourceId=@sid AND UserId=@uid LIMIT 1", [P("@sid", sourceId), P("@uid", Uid)], ct);
+        var existing = await Query("SELECT \"Id\" FROM \"LeadershipRoles\" WHERE \"SourceId\"=@sid AND \"UserId\"=@uid LIMIT 1", [P("@sid", sourceId), P("@uid", Uid)], ct);
         if (existing.Count > 0)
         {
-            await Exec("UPDATE LeadershipRoles SET Title=@t, Organization=@org, Icon=@ic, Color=@c WHERE SourceId=@sid AND UserId=@uid",
+            await Exec("UPDATE \"LeadershipRoles\" SET \"Title\"=@t, \"Organization\"=@org, \"Icon\"=@ic, \"Color\"=@c WHERE \"SourceId\"=@sid AND \"UserId\"=@uid",
                 [P("@t", title), P("@org", org), P("@ic", icon), P("@c", color), P("@sid", sourceId), P("@uid", Uid)], ct);
             return;
         }
 
         var roleId = Guid.NewGuid().ToString();
         var wid = workId ?? sourceId;
-        await Exec(@"INSERT INTO LeadershipRoles (Id,UserId,Title,Organization,WorkId,ReviewFrequency,Color,Icon,Priority,PulseStatus,IsActive,SourceId)
+        await Exec(@"INSERT INTO ""LeadershipRoles"" (""Id"",""UserId"",""Title"",""Organization"",""WorkId"",""ReviewFrequency"",""Color"",""Icon"",""Priority"",""PulseStatus"",""IsActive"",""SourceId"")
             VALUES(@id,@uid,@t,@org,@wid,'weekly',@c,@ic,0,'green',1,@sid)",
             [P("@id", roleId), P("@uid", Uid), P("@t", title), P("@org", org), P("@wid", wid), P("@c", color), P("@ic", icon), P("@sid", sourceId)], ct);
     }
 
     private async Task SyncRoleTitle(string sourceId, string title, string? org, CancellationToken ct)
     {
-        await Exec("UPDATE LeadershipRoles SET Title=@t, Organization=@org WHERE SourceId=@sid AND UserId=@uid",
+        await Exec("UPDATE \"LeadershipRoles\" SET \"Title\"=@t, \"Organization\"=@org WHERE \"SourceId\"=@sid AND \"UserId\"=@uid",
             [P("@t", title), P("@org", org), P("@sid", sourceId), P("@uid", Uid)], ct);
     }
 
     private async Task DeleteLeadershipRole(string sourceId, CancellationToken ct)
     {
         // حذف الملاحظات والطلبات أولاً
-        var roleIds = await Query("SELECT Id FROM LeadershipRoles WHERE SourceId=@sid AND UserId=@uid", [P("@sid", sourceId), P("@uid", Uid)], ct);
+        var roleIds = await Query("SELECT \"Id\" FROM \"LeadershipRoles\" WHERE \"SourceId\"=@sid AND \"UserId\"=@uid", [P("@sid", sourceId), P("@uid", Uid)], ct);
         foreach (var row in roleIds)
         {
             var rid = row["id"]?.ToString();
             if (rid == null) continue;
-            await Exec("DELETE FROM LeadershipNotes WHERE RoleId=@rid", [P("@rid", rid)], ct);
-            await Exec("DELETE FROM LeadershipDevRequests WHERE RoleId=@rid", [P("@rid", rid)], ct);
+            await Exec("DELETE FROM \"LeadershipNotes\" WHERE \"RoleId\"=@rid", [P("@rid", rid)], ct);
+            await Exec("DELETE FROM \"LeadershipDevRequests\" WHERE \"RoleId\"=@rid", [P("@rid", rid)], ct);
         }
-        await Exec("DELETE FROM LeadershipRoles WHERE SourceId=@sid AND UserId=@uid", [P("@sid", sourceId), P("@uid", Uid)], ct);
+        await Exec("DELETE FROM \"LeadershipRoles\" WHERE \"SourceId\"=@sid AND \"UserId\"=@uid", [P("@sid", sourceId), P("@uid", Uid)], ct);
     }
 
     // ═══ Raw SQL helpers ═══
