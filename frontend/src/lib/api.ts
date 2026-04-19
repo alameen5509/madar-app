@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://madar-api-production-a467.up.railway.app';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://madar-api-app.azurewebsites.net';
 
 // ─── Cookie Helper ────────────────────────────────────────────────────────────
 
