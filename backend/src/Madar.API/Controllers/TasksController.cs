@@ -291,6 +291,105 @@ public class TasksController : BaseController
         });
     }
 
+    // ═══ FILTERED TASK ENDPOINTS ═══════════════════════════════════════════
+
+    /// <summary>مهام اليوم (المعلقة + المتأخرة)</summary>
+    [HttpGet("today")]
+    public async Task<IActionResult> GetTodayTasks([FromQuery] bool includeCompleted = false, CancellationToken ct = default)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var today = DateTime.UtcNow.Date;
+
+        var query = _db.SmartTasks
+            .Include(t => t.LifeCircle).Include(t => t.Goal)
+            .Where(t => t.OwnerId == userId && t.Status != Madar.Domain.Enums.TaskStatus.Cancelled && t.ParentTaskId == null)
+            .Where(t => t.DueDate.HasValue && t.DueDate.Value.Date <= today); // today + overdue
+
+        if (!includeCompleted)
+            query = query.Where(t => t.Status != Madar.Domain.Enums.TaskStatus.Completed);
+
+        var tasks = await query
+            .OrderByDescending(t => t.UserPriority).ThenBy(t => t.DueDate).ThenBy(t => t.CreatedAt)
+            .Select(t => new {
+                t.Id, t.Title, t.Description, status = t.Status.ToString(), t.UserPriority,
+                t.DueDate, t.IsRecurring, t.RecurrenceRule, t.ContextNote,
+                t.CompletedAt, t.CreatedAt, t.Cost, t.CostCurrency,
+                isOverdue = t.DueDate.HasValue && t.DueDate.Value.Date < today,
+                lifeCircle = t.LifeCircle == null ? null : new { t.LifeCircle.Id, t.LifeCircle.Name, color = t.LifeCircle.ColorHex ?? "#5E5495" },
+                goal = t.Goal == null ? null : new { t.Goal.Id, t.Goal.Title },
+            }).ToListAsync(ct);
+
+        return Ok(new { today = today.ToString("yyyy-MM-dd"), count = tasks.Count, tasks });
+    }
+
+    /// <summary>المهام المتأخرة فقط</summary>
+    [HttpGet("overdue")]
+    public async Task<IActionResult> GetOverdueTasks(CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var today = DateTime.UtcNow.Date;
+
+        var tasks = await _db.SmartTasks
+            .Where(t => t.OwnerId == userId && t.Status != Madar.Domain.Enums.TaskStatus.Cancelled
+                && t.Status != Madar.Domain.Enums.TaskStatus.Completed && t.ParentTaskId == null
+                && t.DueDate.HasValue && t.DueDate.Value.Date < today)
+            .OrderBy(t => t.DueDate).ThenByDescending(t => t.UserPriority)
+            .Select(t => new {
+                t.Id, t.Title, status = t.Status.ToString(), t.UserPriority, t.DueDate, t.ContextNote,
+                daysOverdue = (int)(today - t.DueDate!.Value.Date).TotalDays,
+            }).ToListAsync(ct);
+
+        return Ok(new { count = tasks.Count, tasks });
+    }
+
+    /// <summary>المهام القادمة (الأيام القادمة)</summary>
+    [HttpGet("upcoming")]
+    public async Task<IActionResult> GetUpcomingTasks([FromQuery] int days = 7, CancellationToken ct = default)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tomorrow = DateTime.UtcNow.Date.AddDays(1);
+        var endDate = tomorrow.AddDays(days);
+
+        var tasks = await _db.SmartTasks
+            .Where(t => t.OwnerId == userId && t.Status != Madar.Domain.Enums.TaskStatus.Cancelled
+                && t.Status != Madar.Domain.Enums.TaskStatus.Completed && t.ParentTaskId == null
+                && t.DueDate.HasValue && t.DueDate.Value.Date >= tomorrow && t.DueDate.Value.Date <= endDate)
+            .OrderBy(t => t.DueDate).ThenByDescending(t => t.UserPriority)
+            .Select(t => new {
+                t.Id, t.Title, status = t.Status.ToString(), t.UserPriority, t.DueDate, t.ContextNote,
+            }).ToListAsync(ct);
+
+        return Ok(new { from = tomorrow.ToString("yyyy-MM-dd"), to = endDate.ToString("yyyy-MM-dd"), count = tasks.Count, tasks });
+    }
+
+    /// <summary>ملخص سريع للمهام</summary>
+    [HttpGet("summary")]
+    public async Task<IActionResult> GetTasksSummary(CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var today = DateTime.UtcNow.Date;
+
+        var all = await _db.SmartTasks
+            .Where(t => t.OwnerId == userId && t.ParentTaskId == null)
+            .Select(t => new { t.Status, t.DueDate })
+            .ToListAsync(ct);
+
+        var active = all.Where(t => t.Status != Madar.Domain.Enums.TaskStatus.Cancelled && t.Status != Madar.Domain.Enums.TaskStatus.Completed);
+
+        return Ok(new {
+            total = all.Count,
+            completed = all.Count(t => t.Status == Madar.Domain.Enums.TaskStatus.Completed),
+            cancelled = all.Count(t => t.Status == Madar.Domain.Enums.TaskStatus.Cancelled),
+            pending = active.Count(),
+            todayDue = active.Count(t => t.DueDate.HasValue && t.DueDate.Value.Date == today),
+            overdue = active.Count(t => t.DueDate.HasValue && t.DueDate.Value.Date < today),
+            upcoming7Days = active.Count(t => t.DueDate.HasValue && t.DueDate.Value.Date > today && t.DueDate.Value.Date <= today.AddDays(7)),
+            noDate = active.Count(t => !t.DueDate.HasValue),
+        });
+    }
+
+    // ═══ END FILTERED ENDPOINTS ═════════════════════════════════════════
+
     /// <summary>إنشاء مهمة جديدة</summary>
     [HttpPost]
     public async Task<IActionResult> CreateTask(
