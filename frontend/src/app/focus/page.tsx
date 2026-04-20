@@ -358,7 +358,6 @@ export default function FocusPage() {
     // idx stays same, which now points to what was the next task
   }
 
-  const task = tasks[idx];
   const now = new Date(); now.setHours(0, 0, 0, 0);
   const todayStr = localDateStr();
 
@@ -416,7 +415,15 @@ export default function FocusPage() {
     );
   }
 
-  if (!task) return null;
+  const task = tasks[idx];
+  if (!task) {
+    // Safety: idx out of bounds during transition — show loading briefly
+    return (
+      <main className="flex-1 flex items-center justify-center" style={{ background: "var(--bg)" }}>
+        <div className="w-8 h-8 border-3 border-[#5E5495] border-t-transparent rounded-full animate-spin" />
+      </main>
+    );
+  }
   const dl = dateLabel(task.dueDate);
   const circle = task.lifeCircle;
   const priorityLabel = task.userPriority >= 4 ? "عالية" : task.userPriority >= 3 ? "متوسطة" : "منخفضة";
