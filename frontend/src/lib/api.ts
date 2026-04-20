@@ -177,6 +177,30 @@ export async function getTasks(): Promise<SmartTask[]> {
   return data;
 }
 
+// ═══ Filtered Task Endpoints ═══
+export async function getTasksSummary() {
+  const { data } = await api.get<{
+    total: number; completed: number; cancelled: number; pending: number;
+    todayDue: number; overdue: number; upcoming7Days: number; noDate: number;
+  }>('/api/tasks/summary');
+  return data;
+}
+
+export async function getTodayTasks(includeCompleted = false) {
+  const { data } = await api.get(`/api/tasks/today?includeCompleted=${includeCompleted}`);
+  return data as { today: string; count: number; tasks: SmartTask[] };
+}
+
+export async function getOverdueTasks() {
+  const { data } = await api.get('/api/tasks/overdue');
+  return data as { count: number; tasks: SmartTask[] };
+}
+
+export async function getUpcomingTasks(days = 7) {
+  const { data } = await api.get(`/api/tasks/upcoming?days=${days}`);
+  return data as { from: string; to: string; count: number; tasks: SmartTask[] };
+}
+
 export async function getGoals(): Promise<Goal[]> {
   const { data } = await api.get<Goal[]>('/api/goals');
   return data;

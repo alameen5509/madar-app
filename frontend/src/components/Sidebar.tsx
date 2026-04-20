@@ -84,22 +84,12 @@ export default function Sidebar() {
 
   useEffect(() => {
     import("@/lib/api").then(({ api }) => {
-      api.get("/api/tasks").then((r) => {
-        const all = r.data as { status: string; dueDate?: string }[];
-        const pending = all.filter((t) => t.status !== "Completed" && t.status !== "Cancelled" && t.status !== "Inbox");
-        // Focus: exclude hour-postponed tasks
-        const nowTime = new Date();
-        const focusTasks = pending.filter(t => {
-          if (t.dueDate) {
-            const due = new Date(t.dueDate);
-            const h = due.getHours(), m = due.getMinutes();
-            if ((h !== 0 || m !== 0) && due > nowTime) return false;
-          }
-          return true;
-        });
-        setApiTasks(pending.length);
-        setApiFocus(focusTasks.length);
-        setApiInbox(all.filter((t) => t.status === "Inbox").length);
+      // Use summary endpoint (much faster than fetching all tasks)
+      api.get("/api/tasks/summary").then((r) => {
+        const s = r.data as { pending: number; todayDue: number; overdue: number };
+        setApiTasks(s.pending);
+        setApiFocus(s.todayDue + s.overdue);
+        setApiInbox(0);
       }).catch(() => {});
       // War-room: count critical (red) roles
       api.get("/api/war-room/roles").then((r) => {
