@@ -49,25 +49,24 @@ public class FamilyMealsController : ControllerBase
     [HttpGet("plans")]
     public async Task<IActionResult> GetPlans([FromQuery] string? memberId, [FromQuery] string? date, CancellationToken ct)
     {
-        var sql = @"SELECT p.*, fm.Name as MemberName, fm.Relationship,
-            m.Name as MealName FROM PersonalMealPlans p
-            JOIN FamilyMembers fm ON p.MemberId=fm.Id
-            LEFT JOIN Meals m ON p.MealId=m.Id
-            WHERE p.UserId=@uid";
+        var sql = @"SELECT p.*, fm.""Name"" as ""MemberName"", fm.""Relationship"",
+            m.""Name"" as ""MealName"" FROM ""PersonalMealPlans"" p
+            JOIN ""FamilyMembers"" fm ON p.""MemberId""=fm.""Id""
+            LEFT JOIN ""Meals"" m ON p.""MealId""=m.""Id""
+            WHERE p.""UserId""=@uid";
         var ps = new List<NpgsqlParameter> { P("@uid",Uid) };
-        if (memberId != null) { sql += " AND p.MemberId=@mid"; ps.Add(P("@mid",memberId)); }
-        if (date != null) { sql += " AND p.PlanDate=@d"; ps.Add(P("@d",date)); }
-        sql += " ORDER BY p.PlanDate, fm.Name, FIELD(p.MealTime,'breakfast','lunch','dinner','snack')";
+        if (memberId != null) { sql += @" AND p.""MemberId""=@mid"; ps.Add(P("@mid",memberId)); }
+        if (date != null) { sql += @" AND p.""PlanDate""=@d"; ps.Add(P("@d",date)); }
+        sql += @" ORDER BY p.""PlanDate"", fm.""Name""";
         return Ok(await Q(sql, ps, ct));
     }
 
     [HttpGet("plans/daily")]
     public async Task<IActionResult> GetDailyGrid([FromQuery] string date, CancellationToken ct)
     {
-        var members = await Q("SELECT Id, Name, Relationship FROM FamilyMembers WHERE UserId=@uid AND IsActive=1 ORDER BY Name", Ps("@uid",Uid), ct);
-        var plans = await Q(@"SELECT p.*, m.Name as MealName FROM PersonalMealPlans p
-            LEFT JOIN Meals m ON p.MealId=m.Id WHERE p.UserId=@uid AND p.PlanDate=@d
-            ORDER BY FIELD(p.MealTime,'breakfast','lunch','dinner','snack')",
+        var members = await Q(@"SELECT ""Id"", ""Name"", ""Relationship"" FROM ""FamilyMembers"" WHERE ""UserId""=@uid AND ""IsActive""=true ORDER BY ""Name""", Ps("@uid",Uid), ct);
+        var plans = await Q(@"SELECT p.*, m.""Name"" as ""MealName"" FROM ""PersonalMealPlans"" p
+            LEFT JOIN ""Meals"" m ON p.""MealId""=m.""Id"" WHERE p.""UserId""=@uid AND p.""PlanDate""=@d",
             [P("@uid",Uid),P("@d",date)], ct);
         return Ok(new { members, plans, date });
     }

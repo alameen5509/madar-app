@@ -187,10 +187,10 @@ public class UsersController : BaseController
             if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync(ct);
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"SELECT
-                (SELECT COUNT(*) FROM WebProjectTeams
-                   WHERE UserId=@uid OR (@e <> '' AND LOWER(TRIM(Email))=@e))
-              + (SELECT COUNT(*) FROM WebProjectMembers
-                   WHERE UserId=@uid OR (@e <> '' AND LOWER(TRIM(Email))=@e))";
+                (SELECT COUNT(*) FROM ""WebProjectTeams""
+                   WHERE ""UserId""::text=@uid OR (@e <> '' AND LOWER(TRIM(""Email""))=@e))
+              + (SELECT COUNT(*) FROM ""WebProjectMembers""
+                   WHERE ""UserId""::text=@uid OR (@e <> '' AND LOWER(TRIM(""Email""))=@e))";
             var pUid = cmd.CreateParameter(); pUid.ParameterName = "@uid"; pUid.Value = userId.ToString(); cmd.Parameters.Add(pUid);
             var p = cmd.CreateParameter(); p.ParameterName = "@e"; p.Value = emailLower; cmd.Parameters.Add(p);
             var count = Convert.ToInt32(await cmd.ExecuteScalarAsync(ct));
