@@ -19,7 +19,7 @@ public class DevTicketsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken ct)
     {
-        var rows = await Q(@"SELECT * FROM ""DevTickets"" WHERE ""UserId""=@uid ORDER BY
+        var rows = await Q(@"SELECT * FROM ""DevTickets"" WHERE ""UserId""::text=@uid ORDER BY
             CASE ""Status"" WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'failed' THEN 2 ELSE 3 END,
             ""CreatedAt"" DESC",
             [new("@uid", Uid)], ct);
@@ -44,7 +44,7 @@ public class DevTicketsController : ControllerBase
         var rows = await E(@"UPDATE ""DevTickets"" SET
             ""Title""=COALESCE(@t,""Title""), ""UserRequest""=COALESCE(@ur,""UserRequest""),
             ""AiCommand""=COALESCE(@cmd,""AiCommand""), ""Status""=COALESCE(@st,""Status""), ""UpdatedAt""=NOW()
-            WHERE ""Id""=@id AND ""UserId""=@uid",
+            WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
             [new("@id",id),new("@uid",Uid),new("@t",(object?)req.Title??DBNull.Value),
              new("@ur",(object?)req.Description??DBNull.Value),new("@cmd",(object?)req.Command??DBNull.Value),
              new("@st",(object?)req.Status??DBNull.Value)], ct);
@@ -55,7 +55,7 @@ public class DevTicketsController : ControllerBase
     public async Task<IActionResult> Resolve(string id, CancellationToken ct)
     {
         var rows = await E(@"UPDATE ""DevTickets"" SET ""Status""='resolved', ""ResolvedAt""=NOW(), ""UpdatedAt""=NOW()
-            WHERE ""Id""=@id AND ""UserId""=@uid", [new("@id",id),new("@uid",Uid)], ct);
+            WHERE ""Id""::text=@id AND ""UserId""::text=@uid", [new("@id",id),new("@uid",Uid)], ct);
         return rows > 0 ? Ok(new { id, status = "resolved" }) : NotFound();
     }
 
@@ -63,7 +63,7 @@ public class DevTicketsController : ControllerBase
     public async Task<IActionResult> NotModified(string id, CancellationToken ct)
     {
         var rows = await E(@"UPDATE ""DevTickets"" SET ""Status""='not_modified', ""UpdatedAt""=NOW()
-            WHERE ""Id""=@id AND ""UserId""=@uid", [new("@id",id),new("@uid",Uid)], ct);
+            WHERE ""Id""::text=@id AND ""UserId""::text=@uid", [new("@id",id),new("@uid",Uid)], ct);
         return rows > 0 ? Ok(new { id, status = "not_modified" }) : NotFound();
     }
 

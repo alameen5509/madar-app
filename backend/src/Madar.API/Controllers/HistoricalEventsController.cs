@@ -71,7 +71,7 @@ public class HistoricalEventsController : ControllerBase
     public async Task<IActionResult> Update(Guid id, [FromBody] HistoricalEventReq req, CancellationToken ct)
     {
         var rows = await Exec(@"UPDATE ""HistoricalEvents"" SET ""Title""=@ti,""GregorianDate""=@gd,""HijriDate""=@hd,""Location""=@lo,
-            ""Description""=@de,""StrategicSignificance""=@ss,""OrderIndex""=@oi,""Category""=@ca WHERE ""Id""=@id AND ""UserId""=@uid",
+            ""Description""=@de,""StrategicSignificance""=@ss,""OrderIndex""=@oi,""Category""=@ca WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
             [new("@id",id.ToString()),new("@uid",Uid),new("@ti",req.Title??""),
              new("@gd",(object?)req.GregorianDate??DBNull.Value),new("@hd",(object?)req.HijriDate??DBNull.Value),
              new("@lo",(object?)req.Location??DBNull.Value),new("@de",(object?)req.Description??DBNull.Value),

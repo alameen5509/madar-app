@@ -21,7 +21,7 @@ public class TawbahController : ControllerBase
             (SELECT COUNT(*) FROM ""TawbahActions"" a WHERE a.""TawbahId""=t.""Id"") as ""ActionsCount"",
             (SELECT COUNT(*) FROM ""TawbahActions"" a WHERE a.""TawbahId""=t.""Id"" AND a.""IsCompleted""=1) as ""CompletedActions"",
             (SELECT COUNT(*) FROM ""TawbahReflections"" r WHERE r.""TawbahId""=t.""Id"") as ""ReflectionsCount""
-            FROM ""TawbahRecords"" t WHERE t.""UserId""=@uid ORDER BY t.""Status""='active' DESC, t.""CreatedAt"" DESC",
+            FROM ""TawbahRecords"" t WHERE t.""UserId""::text=@uid ORDER BY t.""Status""='active' DESC, t.""CreatedAt"" DESC",
             Ps("@uid", Uid), ct);
         return Ok(rows);
     }
@@ -86,7 +86,7 @@ public class TawbahController : ControllerBase
     {
         var rows = await E(@"UPDATE ""TawbahRecords"" SET ""Title""=COALESCE(@t,""Title""),""Category""=COALESCE(@cat,""Category""),
             ""RootCause""=COALESCE(@rc,""RootCause""),""RepentanceText""=COALESCE(@rt,""RepentanceText""),""FixPlan""=COALESCE(@fp,""FixPlan"")
-            WHERE ""Id""=@id AND ""UserId""=@uid",
+            WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
             [P("@id",id),P("@uid",Uid),P("@t",req.Title),P("@cat",req.Category),P("@rc",req.RootCause),P("@rt",req.RepentanceText),P("@fp",req.FixPlan)], ct);
         return rows > 0 ? Ok(new { id }) : NotFound();
     }

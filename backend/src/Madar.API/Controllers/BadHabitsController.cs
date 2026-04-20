@@ -21,7 +21,7 @@ public class BadHabitsController : ControllerBase
             (SELECT COUNT(*) FROM ""BadHabitLogs"" l WHERE l.""HabitId""=h.""Id"" AND l.""Status""='clean') as ""CleanDays"",
             (SELECT COUNT(*) FROM ""BadHabitLogs"" l WHERE l.""HabitId""=h.""Id"" AND l.""Status""='urge_resisted') as ""ResistedDays"",
             (SELECT ""Status"" FROM ""BadHabitLogs"" l WHERE l.""HabitId""=h.""Id"" AND l.""LogDate""=CURDATE() LIMIT 1) as ""TodayStatus""
-            FROM ""BadHabits"" h WHERE h.""UserId""=@uid ORDER BY h.""Status""='active' DESC, h.""CurrentStreak"" DESC",
+            FROM ""BadHabits"" h WHERE h.""UserId""::text=@uid ORDER BY h.""Status""='active' DESC, h.""CurrentStreak"" DESC",
             Ps("@uid", Uid), ct);
         return Ok(rows);
     }

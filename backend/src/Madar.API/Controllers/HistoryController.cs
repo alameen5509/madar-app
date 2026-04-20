@@ -93,7 +93,7 @@ public class HistoryController : ControllerBase
 
         var rows = await Exec(@"UPDATE ""HistoryRecords"" SET ""Year""=@y,""Month""=@mo,""Day""=@da,""HijriYear""=@hy,""HijriMonth""=@hm,""HijriDay""=@hd,""InputType""=@it,""Title""=@ti,""Description""=@de,
             ""Figure""=@fi,""Location""=@lo,""Country""=@co,""Category""=@ca,""StrategicImportance""=@si,""Importance""=@im,""Source""=@so,""Tags""=@ta
-            WHERE ""Id""=@id AND ""UserId""=@uid",
+            WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
             [new("@id",id.ToString()),new("@uid",Uid),new("@y",year),new("@mo",(object?)req.Month??DBNull.Value),new("@da",(object?)req.Day??DBNull.Value),
              new("@hy",hijriYear),new("@hm",(object?)req.HijriMonth??DBNull.Value),new("@hd",(object?)req.HijriDay??DBNull.Value),
              new("@it",req.InputType??"gregorian"),new("@ti",req.Title??""),new("@de",(object?)req.Description??DBNull.Value),

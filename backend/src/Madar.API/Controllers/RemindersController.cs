@@ -22,7 +22,7 @@ public class RemindersController : ControllerBase
             t.""ReminderFrequency"", t.""ReminderIntervalDays"", t.""NextReminderAt"", t.""LastRemindedAt"",
             t.""SnoozedUntil"", t.""ReminderStatus"", t.""AssignedPersonName"", t.""AssignedPersonRelation""
             FROM ""SmartTasks"" t
-            WHERE t.""OwnerId""=@uid
+            WHERE t.""OwnerId""::text=@uid
             AND t.""ReminderFrequency"" IS NOT NULL AND t.""ReminderFrequency"" != 'none'
             AND t.""ReminderStatus"" = 'active'
             AND (t.""SnoozedUntil"" IS NULL OR t.""SnoozedUntil"" <= NOW())
@@ -43,7 +43,7 @@ public class RemindersController : ControllerBase
             t.""ReminderStartDate"",
             (SELECT COUNT(*) FROM ""ReminderLogs"" rl WHERE rl.""TaskId""=t.""Id"") as ""LogCount""
             FROM ""SmartTasks"" t
-            WHERE t.""OwnerId""=@uid AND t.""ReminderFrequency"" IS NOT NULL AND t.""ReminderFrequency"" != 'none'
+            WHERE t.""OwnerId""::text=@uid AND t.""ReminderFrequency"" IS NOT NULL AND t.""ReminderFrequency"" != 'none'
             ORDER BY t.""NextReminderAt""",
             Ps("@uid", Uid), ct);
         // Add recent logs for each task
@@ -65,7 +65,7 @@ public class RemindersController : ControllerBase
             ""ReminderFrequency""=@f, ""ReminderIntervalDays""=@i, ""ReminderStartDate""=@sd,
             ""NextReminderAt""=@na, ""ReminderStatus""='active',
             ""AssignedPersonName""=@pn, ""AssignedPersonRelation""=@pr
-            WHERE ""Id""=@id AND ""OwnerId""=@uid",
+            WHERE ""Id""::text=@id AND ""OwnerId""::text=@uid",
             [P("@id",taskId),P("@uid",Uid),P("@f",req.Frequency??"none"),
              P("@i",req.IntervalDays),P("@sd",req.StartDate),P("@na",nextAt),
              P("@pn",req.PersonName),P("@pr",req.PersonRelation)], ct);
@@ -115,7 +115,7 @@ public class RemindersController : ControllerBase
         var rows = await E(@"UPDATE ""SmartTasks"" SET ""ReminderFrequency""='none', ""ReminderIntervalDays""=NULL,
             ""ReminderStartDate""=NULL, ""NextReminderAt""=NULL, ""LastRemindedAt""=NULL, ""SnoozedUntil""=NULL,
             ""ReminderStatus""='active', ""AssignedPersonName""=NULL, ""AssignedPersonRelation""=NULL
-            WHERE ""Id""=@id AND ""OwnerId""=@uid",
+            WHERE ""Id""::text=@id AND ""OwnerId""::text=@uid",
             [P("@id",taskId),P("@uid",Uid)], ct);
         return rows > 0 ? Ok(new { taskId }) : NotFound();
     }

@@ -24,12 +24,12 @@ public class CircleGroupsController : ControllerBase
         var uid = Uid;
         // Also try lowercase — TiDB may store GUIDs differently
         var groups = await Q(@"SELECT * FROM ""CircleGroups""
-            WHERE ""UserId""=@uid OR ""UserId""=@uidLower
+            WHERE ""UserId""::text=@uid OR ""UserId""::text=@uidLower
             ORDER BY ""Priority"", ""CreatedAt""",
             [new("@uid", uid), new("@uidLower", uid.ToLowerInvariant())], ct);
 
         var circles = await Q(@"SELECT * FROM ""UserCircles""
-            WHERE ""UserId""=@uid OR ""UserId""=@uidLower
+            WHERE ""UserId""::text=@uid OR ""UserId""::text=@uidLower
             ORDER BY ""Priority"", ""CreatedAt""",
             [new("@uid", uid), new("@uidLower", uid.ToLowerInvariant())], ct);
 
@@ -61,7 +61,7 @@ public class CircleGroupsController : ControllerBase
     public async Task<IActionResult> UpdateGroup(Guid id, [FromBody] GroupReq req, CancellationToken ct)
     {
         var rows = await E(@"UPDATE ""CircleGroups"" SET ""Name""=COALESCE(@n,""Name""),""Color""=COALESCE(@c,""Color""),
-            ""Icon""=COALESCE(@i,""Icon""),""Priority""=COALESCE(@p,""Priority"") WHERE ""Id""=@id AND ""UserId""=@uid",
+            ""Icon""=COALESCE(@i,""Icon""),""Priority""=COALESCE(@p,""Priority"") WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
             [new("@id",id.ToString()),new("@uid",Uid),new("@n",(object?)req.Name??DBNull.Value),
              new("@c",(object?)req.Color??DBNull.Value),new("@i",(object?)req.Icon??DBNull.Value),
              new("@p",(object?)req.Priority??DBNull.Value)], ct);
@@ -100,7 +100,7 @@ public class CircleGroupsController : ControllerBase
         var slug = req.Slug != null ? req.Slug.Trim().ToLowerInvariant().Replace(" ", "-") : null;
         var rows = await E(@"UPDATE ""UserCircles"" SET ""Name""=COALESCE(@n,""Name""),""Color""=COALESCE(@c,""Color""),
             ""Icon""=COALESCE(@i,""Icon""),""Slug""=COALESCE(@s,""Slug""),""Priority""=COALESCE(@p,""Priority"")
-            WHERE ""Id""=@id AND ""UserId""=@uid",
+            WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
             [new("@id",id.ToString()),new("@uid",Uid),new("@n",(object?)req.Name??DBNull.Value),
              new("@c",(object?)req.Color??DBNull.Value),new("@i",(object?)req.Icon??DBNull.Value),
              new("@s",(object?)slug??DBNull.Value),new("@p",(object?)req.Priority??DBNull.Value)], ct);

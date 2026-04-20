@@ -137,7 +137,7 @@ public class NutritionController : ControllerBase
             i["brands"] = await Q(@"SELECT ib.*,
                 (SELECT ""Price"" FROM ""IngredientPrices"" WHERE ""BrandId""=ib.""Id"" ORDER BY ""PurchaseDate"" DESC LIMIT 1) as ""LastPrice"",
                 (SELECT AVG(""Price"") FROM (SELECT ""Price"" FROM ""IngredientPrices"" WHERE ""BrandId""=ib.""Id"" ORDER BY ""PurchaseDate"" DESC LIMIT 5) sub) as ""AvgPrice""
-                FROM ""IngredientBrands"" ib WHERE ib.""IngredientId""=@iid AND ib.""IsActive""=1 ORDER BY ib.""IsPreferred"" DESC",
+                FROM ""IngredientBrands"" ib WHERE ib.""IngredientId""::text=@iid AND ib.""IsActive""=1 ORDER BY ib.""IsPreferred"" DESC",
                 Ps("@iid",i["id"]?.ToString()??""), ct);
         return Ok(items);
     }
@@ -177,7 +177,7 @@ public class NutritionController : ControllerBase
             FROM ""MealPlans"" mp
             LEFT JOIN ""Meals"" bm ON mp.""BreakfastMealId""=bm.""Id"" LEFT JOIN ""Meals"" lm ON mp.""LunchMealId""=lm.""Id""
             LEFT JOIN ""Meals"" dm ON mp.""DinnerMealId""=dm.""Id"" LEFT JOIN ""Meals"" sm ON mp.""SnackMealId""=sm.""Id""
-            WHERE mp.""UserId""=@uid AND mp.""PlanDate"">=@s AND mp.""PlanDate""<@e ORDER BY mp.""PlanDate""",
+            WHERE mp.""UserId""::text=@uid AND mp.""PlanDate"">=@s AND mp.""PlanDate""<@e ORDER BY mp.""PlanDate""",
             [P("@uid",Uid),P("@s",s),P("@e",s.AddDays(7))], ct);
         return Ok(plans);
     }

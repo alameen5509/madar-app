@@ -45,7 +45,7 @@ public class PhoneAddictionController : ControllerBase
             ""WeeklyReductionMinutes""=COALESCE(@red,""WeeklyReductionMinutes""),
             ""WhyMotivation""=COALESCE(@why,""WhyMotivation""),
             ""Status""=COALESCE(@st,""Status"")
-            WHERE ""Id""=@id AND ""UserId""=@uid",
+            WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
             [P("@id",id),P("@uid",Uid),P("@cur",req.CurrentDailyHours),P("@tgt",req.TargetDailyHours),
              P("@red",req.WeeklyReductionMinutes),P("@why",req.WhyMotivation),P("@st",req.Status)], ct);
         return Ok(new { id });
@@ -93,7 +93,7 @@ public class PhoneAddictionController : ControllerBase
     public async Task<IActionResult> UpdateTrigger(string id, [FromBody] TriggerReq req, CancellationToken ct)
     {
         await E(@"UPDATE ""PhoneTriggers"" SET ""TriggerName""=COALESCE(@n,""TriggerName""),""Category""=COALESCE(@c,""Category""),
-            ""Alternative""=COALESCE(@a,""Alternative""),""Frequency""=COALESCE(@f,""Frequency"") WHERE ""Id""=@id AND ""UserId""=@uid",
+            ""Alternative""=COALESCE(@a,""Alternative""),""Frequency""=COALESCE(@f,""Frequency"") WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
             [P("@id",id),P("@uid",Uid),P("@n",req.TriggerName),P("@c",req.Category),P("@a",req.Alternative),P("@f",req.Frequency)], ct);
         return Ok(new { id });
     }
@@ -122,7 +122,7 @@ public class PhoneAddictionController : ControllerBase
     {
         await E(@"UPDATE ""PhoneFreeZones"" SET ""ZoneName""=COALESCE(@n,""ZoneName""),""StartTime""=COALESCE(@st,""StartTime""),
             ""EndTime""=COALESCE(@et,""EndTime""),""DaysOfWeek""=COALESCE(@dow,""DaysOfWeek""),""IsActive""=COALESCE(@a,""IsActive"")
-            WHERE ""Id""=@id AND ""UserId""=@uid",
+            WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
             [P("@id",id),P("@uid",Uid),P("@n",req.ZoneName),P("@st",req.StartTime),P("@et",req.EndTime),
              P("@dow",req.DaysOfWeek),P("@a",req.IsActive)], ct);
         return Ok(new { id });
@@ -238,7 +238,7 @@ public class PhoneAddictionController : ControllerBase
         var yesterdayLog = await Q("SELECT * FROM \"ScreenTimeLogs\" WHERE \"UserId\"=@uid AND \"Date\"=DATE_SUB(CURDATE(), INTERVAL 1 DAY) LIMIT 1", Ps("@uid", Uid), ct);
         var last7 = await Q("SELECT \"Date\", \"ActualMinutes\", \"TargetMinutes\" FROM \"ScreenTimeLogs\" WHERE \"UserId\"=@uid AND \"Date\" >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) ORDER BY \"Date\"", Ps("@uid", Uid), ct);
         var streak = await Q(@"SELECT COUNT(*) as c FROM (
-            SELECT ""Date"", ""ActualMinutes"", ""TargetMinutes"" FROM ""ScreenTimeLogs"" WHERE ""UserId""=@uid AND ""Date"" <= CURDATE() ORDER BY ""Date"" DESC LIMIT 30
+            SELECT ""Date"", ""ActualMinutes"", ""TargetMinutes"" FROM ""ScreenTimeLogs"" WHERE ""UserId""::text=@uid AND ""Date"" <= CURDATE() ORDER BY ""Date"" DESC LIMIT 30
         ) t WHERE ""ActualMinutes"" <= ""TargetMinutes""", Ps("@uid", Uid), ct);
         var triggers = await Q("SELECT COUNT(*) as c FROM \"PhoneTriggers\" WHERE \"UserId\"=@uid", Ps("@uid", Uid), ct);
         var zones = await Q("SELECT COUNT(*) as c FROM \"PhoneFreeZones\" WHERE \"UserId\"=@uid AND \"IsActive\"=1", Ps("@uid", Uid), ct);

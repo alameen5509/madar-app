@@ -21,22 +21,22 @@ public class WarRoomController : ControllerBase
     {
         // تنظيف الأدوار اليتيمة المرتبطة بأعمال محذوفة
         var uid = Guid.Parse(Uid);
-        var orphanRoles = await Q(@"SELECT ""Id"" FROM ""LeadershipRoles"" WHERE ""UserId""=@uid AND ""WorkId"" IS NOT NULL AND ""WorkId"" != '' AND ""WorkId"" NOT IN (SELECT ""Id""::text FROM ""Works"" WHERE ""OwnerId""::text=@uid2)",
+        var orphanRoles = await Q(@"SELECT ""Id"" FROM ""LeadershipRoles"" WHERE ""UserId""::text=@uid AND ""WorkId"" IS NOT NULL AND ""WorkId"" != '' AND ""WorkId"" NOT IN (SELECT ""Id""::text FROM ""Works"" WHERE ""OwnerId""::text=@uid2)",
             [P("@uid", Uid), P("@uid2", Uid)], ct);
         foreach (var orphan in orphanRoles)
         {
             var oid = orphan["id"]?.ToString();
             if (oid == null) continue;
-            await E(@"DELETE FROM ""LeadershipNotes"" WHERE ""RoleId""=@rid", Ps("@rid", oid), ct);
-            await E(@"DELETE FROM ""LeadershipDevRequests"" WHERE ""RoleId""=@rid", Ps("@rid", oid), ct);
-            await E(@"DELETE FROM ""LeadershipRoles"" WHERE ""Id""=@id", Ps("@id", oid), ct);
+            await E(@"DELETE FROM ""LeadershipNotes"" WHERE ""RoleId""::text=@rid", Ps("@rid", oid), ct);
+            await E(@"DELETE FROM ""LeadershipDevRequests"" WHERE ""RoleId""::text=@rid", Ps("@rid", oid), ct);
+            await E(@"DELETE FROM ""LeadershipRoles"" WHERE ""Id""::text=@id", Ps("@id", oid), ct);
         }
 
         // المناصب اليدوية
         var roles = await Q(@"SELECT r.*,
             (SELECT COUNT(*) FROM ""LeadershipNotes"" n WHERE n.""RoleId""=r.""Id"") as ""NotesCount"",
             (SELECT COUNT(*) FROM ""LeadershipDevRequests"" d WHERE d.""RoleId""=r.""Id"" AND d.""Status"" IN ('new','inReview')) as ""PendingDevCount""
-            FROM ""LeadershipRoles"" r WHERE r.""UserId""=@uid AND r.""IsActive""=true ORDER BY r.""Priority"", r.""CreatedAt""",
+            FROM ""LeadershipRoles"" r WHERE r.""UserId""::text=@uid AND r.""IsActive""=true ORDER BY r.""Priority"", r.""CreatedAt""",
             Ps("@uid", Uid), ct);
 
         // الأعمال والوظائف — تظهر تلقائياً كمناصب
@@ -124,7 +124,7 @@ public class WarRoomController : ControllerBase
     {
         var rows = await E(@"UPDATE ""LeadershipRoles"" SET ""Title""=COALESCE(@t,""Title""),""Organization""=COALESCE(@org,""Organization""),
             ""Sector""=COALESCE(@sec,""Sector""),""Description""=COALESCE(@desc,""Description""),""Color""=COALESCE(@c,""Color""),""Icon""=COALESCE(@ic,""Icon""),
-            ""Priority""=COALESCE(@p,""Priority"") WHERE ""Id""=@id AND ""UserId""=@uid",
+            ""Priority""=COALESCE(@p,""Priority"") WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
             [P("@id",id),P("@uid",Uid),P("@t",req.Title),P("@org",req.Organization),P("@sec",req.Sector),
              P("@desc",req.Description),P("@c",req.Color),P("@ic",req.Icon),P("@p",req.Priority)], ct);
         return rows > 0 ? Ok(new { id }) : NotFound();
@@ -133,9 +133,9 @@ public class WarRoomController : ControllerBase
     [HttpDelete("roles/{id}")]
     public async Task<IActionResult> DeleteRole(string id, CancellationToken ct)
     {
-        await E(@"DELETE FROM ""LeadershipNotes"" WHERE ""RoleId""=@id", Ps("@id",id), ct);
-        await E(@"DELETE FROM ""LeadershipDevRequests"" WHERE ""RoleId""=@id", Ps("@id",id), ct);
-        return (await E(@"DELETE FROM ""LeadershipRoles"" WHERE ""Id""=@id AND ""UserId""=@uid", [P("@id",id),P("@uid",Uid)], ct)) > 0 ? NoContent() : NotFound();
+        await E(@"DELETE FROM ""LeadershipNotes"" WHERE ""RoleId""::text=@id", Ps("@id",id), ct);
+        await E(@"DELETE FROM ""LeadershipDevRequests"" WHERE ""RoleId""::text=@id", Ps("@id",id), ct);
+        return (await E(@"DELETE FROM ""LeadershipRoles"" WHERE ""Id""::text=@id AND ""UserId""::text=@uid", [P("@id",id),P("@uid",Uid)], ct)) > 0 ? NoContent() : NotFound();
     }
 
     // ═══ PULSE ═══════════════════════════════════════════════════════════
@@ -149,7 +149,7 @@ public class WarRoomController : ControllerBase
                 WHEN 'weekly' THEN NOW() + INTERVAL '7 days'
                 WHEN 'monthly' THEN NOW() + INTERVAL '1 month'
                 ELSE NOW() + INTERVAL '7 days' END
-            WHERE ""Id""=@id AND ""UserId""=@uid",
+            WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
             [P("@id",id),P("@uid",Uid),P("@ps",req.Status??"green"),P("@pn",req.Note)], ct);
         return rows > 0 ? Ok(new { id, pulseStatus = req.Status }) : NotFound();
     }
@@ -158,7 +158,7 @@ public class WarRoomController : ControllerBase
 
     [HttpGet("roles/{roleId}/notes")]
     public async Task<IActionResult> GetNotes(string roleId, CancellationToken ct) =>
-        Ok(await Q(@"SELECT * FROM ""LeadershipNotes"" WHERE ""RoleId""=@rid AND ""UserId""=@uid ORDER BY ""CreatedAt"" DESC LIMIT 50",
+        Ok(await Q(@"SELECT * FROM ""LeadershipNotes"" WHERE ""RoleId""::text=@rid AND ""UserId""::text=@uid ORDER BY ""CreatedAt"" DESC LIMIT 50",
             [P("@rid",roleId),P("@uid",Uid)], ct));
 
     [HttpPost("roles/{roleId}/notes")]
@@ -183,7 +183,7 @@ public class WarRoomController : ControllerBase
 
     [HttpGet("roles/{roleId}/dev-requests")]
     public async Task<IActionResult> GetDevRequests(string roleId, CancellationToken ct) =>
-        Ok(await Q(@"SELECT * FROM ""LeadershipDevRequests"" WHERE ""RoleId""=@rid AND ""UserId""=@uid ORDER BY CASE ""Status"" WHEN 'new' THEN 0 WHEN 'inReview' THEN 1 ELSE 2 END, ""CreatedAt"" DESC",
+        Ok(await Q(@"SELECT * FROM ""LeadershipDevRequests"" WHERE ""RoleId""::text=@rid AND ""UserId""::text=@uid ORDER BY CASE ""Status"" WHEN 'new' THEN 0 WHEN 'inReview' THEN 1 ELSE 2 END, ""CreatedAt"" DESC",
             [P("@rid",roleId),P("@uid",Uid)], ct));
 
     [HttpPost("roles/{roleId}/dev-requests")]
@@ -198,7 +198,7 @@ public class WarRoomController : ControllerBase
     [HttpPatch("dev-requests/{id}/status")]
     public async Task<IActionResult> UpdateDevStatus(string id, [FromBody] StatusReq req, CancellationToken ct)
     {
-        var rows = await E(@"UPDATE ""LeadershipDevRequests"" SET ""Status""=@s WHERE ""Id""=@id AND ""UserId""=@uid",
+        var rows = await E(@"UPDATE ""LeadershipDevRequests"" SET ""Status""=@s WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
             [P("@id",id),P("@uid",Uid),P("@s",req.Status??"new")], ct);
         return rows > 0 ? Ok(new { id, status = req.Status }) : NotFound();
     }
@@ -206,13 +206,13 @@ public class WarRoomController : ControllerBase
     [HttpDelete("notes/{id}")]
     public async Task<IActionResult> DeleteNote(string id, CancellationToken ct)
     {
-        return (await E(@"DELETE FROM ""LeadershipNotes"" WHERE ""Id""=@id AND ""UserId""=@uid", [P("@id",id),P("@uid",Uid)], ct)) > 0 ? NoContent() : NotFound();
+        return (await E(@"DELETE FROM ""LeadershipNotes"" WHERE ""Id""::text=@id AND ""UserId""::text=@uid", [P("@id",id),P("@uid",Uid)], ct)) > 0 ? NoContent() : NotFound();
     }
 
     [HttpDelete("dev-requests/{id}")]
     public async Task<IActionResult> DeleteDevRequest(string id, CancellationToken ct)
     {
-        return (await E(@"DELETE FROM ""LeadershipDevRequests"" WHERE ""Id""=@id AND ""UserId""=@uid", [P("@id",id),P("@uid",Uid)], ct)) > 0 ? NoContent() : NotFound();
+        return (await E(@"DELETE FROM ""LeadershipDevRequests"" WHERE ""Id""::text=@id AND ""UserId""::text=@uid", [P("@id",id),P("@uid",Uid)], ct)) > 0 ? NoContent() : NotFound();
     }
 
     // ═══ BRIEFING ════════════════════════════════════════════════════════
@@ -220,11 +220,11 @@ public class WarRoomController : ControllerBase
     [HttpGet("briefing")]
     public async Task<IActionResult> GetBriefing(CancellationToken ct)
     {
-        var roles = await Q(@"SELECT ""Id"", ""Title"", ""Icon"", ""PulseStatus"", ""PulseNote"", ""NextReviewDate"" FROM ""LeadershipRoles"" WHERE ""UserId""=@uid AND ""IsActive""=true ORDER BY ""Priority""",
+        var roles = await Q(@"SELECT ""Id"", ""Title"", ""Icon"", ""PulseStatus"", ""PulseNote"", ""NextReviewDate"" FROM ""LeadershipRoles"" WHERE ""UserId""::text=@uid AND ""IsActive""=true ORDER BY ""Priority""",
             Ps("@uid", Uid), ct);
-        var pendingDev = await Q(@"SELECT COUNT(*) as c FROM ""LeadershipDevRequests"" WHERE ""UserId""=@uid AND ""Status"" IN ('new','inReview')",
+        var pendingDev = await Q(@"SELECT COUNT(*) as c FROM ""LeadershipDevRequests"" WHERE ""UserId""::text=@uid AND ""Status"" IN ('new','inReview')",
             Ps("@uid", Uid), ct);
-        var dueReviews = await Q(@"SELECT COUNT(*) as c FROM ""LeadershipRoles"" WHERE ""UserId""=@uid AND ""IsActive""=true AND ""NextReviewDate"" IS NOT NULL AND ""NextReviewDate"" <= NOW()",
+        var dueReviews = await Q(@"SELECT COUNT(*) as c FROM ""LeadershipRoles"" WHERE ""UserId""::text=@uid AND ""IsActive""=true AND ""NextReviewDate"" IS NOT NULL AND ""NextReviewDate"" <= NOW()",
             Ps("@uid", Uid), ct);
         return Ok(new
         {

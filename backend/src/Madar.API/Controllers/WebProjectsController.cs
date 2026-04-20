@@ -31,10 +31,10 @@ public class WebProjectsController : ControllerBase
         Ok(await Q(@"SELECT DISTINCT wp.* FROM ""WebProjects"" wp
             LEFT JOIN ""WebProjectMembers"" wm ON wm.""ProjectId"" = wp.""Id""
             LEFT JOIN ""WebProjectTeams"" wt ON wt.""OwnerId"" = wp.""OwnerId""
-            WHERE wp.""OwnerId""=@uid
-               OR wt.""UserId""=@uid
+            WHERE wp.""OwnerId""::text=@uid
+               OR wt.""UserId""::text=@uid
                OR (@email <> '' AND LOWER(TRIM(wt.""Email""))=@email)
-               OR wm.""UserId""=@uid
+               OR wm.""UserId""::text=@uid
                OR (@email <> '' AND LOWER(TRIM(wm.""Email""))=@email)
             ORDER BY wp.""CreatedAt"" DESC", [P("@uid", Uid), P("@email", UEmail)], ct));
 
@@ -44,11 +44,11 @@ public class WebProjectsController : ControllerBase
         var p = await Q(@"SELECT DISTINCT wp.* FROM ""WebProjects"" wp
             LEFT JOIN ""WebProjectMembers"" wm ON wm.""ProjectId"" = wp.""Id""
             LEFT JOIN ""WebProjectTeams"" wt ON wt.""OwnerId"" = wp.""OwnerId""
-            WHERE wp.""Id""=@id AND (
-                wp.""OwnerId""=@uid
-                OR wt.""UserId""=@uid
+            WHERE wp.""Id""::text=@id AND (
+                wp.""OwnerId""::text=@uid
+                OR wt.""UserId""::text=@uid
                 OR (@email <> '' AND LOWER(TRIM(wt.""Email""))=@email)
-                OR wm.""UserId""=@uid
+                OR wm.""UserId""::text=@uid
                 OR (@email <> '' AND LOWER(TRIM(wm.""Email""))=@email)
             )",
             [P("@id",id),P("@uid",Uid),P("@email",UEmail)], ct);
@@ -81,7 +81,7 @@ public class WebProjectsController : ControllerBase
         await E(@"UPDATE ""WebProjects"" SET ""Title""=COALESCE(@t,""Title""),""ClientName""=COALESCE(@c,""ClientName""),
             ""Description""=COALESCE(@d,""Description""),""CurrentPhase""=COALESCE(@p,""CurrentPhase""),""Status""=COALESCE(@s,""Status""),
             ""Priority""=COALESCE(@pr,""Priority""),""DueDate""=COALESCE(@dd,""DueDate""),""UpdatedAt""=NOW()
-            WHERE ""Id""=@id AND ""OwnerId""=@uid",
+            WHERE ""Id""::text=@id AND ""OwnerId""::text=@uid",
             [P("@id",id),P("@uid",Uid),P("@t",req.Title),P("@c",req.ClientName),P("@d",req.Description),P("@p",req.CurrentPhase),P("@s",req.Status),P("@pr",req.Priority),P("@dd",req.DueDate)], ct);
         return Ok(new { id });
     }
@@ -101,13 +101,13 @@ public class WebProjectsController : ControllerBase
             @"SELECT wm.""Id"", wm.""ProjectId"", wm.""UserId"", wm.""Email"", wm.""Role"", wp.""Title""
               FROM ""WebProjectMembers"" wm
               JOIN ""WebProjects"" wp ON wp.""Id"" = wm.""ProjectId""
-              WHERE wm.""UserId""=@uid OR (@email <> '' AND LOWER(TRIM(wm.""Email""))=@email)",
+              WHERE wm.""UserId""::text=@uid OR (@email <> '' AND LOWER(TRIM(wm.""Email""))=@email)",
             [P("@uid", Uid), P("@email", UEmail)], ct);
         var teamRows = await Q(
             @"SELECT wt.""Id"", wt.""OwnerId"", wt.""UserId"", wt.""Email"", wt.""Role"",
                      (SELECT COUNT(*) FROM ""WebProjects"" wp WHERE wp.""OwnerId"" = wt.""OwnerId"") AS ownerProjectCount
               FROM ""WebProjectTeams"" wt
-              WHERE wt.""UserId""=@uid OR (@email <> '' AND LOWER(TRIM(wt.""Email""))=@email)",
+              WHERE wt.""UserId""::text=@uid OR (@email <> '' AND LOWER(TRIM(wt.""Email""))=@email)",
             [P("@uid", Uid), P("@email", UEmail)], ct);
         var owned = await Q("SELECT COUNT(*) AS c FROM \"WebProjects\" WHERE \"OwnerId\"=@uid",
             Ps("@uid", Uid), ct);
@@ -115,10 +115,10 @@ public class WebProjectsController : ControllerBase
             @"SELECT DISTINCT wp.""Id"", wp.""Title"", wp.""OwnerId"" FROM ""WebProjects"" wp
               LEFT JOIN ""WebProjectMembers"" wm ON wm.""ProjectId"" = wp.""Id""
               LEFT JOIN ""WebProjectTeams"" wt ON wt.""OwnerId"" = wp.""OwnerId""
-              WHERE wp.""OwnerId""=@uid
-                 OR wt.""UserId""=@uid
+              WHERE wp.""OwnerId""::text=@uid
+                 OR wt.""UserId""::text=@uid
                  OR (@email <> '' AND LOWER(TRIM(wt.""Email""))=@email)
-                 OR wm.""UserId""=@uid
+                 OR wm.""UserId""::text=@uid
                  OR (@email <> '' AND LOWER(TRIM(wm.""Email""))=@email)",
             [P("@uid", Uid), P("@email", UEmail)], ct);
         return Ok(new {
@@ -163,8 +163,8 @@ public class WebProjectsController : ControllerBase
                 // Dedupe: if a row with this owner+email/userId exists, do nothing
                 var existing = await Q(
                     @"SELECT ""Id"" FROM ""WebProjectTeams""
-                      WHERE ""OwnerId""=@oid
-                        AND ((@uid IS NOT NULL AND ""UserId""=@uid)
+                      WHERE ""OwnerId""::text=@oid
+                        AND ((@uid IS NOT NULL AND ""UserId""::text=@uid)
                              OR (@e <> '' AND LOWER(TRIM(""Email""))=@e))
                       LIMIT 1",
                     [P("@oid", ownerId), P("@uid", userId), P("@e", email.ToLowerInvariant())], ct);
