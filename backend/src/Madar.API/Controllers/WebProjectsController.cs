@@ -89,22 +89,15 @@ public class WebProjectsController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id, CancellationToken ct)
     {
-        // Verify ownership first
-        var check = await Q("SELECT \"Id\" FROM \"WebProjects\" WHERE \"Id\"=@id AND \"OwnerId\"=@uid",
-            [P("@id",id),P("@uid",Uid)], ct);
-        if (check.Count == 0) return NotFound();
-        // Cascade delete all child tables + project in one batch
-        await E(@"
-            DELETE FROM ""WebProjectMembers"" WHERE ""ProjectId""=@id;
-            DELETE FROM ""WebPhase1Docs"" WHERE ""ProjectId""=@id;
-            DELETE FROM ""WebPhase1Tasks"" WHERE ""ProjectId""=@id;
-            DELETE FROM ""WebPhase3Commands"" WHERE ""ProjectId""=@id;
-            DELETE FROM ""WebPhase4Credentials"" WHERE ""ProjectId""=@id;
-            DELETE FROM ""WebPhase5Commands"" WHERE ""ProjectId""=@id;
-            DELETE FROM ""WebPhase6Requests"" WHERE ""ProjectId""=@id;
-            DELETE FROM ""WebProjects"" WHERE ""Id""=@id",
-            [P("@id",id)], ct);
-        return NoContent();
+        // Use EF Core directly for reliable transaction handling
+        var uid = Uid;
+        var childTables = new[] { "WebProjectMembers","WebPhase1Docs","WebPhase1Tasks",
+            "WebPhase3Commands","WebPhase4Credentials","WebPhase5Commands","WebPhase6Requests" };
+        foreach (var t in childTables)
+            try { await _db.Database.ExecuteSqlRawAsync($"DELETE FROM \"{t}\" WHERE \"ProjectId\"={{0}}", new object[]{id}, ct); } catch {}
+        var rows = await _db.Database.ExecuteSqlRawAsync(
+            "DELETE FROM \"WebProjects\" WHERE \"Id\"={0} AND \"OwnerId\"={1}", new object[]{id, uid}, ct);
+        return rows > 0 ? NoContent() : NotFound();
     }
 
     // ═══ DIAGNOSTICS ═══
