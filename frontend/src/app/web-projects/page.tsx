@@ -27,14 +27,14 @@ export default function WebProjectsPage() {
       // Merge projectType from localStorage
       const withTypes = (data ?? []).map((p: Project) => ({ ...p, projectType: p.projectType || localStorage.getItem("wp_type_" + p.id) || "private" }));
       setProjects(withTypes);
-      // Check if any project is owned by this user (has ownerId matching)
-      const works = await api.get("/api/works").then(r => r.data?.length ?? 0).catch(() => 0);
-      setIsOwner(works > 0 || (data ?? []).some((p: Project & { ownerId?: string }) => p.ownerId));
+      setIsOwner((data ?? []).length > 0);
       setSyncStatus("");
     } catch {
       setSyncStatus("⚠️ فشل التحميل");
     }
     setLoading(false);
+    // Check ownership in background (non-blocking)
+    api.get("/api/works").then(r => { if (r.data?.length > 0) setIsOwner(true); }).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
 
