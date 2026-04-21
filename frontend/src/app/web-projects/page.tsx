@@ -212,8 +212,7 @@ export default function WebProjectsPage() {
                 <button onClick={async (e) => {
                   e.stopPropagation();
                   if (!confirm("حذف \"" + p.title + "\"؟")) return;
-                  try { await api.delete("/api/web-projects/" + p.id); } catch {}
-                  setProjects(prev => prev.filter(x => x.id !== p.id));
+                  try { await api.delete("/api/web-projects/" + p.id); setProjects(prev => prev.filter(x => x.id !== p.id)); } catch { alert("فشل حذف الموقع"); }
                 }} className="text-[10px] px-2 py-1.5 rounded-lg min-h-[32px] hover:bg-red-50" style={{ color: "#DC2626" }}>🗑️</button>
               </div>}
             </div>

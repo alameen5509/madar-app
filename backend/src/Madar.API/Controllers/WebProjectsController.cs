@@ -89,7 +89,7 @@ public class WebProjectsController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id, CancellationToken ct)
     {
-        await E("DELETE FROM \"WebProjects\" WHERE \"Id\"=@id AND \"OwnerId\"=@uid", [P("@id",id),P("@uid",Uid)], ct);
+        await E("DELETE FROM \"WebProjects\" WHERE \"Id\"::text=@id AND \"OwnerId\"::text=@uid", [P("@id",id),P("@uid",Uid)], ct);
         return NoContent();
     }
 
