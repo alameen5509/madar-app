@@ -53,7 +53,7 @@ public class WebProjectsController : ControllerBase
             )",
             [P("@id",id),P("@uid",Uid),P("@email",UEmail)], ct);
         if (p.Count == 0) return NotFound();
-        var members = await Q("SELECT * FROM \"WebProjectMembers\" WHERE \"ProjectId\"=@id", Ps("@id",id), ct);
+        var members = await Q("SELECT * FROM \"WebProjectMembers\" WHERE \"ProjectId\"::text=@id", Ps("@id",id), ct);
         // Determine user role: owner first, otherwise match by UserId then email
         var isOwner = p[0]["ownerId"]?.ToString() == Uid;
         var memberRole = isOwner ? "owner" : "employee";
@@ -89,14 +89,13 @@ public class WebProjectsController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id, CancellationToken ct)
     {
-        // Use EF Core directly for reliable transaction handling
-        var uid = Uid;
-        var childTables = new[] { "WebProjectMembers","WebPhase1Docs","WebPhase1Tasks",
-            "WebPhase3Commands","WebPhase4Credentials","WebPhase5Commands","WebPhase6Requests" };
-        foreach (var t in childTables)
-            try { await _db.Database.ExecuteSqlRawAsync($"DELETE FROM \"{t}\" WHERE \"ProjectId\"={{0}}", new object[]{id}, ct); } catch {}
-        var rows = await _db.Database.ExecuteSqlRawAsync(
-            "DELETE FROM \"WebProjects\" WHERE \"Id\"={0} AND \"OwnerId\"={1}", new object[]{id, uid}, ct);
+        // Delete child records (each independent — one failure won't block others)
+        foreach (var t in new[] { "WebProjectMembers","WebPhase1Docs","WebPhase1Tasks",
+            "WebPhase3Commands","WebPhase4Credentials","WebPhase5Commands","WebPhase6Requests","WebProjectKV" })
+            try { await E($"DELETE FROM \"{t}\" WHERE \"ProjectId\"::text=@id", [P("@id",id)], ct); } catch {}
+        // Delete the project itself
+        var rows = await E("DELETE FROM \"WebProjects\" WHERE \"Id\"::text=@id AND \"OwnerId\"::text=@uid",
+            [P("@id",id),P("@uid",Uid)], ct);
         return rows > 0 ? NoContent() : NotFound();
     }
 
@@ -116,7 +115,7 @@ public class WebProjectsController : ControllerBase
               FROM ""WebProjectTeams"" wt
               WHERE wt.""UserId""::text=@uid OR (@email <> '' AND LOWER(TRIM(wt.""Email""))=@email)",
             [P("@uid", Uid), P("@email", UEmail)], ct);
-        var owned = await Q("SELECT COUNT(*) AS c FROM \"WebProjects\" WHERE \"OwnerId\"=@uid",
+        var owned = await Q("SELECT COUNT(*) AS c FROM \"WebProjects\" WHERE \"OwnerId\"::text=@uid",
             Ps("@uid", Uid), ct);
         var visibleProjects = await Q(
             @"SELECT DISTINCT wp.""Id"", wp.""Title"", wp.""OwnerId"" FROM ""WebProjects"" wp
@@ -160,8 +159,7 @@ public class WebProjectsController : ControllerBase
             [P("@mid",mid),P("@pid",id),P("@uid",userId),P("@n",req.Name),P("@e",email),P("@r",req.Role??"employee")], ct);
 
         // Promote to owner-team membership so this user sees ALL my projects (the source of truth).
-        // Look up the project's owner; this also enforces that only the owner of the project added it.
-        var ownerRows = await Q("SELECT \"OwnerId\" FROM \"WebProjects\" WHERE \"Id\"=@pid LIMIT 1", Ps("@pid", id), ct);
+        var ownerRows = await Q("SELECT \"OwnerId\" FROM \"WebProjects\" WHERE \"Id\"::text=@pid LIMIT 1", Ps("@pid", id), ct);
         if (ownerRows.Count > 0)
         {
             var ownerId = ownerRows[0]["ownerId"]?.ToString();
@@ -190,19 +188,19 @@ public class WebProjectsController : ControllerBase
     // ═══ OWNER TEAM (root of access — see all my projects) ═══
     [HttpGet("team")]
     public async Task<IActionResult> GetTeam(CancellationToken ct) =>
-        Ok(await Q("SELECT * FROM \"WebProjectTeams\" WHERE \"OwnerId\"=@uid ORDER BY \"AddedAt\" DESC", Ps("@uid", Uid), ct));
+        Ok(await Q("SELECT * FROM \"WebProjectTeams\" WHERE \"OwnerId\"::text=@uid ORDER BY \"AddedAt\" DESC", Ps("@uid", Uid), ct));
 
     [HttpDelete("team/{tid}")]
     public async Task<IActionResult> RemoveTeamMember(string tid, CancellationToken ct)
     {
-        await E("DELETE FROM \"WebProjectTeams\" WHERE \"Id\"=@tid AND \"OwnerId\"=@uid", [P("@tid", tid), P("@uid", Uid)], ct);
+        await E("DELETE FROM \"WebProjectTeams\" WHERE \"Id\"::text=@tid AND \"OwnerId\"::text=@uid", [P("@tid", tid), P("@uid", Uid)], ct);
         return NoContent();
     }
 
     [HttpDelete("{id}/members/{mid}")]
     public async Task<IActionResult> RemoveMember(string id, string mid, CancellationToken ct)
     {
-        await E("DELETE FROM \"WebProjectMembers\" WHERE \"Id\"=@mid AND \"ProjectId\"=@pid", [P("@mid",mid),P("@pid",id)], ct);
+        await E("DELETE FROM \"WebProjectMembers\" WHERE \"Id\"::text=@mid AND \"ProjectId\"::text=@pid", [P("@mid",mid),P("@pid",id)], ct);
         return NoContent();
     }
 
@@ -210,16 +208,16 @@ public class WebProjectsController : ControllerBase
     [HttpGet("{id}/phase1/document")]
     public async Task<IActionResult> GetPhase1Doc(string id, CancellationToken ct)
     {
-        var r = await Q("SELECT \"Content\" FROM \"WebPhase1Docs\" WHERE \"ProjectId\"=@id ORDER BY \"UpdatedAt\" DESC LIMIT 1", Ps("@id",id), ct);
+        var r = await Q("SELECT \"Content\" FROM \"WebPhase1Docs\" WHERE \"ProjectId\"::text=@id ORDER BY \"UpdatedAt\" DESC LIMIT 1", Ps("@id",id), ct);
         return Ok(new { content = r.Count > 0 ? r[0]["content"]?.ToString() : "" });
     }
 
     [HttpPut("{id}/phase1/document")]
     public async Task<IActionResult> SavePhase1Doc(string id, [FromBody] DocReq req, CancellationToken ct)
     {
-        var existing = await Q("SELECT \"Id\" FROM \"WebPhase1Docs\" WHERE \"ProjectId\"=@id LIMIT 1", Ps("@id",id), ct);
+        var existing = await Q("SELECT \"Id\" FROM \"WebPhase1Docs\" WHERE \"ProjectId\"::text=@id LIMIT 1", Ps("@id",id), ct);
         if (existing.Count > 0)
-            await E("UPDATE \"WebPhase1Docs\" SET \"Content\"=@c,\"UpdatedAt\"=NOW() WHERE \"Id\"=@eid", [P("@eid",existing[0]["id"]!.ToString()!),P("@c",req.Content)], ct);
+            await E("UPDATE \"WebPhase1Docs\" SET \"Content\"=@c,\"UpdatedAt\"=NOW() WHERE \"Id\"::text=@eid", [P("@eid",existing[0]["id"]!.ToString()!),P("@c",req.Content)], ct);
         else
             await E("INSERT INTO \"WebPhase1Docs\" (\"Id\",\"ProjectId\",\"Content\",\"UpdatedAt\") VALUES(@nid,@id,@c,NOW())", [P("@nid",NewId()),P("@id",id),P("@c",req.Content)], ct);
         return Ok(new { saved = true });
@@ -227,13 +225,13 @@ public class WebProjectsController : ControllerBase
 
     [HttpGet("{id}/phase1/tasks")]
     public async Task<IActionResult> GetPhase1Tasks(string id, CancellationToken ct) =>
-        Ok(await Q("SELECT * FROM \"WebPhase1Tasks\" WHERE \"ProjectId\"=@id ORDER BY \"Order\"", Ps("@id",id), ct));
+        Ok(await Q("SELECT * FROM \"WebPhase1Tasks\" WHERE \"ProjectId\"::text=@id ORDER BY \"Order\"", Ps("@id",id), ct));
 
     [HttpPost("{id}/phase1/tasks")]
     public async Task<IActionResult> AddPhase1Task(string id, [FromBody] WpTaskReq req, CancellationToken ct)
     {
         var tid = NewId();
-        var maxOrder = await Q("SELECT MAX(\"Order\") as m FROM \"WebPhase1Tasks\" WHERE \"ProjectId\"=@id", Ps("@id",id), ct);
+        var maxOrder = await Q("SELECT MAX(\"Order\") as m FROM \"WebPhase1Tasks\" WHERE \"ProjectId\"::text=@id", Ps("@id",id), ct);
         var order = Convert.ToInt32(maxOrder[0]["m"] ?? 0) + 1;
         await E("INSERT INTO \"WebPhase1Tasks\" (\"Id\",\"ProjectId\",\"Title\",\"AssignedTo\",\"Status\",\"Order\",\"CreatedAt\") VALUES(@tid,@pid,@t,@a,'pending',@o,NOW())",
             [P("@tid",tid),P("@pid",id),P("@t",req.Title),P("@a",req.AssignedTo),P("@o",order)], ct);
@@ -243,7 +241,7 @@ public class WebProjectsController : ControllerBase
     [HttpPatch("{id}/phase1/tasks/{taskId}")]
     public async Task<IActionResult> UpdatePhase1Task(string id, string taskId, [FromBody] WpTaskReq req, CancellationToken ct)
     {
-        await E("UPDATE \"WebPhase1Tasks\" SET \"Title\"=COALESCE(@t,\"Title\"),\"AssignedTo\"=COALESCE(@a,\"AssignedTo\"),\"Status\"=COALESCE(@s,\"Status\") WHERE \"Id\"=@tid AND \"ProjectId\"=@pid",
+        await E("UPDATE \"WebPhase1Tasks\" SET \"Title\"=COALESCE(@t,\"Title\"),\"AssignedTo\"=COALESCE(@a,\"AssignedTo\"),\"Status\"=COALESCE(@s,\"Status\") WHERE \"Id\"::text=@tid AND \"ProjectId\"::text=@pid",
             [P("@tid",taskId),P("@pid",id),P("@t",req.Title),P("@a",req.AssignedTo),P("@s",req.Status)], ct);
         return Ok(new { id = taskId });
     }
@@ -251,20 +249,20 @@ public class WebProjectsController : ControllerBase
     [HttpDelete("{id}/phase1/tasks/{taskId}")]
     public async Task<IActionResult> DeletePhase1Task(string id, string taskId, CancellationToken ct)
     {
-        await E("DELETE FROM \"WebPhase1Tasks\" WHERE \"Id\"=@tid AND \"ProjectId\"=@pid", [P("@tid",taskId),P("@pid",id)], ct);
+        await E("DELETE FROM \"WebPhase1Tasks\" WHERE \"Id\"::text=@tid AND \"ProjectId\"::text=@pid", [P("@tid",taskId),P("@pid",id)], ct);
         return NoContent();
     }
 
     // ═══ PHASE 3: Setup Commands ═══
     [HttpGet("{id}/phase3/commands")]
     public async Task<IActionResult> GetPhase3Cmds(string id, CancellationToken ct) =>
-        Ok(await Q("SELECT * FROM \"WebPhase3Commands\" WHERE \"ProjectId\"=@id ORDER BY \"Order\"", Ps("@id",id), ct));
+        Ok(await Q("SELECT * FROM \"WebPhase3Commands\" WHERE \"ProjectId\"::text=@id ORDER BY \"Order\"", Ps("@id",id), ct));
 
     [HttpPost("{id}/phase3/commands")]
     public async Task<IActionResult> AddPhase3Cmd(string id, [FromBody] CmdReq req, CancellationToken ct)
     {
         var cid = NewId();
-        var maxOrder = await Q("SELECT MAX(\"Order\") as m FROM \"WebPhase3Commands\" WHERE \"ProjectId\"=@id", Ps("@id",id), ct);
+        var maxOrder = await Q("SELECT MAX(\"Order\") as m FROM \"WebPhase3Commands\" WHERE \"ProjectId\"::text=@id", Ps("@id",id), ct);
         var order = Convert.ToInt32(maxOrder[0]["m"] ?? 0) + 1;
         await E("INSERT INTO \"WebPhase3Commands\" (\"Id\",\"ProjectId\",\"Title\",\"Command\",\"Order\",\"Status\",\"CreatedAt\") VALUES(@cid,@pid,@t,@cmd,@o,'pending',NOW())",
             [P("@cid",cid),P("@pid",id),P("@t",req.Title),P("@cmd",req.Command),P("@o",order)], ct);
@@ -274,7 +272,7 @@ public class WebProjectsController : ControllerBase
     [HttpPatch("{id}/phase3/commands/{cmdId}/done")]
     public async Task<IActionResult> Phase3CmdDone(string id, string cmdId, CancellationToken ct)
     {
-        await E("UPDATE \"WebPhase3Commands\" SET \"Status\"='done',\"DoneAt\"=NOW() WHERE \"Id\"=@cid AND \"ProjectId\"=@pid",
+        await E("UPDATE \"WebPhase3Commands\" SET \"Status\"='done',\"DoneAt\"=NOW() WHERE \"Id\"::text=@cid AND \"ProjectId\"::text=@pid",
             [P("@cid",cmdId),P("@pid",id)], ct);
         return Ok(new { id = cmdId, status = "done" });
     }
@@ -282,14 +280,14 @@ public class WebProjectsController : ControllerBase
     [HttpGet("{id}/phase3/next-command")]
     public async Task<IActionResult> GetNextPhase3Cmd(string id, CancellationToken ct)
     {
-        var r = await Q("SELECT * FROM \"WebPhase3Commands\" WHERE \"ProjectId\"=@id AND \"Status\"='pending' ORDER BY \"Order\" LIMIT 1", Ps("@id",id), ct);
+        var r = await Q("SELECT * FROM \"WebPhase3Commands\" WHERE \"ProjectId\"::text=@id AND \"Status\"='pending' ORDER BY \"Order\" LIMIT 1", Ps("@id",id), ct);
         return Ok(r.Count > 0 ? r[0] : null);
     }
 
     // ═══ PHASE 4: Credentials ═══
     [HttpGet("{id}/phase4/credentials")]
     public async Task<IActionResult> GetCredentials(string id, CancellationToken ct) =>
-        Ok(await Q("SELECT * FROM \"WebPhase4Credentials\" WHERE \"ProjectId\"=@id ORDER BY \"CreatedAt\"", Ps("@id",id), ct));
+        Ok(await Q("SELECT * FROM \"WebPhase4Credentials\" WHERE \"ProjectId\"::text=@id ORDER BY \"CreatedAt\"", Ps("@id",id), ct));
 
     [HttpPost("{id}/phase4/credentials")]
     public async Task<IActionResult> AddCredential(string id, [FromBody] CredReq req, CancellationToken ct)
@@ -303,20 +301,20 @@ public class WebProjectsController : ControllerBase
     [HttpDelete("{id}/phase4/credentials/{credId}")]
     public async Task<IActionResult> DeleteCredential(string id, string credId, CancellationToken ct)
     {
-        await E("DELETE FROM \"WebPhase4Credentials\" WHERE \"Id\"=@cid AND \"ProjectId\"=@pid", [P("@cid",credId),P("@pid",id)], ct);
+        await E("DELETE FROM \"WebPhase4Credentials\" WHERE \"Id\"::text=@cid AND \"ProjectId\"::text=@pid", [P("@cid",credId),P("@pid",id)], ct);
         return NoContent();
     }
 
     // ═══ PHASE 5: Dev Commands ═══
     [HttpGet("{id}/phase5/commands")]
     public async Task<IActionResult> GetPhase5Cmds(string id, CancellationToken ct) =>
-        Ok(await Q("SELECT * FROM \"WebPhase5Commands\" WHERE \"ProjectId\"=@id ORDER BY \"Order\"", Ps("@id",id), ct));
+        Ok(await Q("SELECT * FROM \"WebPhase5Commands\" WHERE \"ProjectId\"::text=@id ORDER BY \"Order\"", Ps("@id",id), ct));
 
     [HttpPost("{id}/phase5/commands")]
     public async Task<IActionResult> AddPhase5Cmd(string id, [FromBody] CmdReq req, CancellationToken ct)
     {
         var cid = NewId();
-        var maxOrder = await Q("SELECT MAX(\"Order\") as m FROM \"WebPhase5Commands\" WHERE \"ProjectId\"=@id", Ps("@id",id), ct);
+        var maxOrder = await Q("SELECT MAX(\"Order\") as m FROM \"WebPhase5Commands\" WHERE \"ProjectId\"::text=@id", Ps("@id",id), ct);
         var order = Convert.ToInt32(maxOrder[0]["m"] ?? 0) + 1;
         await E("INSERT INTO \"WebPhase5Commands\" (\"Id\",\"ProjectId\",\"Title\",\"Command\",\"Order\",\"Status\",\"AddedBy\",\"CreatedAt\") VALUES(@cid,@pid,@t,@cmd,@o,'pending',@uid,NOW())",
             [P("@cid",cid),P("@pid",id),P("@t",req.Title),P("@cmd",req.Command),P("@o",order),P("@uid",Uid)], ct);
@@ -326,7 +324,7 @@ public class WebProjectsController : ControllerBase
     [HttpPatch("{id}/phase5/commands/{cmdId}/employee-done")]
     public async Task<IActionResult> Phase5EmployeeDone(string id, string cmdId, CancellationToken ct)
     {
-        await E("UPDATE \"WebPhase5Commands\" SET \"Status\"='employeeDone',\"EmployeeDoneAt\"=NOW() WHERE \"Id\"=@cid AND \"ProjectId\"=@pid",
+        await E("UPDATE \"WebPhase5Commands\" SET \"Status\"='employeeDone',\"EmployeeDoneAt\"=NOW() WHERE \"Id\"::text=@cid AND \"ProjectId\"::text=@pid",
             [P("@cid",cmdId),P("@pid",id)], ct);
         return Ok(new { id = cmdId, status = "employeeDone" });
     }
@@ -334,7 +332,7 @@ public class WebProjectsController : ControllerBase
     [HttpPatch("{id}/phase5/commands/{cmdId}/owner-approve")]
     public async Task<IActionResult> Phase5OwnerApprove(string id, string cmdId, [FromBody] WpNoteReq? req, CancellationToken ct)
     {
-        await E("UPDATE \"WebPhase5Commands\" SET \"Status\"='closed',\"OwnerApprovedAt\"=NOW(),\"Notes\"=COALESCE(@n,\"Notes\") WHERE \"Id\"=@cid AND \"ProjectId\"=@pid",
+        await E("UPDATE \"WebPhase5Commands\" SET \"Status\"='closed',\"OwnerApprovedAt\"=NOW(),\"Notes\"=COALESCE(@n,\"Notes\") WHERE \"Id\"::text=@cid AND \"ProjectId\"::text=@pid",
             [P("@cid",cmdId),P("@pid",id),P("@n",req?.Notes)], ct);
         return Ok(new { id = cmdId, status = "closed" });
     }
@@ -342,7 +340,7 @@ public class WebProjectsController : ControllerBase
     // ═══ PHASE 6: Client Requests ═══
     [HttpGet("{id}/phase6/requests")]
     public async Task<IActionResult> GetPhase6Reqs(string id, CancellationToken ct) =>
-        Ok(await Q("SELECT * FROM \"WebPhase6Requests\" WHERE \"ProjectId\"=@id ORDER BY \"CreatedAt\" DESC", Ps("@id",id), ct));
+        Ok(await Q("SELECT * FROM \"WebPhase6Requests\" WHERE \"ProjectId\"::text=@id ORDER BY \"CreatedAt\" DESC", Ps("@id",id), ct));
 
     [HttpPost("{id}/phase6/requests")]
     public async Task<IActionResult> AddPhase6Req(string id, [FromBody] ClientReqReq req, CancellationToken ct)
@@ -356,7 +354,7 @@ public class WebProjectsController : ControllerBase
     [HttpPatch("{id}/phase6/requests/{reqId}")]
     public async Task<IActionResult> UpdatePhase6Req(string id, string reqId, [FromBody] ClientReqReq req, CancellationToken ct)
     {
-        await E("UPDATE \"WebPhase6Requests\" SET \"Status\"=COALESCE(@s,\"Status\"),\"OwnerNote\"=COALESCE(@on,\"OwnerNote\") WHERE \"Id\"=@rid AND \"ProjectId\"=@pid",
+        await E("UPDATE \"WebPhase6Requests\" SET \"Status\"=COALESCE(@s,\"Status\"),\"OwnerNote\"=COALESCE(@on,\"OwnerNote\") WHERE \"Id\"::text=@rid AND \"ProjectId\"::text=@pid",
             [P("@rid",reqId),P("@pid",id),P("@s",req.Status),P("@on",req.OwnerNote)], ct);
         return Ok(new { id = reqId });
     }
@@ -365,10 +363,10 @@ public class WebProjectsController : ControllerBase
     [HttpGet("{id}/dashboard")]
     public async Task<IActionResult> GetDashboard(string id, CancellationToken ct)
     {
-        var p1Tasks = await Q("SELECT COUNT(*) as total, SUM(CASE WHEN \"Status\"='done' THEN 1 ELSE 0 END) as done FROM \"WebPhase1Tasks\" WHERE \"ProjectId\"=@id", Ps("@id",id), ct);
-        var p3Cmds = await Q("SELECT COUNT(*) as total, SUM(CASE WHEN \"Status\"='done' THEN 1 ELSE 0 END) as done FROM \"WebPhase3Commands\" WHERE \"ProjectId\"=@id", Ps("@id",id), ct);
-        var p5Cmds = await Q("SELECT COUNT(*) as total, SUM(CASE WHEN \"Status\"='closed' THEN 1 ELSE 0 END) as closed, SUM(CASE WHEN \"Status\"='employeeDone' THEN 1 ELSE 0 END) as review FROM \"WebPhase5Commands\" WHERE \"ProjectId\"=@id", Ps("@id",id), ct);
-        var p6Reqs = await Q("SELECT COUNT(*) as total, SUM(CASE WHEN \"Status\"='done' THEN 1 ELSE 0 END) as done FROM \"WebPhase6Requests\" WHERE \"ProjectId\"=@id", Ps("@id",id), ct);
+        var p1Tasks = await Q("SELECT COUNT(*) as total, SUM(CASE WHEN \"Status\"='done' THEN 1 ELSE 0 END) as done FROM \"WebPhase1Tasks\" WHERE \"ProjectId\"::text=@id", Ps("@id",id), ct);
+        var p3Cmds = await Q("SELECT COUNT(*) as total, SUM(CASE WHEN \"Status\"='done' THEN 1 ELSE 0 END) as done FROM \"WebPhase3Commands\" WHERE \"ProjectId\"::text=@id", Ps("@id",id), ct);
+        var p5Cmds = await Q("SELECT COUNT(*) as total, SUM(CASE WHEN \"Status\"='closed' THEN 1 ELSE 0 END) as closed, SUM(CASE WHEN \"Status\"='employeeDone' THEN 1 ELSE 0 END) as review FROM \"WebPhase5Commands\" WHERE \"ProjectId\"::text=@id", Ps("@id",id), ct);
+        var p6Reqs = await Q("SELECT COUNT(*) as total, SUM(CASE WHEN \"Status\"='done' THEN 1 ELSE 0 END) as done FROM \"WebPhase6Requests\" WHERE \"ProjectId\"::text=@id", Ps("@id",id), ct);
         return Ok(new { phase1 = p1Tasks[0], phase3 = p3Cmds[0], phase5 = p5Cmds[0], phase6 = p6Reqs[0] });
     }
 
@@ -381,7 +379,7 @@ public class WebProjectsController : ControllerBase
     {
         // Ensure table exists
         try { await E("CREATE TABLE IF NOT EXISTS \"WebProjectKV\" (\"ProjectId\" VARCHAR(36) NOT NULL, \"Key\" VARCHAR(100) NOT NULL, \"Value\" TEXT, \"UpdatedAt\" TIMESTAMP NOT NULL DEFAULT NOW(), PRIMARY KEY (\"ProjectId\", \"Key\"))", [], ct); } catch {}
-        var rows = await Q("SELECT \"Value\" FROM \"WebProjectKV\" WHERE \"ProjectId\"=@pid AND \"Key\"=@k LIMIT 1", [P("@pid", id), P("@k", key)], ct);
+        var rows = await Q("SELECT \"Value\" FROM \"WebProjectKV\" WHERE \"ProjectId\"::text=@pid AND \"Key\"=@k LIMIT 1", [P("@pid", id), P("@k", key)], ct);
         if (rows.Count == 0) return Ok(new { value = (string?)null });
         return Ok(new { value = rows[0]["value"]?.ToString() });
     }
