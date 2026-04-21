@@ -27,8 +27,8 @@ export default function WebProjectsPage() {
       const withTypes = (data ?? []).map((p: Project) => ({ ...p, projectType: p.projectType || localStorage.getItem("wp_type_" + p.id) || "private" }));
       setProjects(withTypes);
       setIsOwner(true);
-    } catch {
-      setSyncStatus("⚠️ فشل التحميل");
+    } catch (err: any) {
+      setSyncStatus("⚠️ فشل التحميل: " + (err?.response?.status || err?.message || ""));
     }
     setLoading(false);
   }, []);
@@ -41,7 +41,7 @@ export default function WebProjectsPage() {
       if (data?.id) { try { localStorage.setItem("wp_type_" + data.id, np.type); } catch {} }
       setNp({ title: "", client: "", desc: "", priority: "medium", dueDate: "", type: "private" }); setShowNew(false);
       load();
-    } catch { alert("فشل الإنشاء"); }
+    } catch (err: any) { alert("فشل الإنشاء: " + (err?.response?.data?.title || err?.response?.data?.message || err?.response?.status || err?.message || "")); }
   }
 
   const PRIORITIES: Record<string,{label:string;color:string;icon:string}> = {
@@ -207,7 +207,7 @@ export default function WebProjectsPage() {
                 <button onClick={async (e) => {
                   e.stopPropagation();
                   if (!confirm("حذف \"" + p.title + "\"؟")) return;
-                  try { await api.delete("/api/web-projects/" + p.id); setProjects(prev => prev.filter(x => x.id !== p.id)); } catch { alert("فشل حذف الموقع"); }
+                  try { await api.delete("/api/web-projects/" + p.id); setProjects(prev => prev.filter(x => x.id !== p.id)); } catch (err: any) { alert("فشل الحذف: " + (err?.response?.data?.title || err?.response?.status || err?.message || "")); }
                 }} className="text-[10px] px-2 py-1.5 rounded-lg min-h-[32px] hover:bg-red-50" style={{ color: "#DC2626" }}>🗑️</button>
               </div>}
             </div>
