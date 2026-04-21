@@ -24,17 +24,13 @@ export default function WebProjectsPage() {
     setLoading(true); setSyncStatus("");
     try {
       const { data } = await api.get("/api/web-projects");
-      // Merge projectType from localStorage
       const withTypes = (data ?? []).map((p: Project) => ({ ...p, projectType: p.projectType || localStorage.getItem("wp_type_" + p.id) || "private" }));
       setProjects(withTypes);
-      setIsOwner((data ?? []).length > 0);
-      setSyncStatus("");
+      setIsOwner(true);
     } catch {
       setSyncStatus("⚠️ فشل التحميل");
     }
     setLoading(false);
-    // Check ownership in background (non-blocking)
-    api.get("/api/works").then(r => { if (r.data?.length > 0) setIsOwner(true); }).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -42,7 +38,6 @@ export default function WebProjectsPage() {
     if (!np.title.trim()) return;
     try {
       const { data } = await api.post("/api/web-projects", { title: np.title.trim(), clientName: np.client.trim() || undefined, description: np.desc.trim() || undefined, priority: np.priority, dueDate: np.dueDate || undefined });
-      // Save type locally
       if (data?.id) { try { localStorage.setItem("wp_type_" + data.id, np.type); } catch {} }
       setNp({ title: "", client: "", desc: "", priority: "medium", dueDate: "", type: "private" }); setShowNew(false);
       load();

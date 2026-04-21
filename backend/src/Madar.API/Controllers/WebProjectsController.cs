@@ -89,18 +89,22 @@ public class WebProjectsController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id, CancellationToken ct)
     {
-        // Delete child records first
-        var pp = new List<NpgsqlParameter>[] { [P("@id",id)], [P("@id",id)], [P("@id",id)], [P("@id",id)], [P("@id",id)], [P("@id",id)], [P("@id",id)] };
-        await E("DELETE FROM \"WebProjectMembers\" WHERE \"ProjectId\"=@id", pp[0], ct);
-        await E("DELETE FROM \"WebPhase1Docs\" WHERE \"ProjectId\"=@id", pp[1], ct);
-        await E("DELETE FROM \"WebPhase1Tasks\" WHERE \"ProjectId\"=@id", pp[2], ct);
-        await E("DELETE FROM \"WebPhase3Commands\" WHERE \"ProjectId\"=@id", pp[3], ct);
-        await E("DELETE FROM \"WebPhase4Credentials\" WHERE \"ProjectId\"=@id", pp[4], ct);
-        await E("DELETE FROM \"WebPhase5Commands\" WHERE \"ProjectId\"=@id", pp[5], ct);
-        await E("DELETE FROM \"WebPhase6Requests\" WHERE \"ProjectId\"=@id", pp[6], ct);
-        try { await E("DELETE FROM \"WebProjectKV\" WHERE \"ProjectId\"=@id", [P("@id",id)], ct); } catch {}
-        var rows = await E("DELETE FROM \"WebProjects\" WHERE \"Id\"=@id AND \"OwnerId\"=@uid", [P("@id",id),P("@uid",Uid)], ct);
-        return rows > 0 ? NoContent() : NotFound();
+        // Verify ownership first
+        var check = await Q("SELECT \"Id\" FROM \"WebProjects\" WHERE \"Id\"=@id AND \"OwnerId\"=@uid",
+            [P("@id",id),P("@uid",Uid)], ct);
+        if (check.Count == 0) return NotFound();
+        // Cascade delete all child tables + project in one batch
+        await E(@"
+            DELETE FROM ""WebProjectMembers"" WHERE ""ProjectId""=@id;
+            DELETE FROM ""WebPhase1Docs"" WHERE ""ProjectId""=@id;
+            DELETE FROM ""WebPhase1Tasks"" WHERE ""ProjectId""=@id;
+            DELETE FROM ""WebPhase3Commands"" WHERE ""ProjectId""=@id;
+            DELETE FROM ""WebPhase4Credentials"" WHERE ""ProjectId""=@id;
+            DELETE FROM ""WebPhase5Commands"" WHERE ""ProjectId""=@id;
+            DELETE FROM ""WebPhase6Requests"" WHERE ""ProjectId""=@id;
+            DELETE FROM ""WebProjects"" WHERE ""Id""=@id",
+            [P("@id",id)], ct);
+        return NoContent();
     }
 
     // ═══ DIAGNOSTICS ═══
