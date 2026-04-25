@@ -28,18 +28,18 @@ public class BoardsController : ControllerBase
         var sql = "SELECT Id, Name, EntityType, EntityId, Data, CreatedAt, UpdatedAt FROM Boards WHERE UserId = @uid";
         var parameters = new List<NpgsqlParameter>
         {
-            new("@uid", UserId.ToString()),
+            P("@uid", UserId.ToString()),
         };
 
         if (!string.IsNullOrEmpty(entityType))
         {
             sql += " AND EntityType = @et";
-            parameters.Add(new("@et", entityType));
+            parameters.Add(P("@et", entityType));
         }
         if (entityId.HasValue)
         {
             sql += " AND EntityId = @eid";
-            parameters.Add(new("@eid", entityId.Value.ToString()));
+            parameters.Add(P("@eid", entityId.Value.ToString()));
         }
         sql += " ORDER BY UpdatedAt DESC";
 
@@ -82,8 +82,8 @@ public class BoardsController : ControllerBase
         {
             using var cmd = q.CreateCommand();
             cmd.CommandText = "SELECT Id, Name, EntityType, EntityId, Data, CreatedAt, UpdatedAt FROM Boards WHERE Id = @id AND UserId = @uid";
-            cmd.Parameters.Add(new NpgsqlParameter("@id", id.ToString()));
-            cmd.Parameters.Add(new NpgsqlParameter("@uid", UserId.ToString()));
+            cmd.Parameters.Add(P("@id", id.ToString()));
+            cmd.Parameters.Add(P("@uid", UserId.ToString()));
 
             using var reader = await cmd.ExecuteReaderAsync(ct);
             if (!await reader.ReadAsync(ct)) return NotFound();
@@ -115,13 +115,13 @@ public class BoardsController : ControllerBase
             using var cmd = q.CreateCommand();
             cmd.CommandText = @"INSERT INTO Boards (Id, UserId, Name, EntityType, EntityId, Data, CreatedAt, UpdatedAt)
                                 VALUES (@id, @uid, @name, @et, @eid, @data, @now, @now)";
-            cmd.Parameters.Add(new NpgsqlParameter("@id", id.ToString()));
-            cmd.Parameters.Add(new NpgsqlParameter("@uid", UserId.ToString()));
-            cmd.Parameters.Add(new NpgsqlParameter("@name", req.Name ?? "سبورة جديدة"));
-            cmd.Parameters.Add(new NpgsqlParameter("@et", req.EntityType ?? "personal"));
-            cmd.Parameters.Add(new NpgsqlParameter("@eid", req.EntityId ?? (object)DBNull.Value));
-            cmd.Parameters.Add(new NpgsqlParameter("@data", req.Data ?? (object)DBNull.Value));
-            cmd.Parameters.Add(new NpgsqlParameter("@now", now));
+            cmd.Parameters.Add(P("@id", id.ToString()));
+            cmd.Parameters.Add(P("@uid", UserId.ToString()));
+            cmd.Parameters.Add(P("@name", req.Name ?? "سبورة جديدة"));
+            cmd.Parameters.Add(P("@et", req.EntityType ?? "personal"));
+            cmd.Parameters.Add(P("@eid", req.EntityId ?? (object)DBNull.Value));
+            cmd.Parameters.Add(P("@data", req.Data ?? (object)DBNull.Value));
+            cmd.Parameters.Add(P("@now", now));
             await cmd.ExecuteNonQueryAsync(ct);
         }
         finally { await q.CloseAsync(); }
@@ -140,11 +140,11 @@ public class BoardsController : ControllerBase
             using var cmd = q.CreateCommand();
             cmd.CommandText = @"UPDATE Boards SET Data = @data, Name = COALESCE(@name, Name), UpdatedAt = @now
                                 WHERE Id = @id AND UserId = @uid";
-            cmd.Parameters.Add(new NpgsqlParameter("@data", req.Data ?? (object)DBNull.Value));
-            cmd.Parameters.Add(new NpgsqlParameter("@name", req.Name ?? (object)DBNull.Value));
-            cmd.Parameters.Add(new NpgsqlParameter("@now", DateTime.UtcNow));
-            cmd.Parameters.Add(new NpgsqlParameter("@id", id.ToString()));
-            cmd.Parameters.Add(new NpgsqlParameter("@uid", UserId.ToString()));
+            cmd.Parameters.Add(P("@data", req.Data ?? (object)DBNull.Value));
+            cmd.Parameters.Add(P("@name", req.Name ?? (object)DBNull.Value));
+            cmd.Parameters.Add(P("@now", DateTime.UtcNow));
+            cmd.Parameters.Add(P("@id", id.ToString()));
+            cmd.Parameters.Add(P("@uid", UserId.ToString()));
             var rows = await cmd.ExecuteNonQueryAsync(ct);
             if (rows == 0) return NotFound();
         }
@@ -163,8 +163,8 @@ public class BoardsController : ControllerBase
         {
             using var cmd = q.CreateCommand();
             cmd.CommandText = "DELETE FROM Boards WHERE Id = @id AND UserId = @uid";
-            cmd.Parameters.Add(new NpgsqlParameter("@id", id.ToString()));
-            cmd.Parameters.Add(new NpgsqlParameter("@uid", UserId.ToString()));
+            cmd.Parameters.Add(P("@id", id.ToString()));
+            cmd.Parameters.Add(P("@uid", UserId.ToString()));
             var rows = await cmd.ExecuteNonQueryAsync(ct);
             if (rows == 0) return NotFound();
         }
@@ -172,6 +172,11 @@ public class BoardsController : ControllerBase
 
         return NoContent();
     }
+
+    static NpgsqlParameter P(string n, object? v) =>
+        v is string s && Guid.TryParse(s, out var g)
+            ? new NpgsqlParameter(n, NpgsqlTypes.NpgsqlDbType.Uuid) { Value = g }
+            : new(n, v ?? DBNull.Value);
 }
 
 public class CreateBoardReq

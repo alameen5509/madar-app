@@ -26,7 +26,7 @@ export default function WorksPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const { data } = await api.get("/api/works"); setWorks(data); } catch {}
+    try { const { data } = await api.get("/api/works"); setWorks(data); } catch (e: any) { console.error(e); }
     finally { setLoading(false); }
   }, []);
 

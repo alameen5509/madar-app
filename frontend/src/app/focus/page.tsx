@@ -150,7 +150,7 @@ export default function FocusPage() {
       });
       setTasks(pending);
       setIdx(0);
-    } catch {}
+    } catch (e: any) { console.error(e); }
     setLoading(false);
   }, [sessionCtx]);
 
@@ -222,7 +222,7 @@ export default function FocusPage() {
     const t = tasks[idx];
     if (!t) return;
     setShowDone(true);
-    try { await api.patch(`/api/tasks/${t.id}/status`, { status: "Completed" }); } catch {}
+    try { await api.patch(`/api/tasks/${t.id}/status`, { status: "Completed" }); } catch { alert("حدث خطأ"); }
     setTimeout(() => {
       setShowDone(false);
       setTasks(prev => prev.filter((_, i) => i !== idx));
@@ -248,7 +248,7 @@ export default function FocusPage() {
         dueDate: tomorrowStr,
         contextNote: t.contextNote,
       });
-    } catch {}
+    } catch { alert("حدث خطأ"); }
     setTimeout(() => {
       setShowDone(false);
       removeCurrentTask();
@@ -262,7 +262,7 @@ export default function FocusPage() {
     const d = new Date();
     d.setDate(d.getDate() + days);
     const localISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T00:00:00`;
-    try { await api.post(`/api/tasks/${t.id}/update`, { dueDate: localISO }); } catch {}
+    try { await api.post(`/api/tasks/${t.id}/update`, { dueDate: localISO }); } catch { alert("حدث خطأ"); }
     removeCurrentTask();
   }
 
@@ -273,7 +273,7 @@ export default function FocusPage() {
     d.setHours(d.getHours() + hours);
     // Send as local datetime string (no UTC conversion) so backend stores it as-is
     const localISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}:00`;
-    try { await api.post(`/api/tasks/${t.id}/update`, { dueDate: localISO }); } catch {}
+    try { await api.post(`/api/tasks/${t.id}/update`, { dueDate: localISO }); } catch { alert("حدث خطأ"); }
     removeCurrentTask();
   }
 
@@ -281,7 +281,7 @@ export default function FocusPage() {
     const t = tasks[idx];
     if (!t) return;
     if (!confirm(`حذف "${t.title}"؟`)) return;
-    try { await api.delete(`/api/tasks/${t.id}`); } catch {}
+    try { await api.delete(`/api/tasks/${t.id}`); } catch { alert("حدث خطأ"); }
     removeCurrentTask();
   }
 
@@ -297,7 +297,7 @@ export default function FocusPage() {
     const t = tasks[idx];
     if (!t) return;
     // 1. Set priority to 5 (highest)
-    try { await api.post(`/api/tasks/${t.id}/update`, { userPriority: 5 }); } catch {}
+    try { await api.post(`/api/tasks/${t.id}/update`, { userPriority: 5 }); } catch { alert("حدث خطأ"); }
     // 2. Update pulse of linked entity to "red" (critical)
     if (t.root?.entityId && t.root.kind !== "legacy") {
       try {
@@ -305,7 +305,7 @@ export default function FocusPage() {
         const roles = Array.isArray(allRoles) ? allRoles : [];
         const role = roles.find((r: { workId?: string }) => r.workId === t.root?.entityId);
         if (role) await api.patch(`/api/war-room/roles/${role.id}/pulse`, { status: "red", note: `🐸 مهمة حرجة: ${t.title}` });
-      } catch {}
+      } catch { alert("حدث خطأ"); }
     }
     // 3. Update locally: move to top, mark as priority 5
     setTasks(prev => {
@@ -329,7 +329,7 @@ export default function FocusPage() {
     try {
       await api.post(`/api/tasks/${t.id}/update`, { dueDate: localISO });
       setTasks(prev => prev.map((tk, i) => i === idx ? { ...tk, dueDate: localISO } : tk));
-    } catch {}
+    } catch { alert("حدث خطأ"); }
     setShowTimePicker(false); setPickTime("");
   }
 
@@ -601,7 +601,7 @@ export default function FocusPage() {
                   const currentSession = (task.contextNote ?? "").match(/session:(\w+)/)?.[1] ?? "outside";
                   return (
                     <button key={c.key} onClick={async () => {
-                      try { await api.post(`/api/tasks/${task.id}/update`, { session: c.key === "outside" ? "" : c.key }); } catch {}
+                      try { await api.post(`/api/tasks/${task.id}/update`, { session: c.key === "outside" ? "" : c.key }); } catch { alert("حدث خطأ"); }
                       load();
                     }}
                       className="py-1.5 rounded-xl text-[10px] font-bold transition"

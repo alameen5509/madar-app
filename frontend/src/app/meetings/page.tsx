@@ -52,7 +52,7 @@ export default function MeetingsPage() {
         if (tab === "past") list = list.filter(m => m.status === "completed" || m.status === "cancelled");
       }
       setMeetings(list);
-    } catch {}
+    } catch (e: any) { console.error(e); }
     setLoading(false);
   }, [tab]);
 
@@ -83,7 +83,7 @@ export default function MeetingsPage() {
       });
       setShowNew(false);
       fetchData();
-    } catch {}
+    } catch { alert("حدث خطأ"); }
   }
 
   function getDuration(m: Meeting): string {
@@ -239,17 +239,17 @@ export default function MeetingsPage() {
                     </div>
                     <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                       {m.status === "scheduled" && (
-                        <button onClick={async () => { try { await completeMeeting(m.id); fetchData(); } catch {} }}
+                        <button onClick={async () => { try { await completeMeeting(m.id); fetchData(); } catch { alert("حدث خطأ"); } }}
                           className="text-[9px] px-2 py-1 rounded-lg font-bold" style={{ background: "#3D8C5A15", color: "#3D8C5A" }}>✅</button>
                       )}
                       {m.meetingLink && (
                         <a href={m.meetingLink} target="_blank" rel="noopener" className="text-[9px] px-2 py-1 rounded-lg font-bold" style={{ background: "#3B82F615", color: "#3B82F6" }}>🔗</a>
                       )}
                       {m.status === "scheduled" && (
-                        <button onClick={async () => { try { await cancelMeeting(m.id); fetchData(); } catch {} }}
+                        <button onClick={async () => { try { await cancelMeeting(m.id); fetchData(); } catch { alert("حدث خطأ"); } }}
                           className="text-[9px] px-1.5 py-1 rounded-lg" style={{ color: "#F59E0B" }}>⏸</button>
                       )}
-                      <button onClick={async () => { if (confirm("حذف؟")) { try { await deleteMeeting(m.id); fetchData(); } catch {} } }}
+                      <button onClick={async () => { if (confirm("حذف؟")) { try { await deleteMeeting(m.id); fetchData(); } catch { alert("حدث خطأ"); } } }}
                         className="text-[9px] px-1 rounded" style={{ color: "#DC2626" }}>🗑️</button>
                     </div>
                   </div>

@@ -45,7 +45,7 @@ public class DevTicketsController : ControllerBase
             ""Title""=COALESCE(@t,""Title""), ""UserRequest""=COALESCE(@ur,""UserRequest""),
             ""AiCommand""=COALESCE(@cmd,""AiCommand""), ""Status""=COALESCE(@st,""Status""), ""UpdatedAt""=NOW()
             WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
-            [P("@id",id),P("@uid",Uid),new("@t",(object?)req.Title??DBNull.Value),
+            [P("@id",id),P("@uid",Uid),P("@t",(object?)req.Title??DBNull.Value),
              P("@ur",req.Description),P("@cmd",req.Command),
              P("@st",req.Status)], ct);
         return rows > 0 ? Ok(new { id }) : NotFound();

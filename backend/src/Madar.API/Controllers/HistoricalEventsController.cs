@@ -20,8 +20,8 @@ public class HistoricalEventsController : ControllerBase
     public async Task<IActionResult> GetAll([FromQuery] string? category, CancellationToken ct)
     {
         var sql = "SELECT * FROM \"HistoricalEvents\" WHERE \"UserId\"=@uid";
-        var ps = new List<NpgsqlParameter> { new("@uid", Uid) };
-        if (!string.IsNullOrEmpty(category)) { sql += " AND \"Category\"=@c"; ps.Add(new("@c", category)); }
+        var ps = new List<NpgsqlParameter> { P("@uid", Uid) };
+        if (!string.IsNullOrEmpty(category)) { sql += " AND \"Category\"=@c"; ps.Add(P("@c", category)); }
         sql += " ORDER BY \"OrderIndex\" ASC, \"CreatedAt\" ASC";
         return Ok(await Query(sql, ps, ct));
     }
@@ -30,7 +30,7 @@ public class HistoricalEventsController : ControllerBase
     public async Task<IActionResult> GetOne(Guid id, CancellationToken ct)
     {
         var rows = await Query("SELECT * FROM \"HistoricalEvents\" WHERE \"Id\"=@id AND \"UserId\"=@uid",
-            [new("@id", id.ToString()), new("@uid", Uid)], ct);
+            [P("@id", id.ToString()), P("@uid", Uid)], ct);
         return rows.Count > 0 ? Ok(rows[0]) : NotFound();
     }
 
@@ -40,11 +40,11 @@ public class HistoricalEventsController : ControllerBase
         var id = Guid.NewGuid();
         await Exec(@"INSERT INTO ""HistoricalEvents"" (""Id"",""UserId"",""Title"",""GregorianDate"",""HijriDate"",""Location"",""Description"",""StrategicSignificance"",""OrderIndex"",""Category"")
             VALUES(@id,@uid,@ti,@gd,@hd,@lo,@de,@ss,@oi,@ca)",
-            [new("@id",id.ToString()),new("@uid",Uid),new("@ti",req.Title??""),
-             new("@gd",(object?)req.GregorianDate??DBNull.Value),new("@hd",(object?)req.HijriDate??DBNull.Value),
-             new("@lo",(object?)req.Location??DBNull.Value),new("@de",(object?)req.Description??DBNull.Value),
-             new("@ss",(object?)req.StrategicSignificance??DBNull.Value),
-             new("@oi",req.OrderIndex??0),new("@ca",req.Category??"")], ct);
+            [P("@id",id.ToString()),P("@uid",Uid),P("@ti",req.Title??""),
+             P("@gd",(object?)req.GregorianDate??DBNull.Value),P("@hd",(object?)req.HijriDate??DBNull.Value),
+             P("@lo",(object?)req.Location??DBNull.Value),P("@de",(object?)req.Description??DBNull.Value),
+             P("@ss",(object?)req.StrategicSignificance??DBNull.Value),
+             P("@oi",req.OrderIndex??0),P("@ca",req.Category??"")], ct);
         return Ok(new { id, title = req.Title });
     }
 
@@ -57,11 +57,11 @@ public class HistoricalEventsController : ControllerBase
             var id = Guid.NewGuid();
             await Exec(@"INSERT INTO ""HistoricalEvents"" (""Id"",""UserId"",""Title"",""GregorianDate"",""HijriDate"",""Location"",""Description"",""StrategicSignificance"",""OrderIndex"",""Category"")
                 VALUES(@id,@uid,@ti,@gd,@hd,@lo,@de,@ss,@oi,@ca)",
-                [new("@id",id.ToString()),new("@uid",Uid),new("@ti",req.Title??""),
-                 new("@gd",(object?)req.GregorianDate??DBNull.Value),new("@hd",(object?)req.HijriDate??DBNull.Value),
-                 new("@lo",(object?)req.Location??DBNull.Value),new("@de",(object?)req.Description??DBNull.Value),
-                 new("@ss",(object?)req.StrategicSignificance??DBNull.Value),
-                 new("@oi",req.OrderIndex??0),new("@ca",req.Category??"")], ct);
+                [P("@id",id.ToString()),P("@uid",Uid),P("@ti",req.Title??""),
+                 P("@gd",(object?)req.GregorianDate??DBNull.Value),P("@hd",(object?)req.HijriDate??DBNull.Value),
+                 P("@lo",(object?)req.Location??DBNull.Value),P("@de",(object?)req.Description??DBNull.Value),
+                 P("@ss",(object?)req.StrategicSignificance??DBNull.Value),
+                 P("@oi",req.OrderIndex??0),P("@ca",req.Category??"")], ct);
             ids.Add(new { id, title = req.Title });
         }
         return Ok(new { count = ids.Count, events = ids });
@@ -72,11 +72,11 @@ public class HistoricalEventsController : ControllerBase
     {
         var rows = await Exec(@"UPDATE ""HistoricalEvents"" SET ""Title""=@ti,""GregorianDate""=@gd,""HijriDate""=@hd,""Location""=@lo,
             ""Description""=@de,""StrategicSignificance""=@ss,""OrderIndex""=@oi,""Category""=@ca WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
-            [new("@id",id.ToString()),new("@uid",Uid),new("@ti",req.Title??""),
-             new("@gd",(object?)req.GregorianDate??DBNull.Value),new("@hd",(object?)req.HijriDate??DBNull.Value),
-             new("@lo",(object?)req.Location??DBNull.Value),new("@de",(object?)req.Description??DBNull.Value),
-             new("@ss",(object?)req.StrategicSignificance??DBNull.Value),
-             new("@oi",req.OrderIndex??0),new("@ca",req.Category??"")], ct);
+            [P("@id",id.ToString()),P("@uid",Uid),P("@ti",req.Title??""),
+             P("@gd",(object?)req.GregorianDate??DBNull.Value),P("@hd",(object?)req.HijriDate??DBNull.Value),
+             P("@lo",(object?)req.Location??DBNull.Value),P("@de",(object?)req.Description??DBNull.Value),
+             P("@ss",(object?)req.StrategicSignificance??DBNull.Value),
+             P("@oi",req.OrderIndex??0),P("@ca",req.Category??"")], ct);
         return rows > 0 ? Ok(new { id }) : NotFound();
     }
 
@@ -84,7 +84,7 @@ public class HistoricalEventsController : ControllerBase
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         var rows = await Exec("DELETE FROM \"HistoricalEvents\" WHERE \"Id\"=@id AND \"UserId\"=@uid",
-            [new("@id", id.ToString()), new("@uid", Uid)], ct);
+            [P("@id", id.ToString()), P("@uid", Uid)], ct);
         return rows > 0 ? NoContent() : NotFound();
     }
 
@@ -204,15 +204,15 @@ public class HistoricalEventsController : ControllerBase
         foreach (var e in events)
         {
             var check = await Query("SELECT \"Id\" FROM \"HistoricalEvents\" WHERE \"UserId\"=@uid AND \"OrderIndex\"=@oi AND \"Category\"='الحرب العالمية الأولى' LIMIT 1",
-                [new("@uid", Uid), new("@oi", e.Order)], ct);
+                [P("@uid", Uid), P("@oi", e.Order)], ct);
             if (check.Count > 0) continue;
 
             await Exec(@"INSERT INTO ""HistoricalEvents"" (""Id"",""UserId"",""Title"",""GregorianDate"",""HijriDate"",""Location"",""Description"",""StrategicSignificance"",""OrderIndex"",""Category"")
                 VALUES(@id,@uid,@ti,@gd,@hd,@lo,@de,@ss,@oi,@ca)",
-                [new("@id",Guid.NewGuid().ToString()),new("@uid",Uid),new("@ti",e.Title),
-                 new("@gd",e.GDate),new("@hd",e.HDate),new("@lo",e.Location),
-                 new("@de",e.Desc),new("@ss",e.Sig),new("@oi",e.Order),
-                 new("@ca","الحرب العالمية الأولى")], ct);
+                [P("@id",Guid.NewGuid().ToString()),P("@uid",Uid),P("@ti",e.Title),
+                 P("@gd",e.GDate),P("@hd",e.HDate),P("@lo",e.Location),
+                 P("@de",e.Desc),P("@ss",e.Sig),P("@oi",e.Order),
+                 P("@ca","الحرب العالمية الأولى")], ct);
             count++;
         }
         return Ok(new { message = $"تم إدخال {count} أحداث جديدة", count });
@@ -222,10 +222,16 @@ public class HistoricalEventsController : ControllerBase
     public async Task<IActionResult> GetCategories(CancellationToken ct)
     {
         return Ok(await Query("SELECT DISTINCT \"Category\" FROM \"HistoricalEvents\" WHERE \"UserId\"=@uid AND \"Category\"!='' ORDER BY \"Category\"",
-            [new("@uid", Uid)], ct));
+            [P("@uid", Uid)], ct));
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────
+
+    static NpgsqlParameter P(string n, object? v) =>
+        v is string s && Guid.TryParse(s, out var g)
+            ? new NpgsqlParameter(n, NpgsqlTypes.NpgsqlDbType.Uuid) { Value = g }
+            : new(n, v ?? DBNull.Value);
+
     private async Task<List<Dictionary<string, object?>>> Query(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection();

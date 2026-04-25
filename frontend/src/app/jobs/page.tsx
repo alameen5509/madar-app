@@ -15,7 +15,7 @@ export default function JobsPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    try { const data = await getCircles(); setCircles(data); } catch {}
+    try { const data = await getCircles(); setCircles(data); } catch (e: any) { console.error(e); }
     finally { setLoading(false); }
   }, []);
 
@@ -32,16 +32,16 @@ export default function JobsPage() {
       await createCircle({ name: newName.trim(), description: newDesc.trim() || undefined, tier: "Business", iconKey: "💼", colorHex: "#2D6B9E" } as CreateCirclePayload);
       setNewName(""); setNewDesc(""); setShowNew(false);
       fetchData();
-    } catch {}
+    } catch { alert("حدث خطأ"); }
   }
 
   async function toggleActive(job: LifeCircle) {
-    try { await updateCircle(job.id, { isActive: !job.isActive } as Partial<LifeCircle>); fetchData(); } catch {}
+    try { await updateCircle(job.id, { isActive: !job.isActive } as Partial<LifeCircle>); fetchData(); } catch { alert("حدث خطأ"); }
   }
 
   async function handleDelete(id: string) {
     if (!confirm("حذف هذه الوظيفة؟")) return;
-    try { await deleteCircle(id); fetchData(); } catch {}
+    try { await deleteCircle(id); fetchData(); } catch { alert("حدث خطأ"); }
   }
 
   return (

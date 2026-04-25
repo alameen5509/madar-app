@@ -85,7 +85,7 @@ function WorkSession({ items, onClose, onUpdate }: { items: SessionItem[]; onClo
   async function addNote() {
     const item = items[idx];
     if (!newNote.trim() || !item?.roleId) return;
-    try { await api.post(`/api/war-room/roles/${item.roleId}/notes`, { content: newNote }); setNewNote(""); } catch {}
+    try { await api.post(`/api/war-room/roles/${item.roleId}/notes`, { content: newNote }); setNewNote(""); } catch { alert("حدث خطأ"); }
   }
 
   async function updatePulse(status: string) {
@@ -97,7 +97,7 @@ function WorkSession({ items, onClose, onUpdate }: { items: SessionItem[]; onClo
       setPulseEdit(status);
       // Update item locally
       (item as { pulse: string }).pulse = status;
-    } catch {}
+    } catch { alert("حدث خطأ"); }
     setSavingPulse(false);
   }
 
@@ -282,14 +282,14 @@ function LeadershipSession({ items, onClose, onUpdate }: { items: SessionItem[];
           content: `📊 مراجعة: ${PULSE[review.status]?.label ?? review.status}${review.note ? ` — ${review.note}` : ""}${review.accomplishments ? ` | الإنجازات: ${review.accomplishments}` : ""}`,
         });
       }
-    } catch {}
+    } catch { alert("حدث خطأ"); }
     setSaving(false);
     next();
   }
 
   async function addSessionNote() {
     if (!newNote.trim() || !item.roleId) return;
-    try { await api.post(`/api/war-room/roles/${item.roleId}/notes`, { content: newNote }); setNewNote(""); } catch {}
+    try { await api.post(`/api/war-room/roles/${item.roleId}/notes`, { content: newNote }); setNewNote(""); } catch { alert("حدث خطأ"); }
   }
 
   function next() { if (idx < items.length - 1) setIdx(idx + 1); else { onUpdate(); onClose(); } }
@@ -428,14 +428,14 @@ export default function WarRoomIndexPage() {
         (r: Role) => r.workId === item.id && !r.isAuto && !r.id.startsWith("auto-")
       );
       if (existing) return existing.id;
-    } catch {}
+    } catch (e: any) { console.error(e); }
     // Create a real leadership role
     try {
       const { data } = await api.post("/api/war-room/roles", {
         title: item.name, workId: item.id, reviewFrequency: "weekly", color: item.color, icon: item.icon,
       });
       return data.id;
-    } catch { return undefined; }
+    } catch (e: any) { console.error(e); return undefined; }
   }
 
   async function startSession(mode: "review" | "work" = "review") {
@@ -489,7 +489,7 @@ export default function WarRoomIndexPage() {
       setWorks(Array.isArray(w) ? w : []);
       const allCircles: Circle[] = (Array.isArray(cg) ? cg : []).flatMap((g: { circles?: Circle[] }) => g.circles ?? []);
       setCircles(allCircles);
-    } catch {}
+    } catch (e: any) { console.error(e); }
     setLoading(false);
   }, []);
 

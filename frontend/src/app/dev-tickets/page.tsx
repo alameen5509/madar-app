@@ -47,7 +47,7 @@ export default function DevTicketsPage() {
       ]);
       setTickets(t ?? []);
       setContext(c?.content ?? "");
-    } catch {}
+    } catch (e: any) { console.error(e); }
     setLoading(false);
   }, []);
 
@@ -64,20 +64,20 @@ export default function DevTicketsPage() {
   }
 
   async function handleResolve(id: string) {
-    try { await api.patch("/api/dev-tickets/" + id + "/resolve"); fetchData(); } catch {}
+    try { await api.patch("/api/dev-tickets/" + id + "/resolve"); fetchData(); } catch { alert("حدث خطأ"); }
   }
 
   async function handleNotModified(id: string) {
-    try { await api.patch("/api/dev-tickets/" + id + "/not-modified"); fetchData(); } catch {}
+    try { await api.patch("/api/dev-tickets/" + id + "/not-modified"); fetchData(); } catch { alert("حدث خطأ"); }
   }
 
   async function handleDelete(id: string) {
     if (!confirm("حذف التذكرة؟")) return;
-    try { await api.delete("/api/dev-tickets/" + id); fetchData(); } catch {}
+    try { await api.delete("/api/dev-tickets/" + id); fetchData(); } catch { alert("حدث خطأ"); }
   }
 
   async function updateCommand(id: string) {
-    try { await api.put("/api/dev-tickets/" + id, { command: editCmd }); setEditId(null); fetchData(); } catch {}
+    try { await api.put("/api/dev-tickets/" + id, { command: editCmd }); setEditId(null); fetchData(); } catch { alert("حدث خطأ"); }
   }
 
   async function saveContext() {

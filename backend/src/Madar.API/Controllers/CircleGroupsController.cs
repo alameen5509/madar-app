@@ -26,12 +26,12 @@ public class CircleGroupsController : ControllerBase
         var groups = await Q(@"SELECT * FROM ""CircleGroups""
             WHERE ""UserId""::text=@uid OR ""UserId""::text=@uidLower
             ORDER BY ""Priority"", ""CreatedAt""",
-            [new("@uid", uid), new("@uidLower", uid.ToLowerInvariant())], ct);
+            [P("@uid", uid), P("@uidLower", uid.ToLowerInvariant())], ct);
 
         var circles = await Q(@"SELECT * FROM ""UserCircles""
             WHERE ""UserId""::text=@uid OR ""UserId""::text=@uidLower
             ORDER BY ""Priority"", ""CreatedAt""",
-            [new("@uid", uid), new("@uidLower", uid.ToLowerInvariant())], ct);
+            [P("@uid", uid), P("@uidLower", uid.ToLowerInvariant())], ct);
 
         // Nest circles inside groups
         var result = groups.Select(g => {
@@ -51,9 +51,9 @@ public class CircleGroupsController : ControllerBase
         var id = Guid.NewGuid();
         await E(@"INSERT INTO ""CircleGroups"" (""Id"",""UserId"",""Name"",""Color"",""Icon"",""Priority"")
             VALUES(@id,@uid,@n,@c,@i,@p)",
-            [new("@id",id.ToString()),new("@uid",Uid),new("@n",req.Name??""),
-             new("@c",(object?)req.Color??DBNull.Value),new("@i",(object?)req.Icon??DBNull.Value),
-             new("@p",req.Priority??0)], ct);
+            [P("@id",id.ToString()),P("@uid",Uid),P("@n",req.Name??""),
+             P("@c",(object?)req.Color??DBNull.Value),P("@i",(object?)req.Icon??DBNull.Value),
+             P("@p",req.Priority??0)], ct);
         return Ok(new { id, name = req.Name });
     }
 
@@ -62,9 +62,9 @@ public class CircleGroupsController : ControllerBase
     {
         var rows = await E(@"UPDATE ""CircleGroups"" SET ""Name""=COALESCE(@n,""Name""),""Color""=COALESCE(@c,""Color""),
             ""Icon""=COALESCE(@i,""Icon""),""Priority""=COALESCE(@p,""Priority"") WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
-            [new("@id",id.ToString()),new("@uid",Uid),new("@n",(object?)req.Name??DBNull.Value),
-             new("@c",(object?)req.Color??DBNull.Value),new("@i",(object?)req.Icon??DBNull.Value),
-             new("@p",(object?)req.Priority??DBNull.Value)], ct);
+            [P("@id",id.ToString()),P("@uid",Uid),P("@n",(object?)req.Name??DBNull.Value),
+             P("@c",(object?)req.Color??DBNull.Value),P("@i",(object?)req.Icon??DBNull.Value),
+             P("@p",(object?)req.Priority??DBNull.Value)], ct);
         return rows > 0 ? Ok(new { id }) : NotFound();
     }
 
@@ -72,9 +72,9 @@ public class CircleGroupsController : ControllerBase
     public async Task<IActionResult> DeleteGroup(Guid id, CancellationToken ct)
     {
         await E("DELETE FROM \"UserCircles\" WHERE \"GroupId\"=@gid AND \"UserId\"=@uid",
-            [new("@gid",id.ToString()),new("@uid",Uid)], ct);
+            [P("@gid",id.ToString()),P("@uid",Uid)], ct);
         var rows = await E("DELETE FROM \"CircleGroups\" WHERE \"Id\"=@id AND \"UserId\"=@uid",
-            [new("@id",id.ToString()),new("@uid",Uid)], ct);
+            [P("@id",id.ToString()),P("@uid",Uid)], ct);
         return rows > 0 ? NoContent() : NotFound();
     }
 
@@ -87,10 +87,10 @@ public class CircleGroupsController : ControllerBase
         var slug = (req.Slug ?? req.Name ?? "").Trim().ToLowerInvariant().Replace(" ", "-");
         await E(@"INSERT INTO ""UserCircles"" (""Id"",""UserId"",""GroupId"",""Name"",""Color"",""Icon"",""Slug"",""Priority"")
             VALUES(@id,@uid,@gid,@n,@c,@i,@s,@p)",
-            [new("@id",id.ToString()),new("@uid",Uid),new("@gid",groupId.ToString()),
-             new("@n",req.Name??""),new("@c",(object?)req.Color??DBNull.Value),
-             new("@i",(object?)req.Icon??DBNull.Value),new("@s",slug),
-             new("@p",req.Priority??0)], ct);
+            [P("@id",id.ToString()),P("@uid",Uid),P("@gid",groupId.ToString()),
+             P("@n",req.Name??""),P("@c",(object?)req.Color??DBNull.Value),
+             P("@i",(object?)req.Icon??DBNull.Value),P("@s",slug),
+             P("@p",req.Priority??0)], ct);
         return Ok(new { id, name = req.Name, slug });
     }
 
@@ -101,9 +101,9 @@ public class CircleGroupsController : ControllerBase
         var rows = await E(@"UPDATE ""UserCircles"" SET ""Name""=COALESCE(@n,""Name""),""Color""=COALESCE(@c,""Color""),
             ""Icon""=COALESCE(@i,""Icon""),""Slug""=COALESCE(@s,""Slug""),""Priority""=COALESCE(@p,""Priority"")
             WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
-            [new("@id",id.ToString()),new("@uid",Uid),new("@n",(object?)req.Name??DBNull.Value),
-             new("@c",(object?)req.Color??DBNull.Value),new("@i",(object?)req.Icon??DBNull.Value),
-             new("@s",(object?)slug??DBNull.Value),new("@p",(object?)req.Priority??DBNull.Value)], ct);
+            [P("@id",id.ToString()),P("@uid",Uid),P("@n",(object?)req.Name??DBNull.Value),
+             P("@c",(object?)req.Color??DBNull.Value),P("@i",(object?)req.Icon??DBNull.Value),
+             P("@s",(object?)slug??DBNull.Value),P("@p",(object?)req.Priority??DBNull.Value)], ct);
         return rows > 0 ? Ok(new { id }) : NotFound();
     }
 
@@ -111,7 +111,7 @@ public class CircleGroupsController : ControllerBase
     public async Task<IActionResult> DeleteCircle(Guid id, CancellationToken ct)
     {
         var rows = await E("DELETE FROM \"UserCircles\" WHERE \"Id\"=@id AND \"UserId\"=@uid",
-            [new("@id",id.ToString()),new("@uid",Uid)], ct);
+            [P("@id",id.ToString()),P("@uid",Uid)], ct);
         return rows > 0 ? NoContent() : NotFound();
     }
 
@@ -122,11 +122,16 @@ public class CircleGroupsController : ControllerBase
         // have NULL slugs, so the frontend falls back to linking by Id).
         var rows = await Q(
             "SELECT * FROM \"UserCircles\" WHERE (\"Slug\"=@s OR \"Id\"=@s) AND \"UserId\"=@uid LIMIT 1",
-            [new("@s", slugOrId), new("@uid", Uid)], ct);
+            [P("@s", slugOrId), P("@uid", Uid)], ct);
         return rows.Count > 0 ? Ok(rows[0]) : NotFound();
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────
+
+    static NpgsqlParameter P(string n, object? v) =>
+        v is string s && Guid.TryParse(s, out var g)
+            ? new NpgsqlParameter(n, NpgsqlTypes.NpgsqlDbType.Uuid) { Value = g }
+            : new(n, v ?? DBNull.Value);
 
     private async Task<List<Dictionary<string, object?>>> Q(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {

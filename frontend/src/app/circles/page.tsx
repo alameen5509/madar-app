@@ -30,7 +30,7 @@ export default function CirclesPage() {
     try {
       const { data } = await api.get("/api/circle-groups");
       setGroups(data ?? []);
-    } catch {}
+    } catch (e: any) { console.error(e); }
     setLoading(false);
   }, []);
 
