@@ -100,6 +100,27 @@ public class WebProjectsController : ControllerBase
     }
 
     // ═══ DIAGNOSTICS ═══
+    [AllowAnonymous]
+    [HttpGet("health")]
+    public async Task<IActionResult> Health(CancellationToken ct)
+    {
+        try {
+            var testId = NewId();
+            var uid = "health-check";
+            // Test INSERT
+            await E(@"INSERT INTO ""WebProjects"" (""Id"",""OwnerId"",""Title"",""ClientName"",""Description"",""CurrentPhase"",""Status"",""Priority"",""CreatedAt"",""UpdatedAt"")
+                VALUES(@id,@uid,'__health_test__',NULL,NULL,1,'active','medium',NOW(),NOW())",
+                [P("@id",testId),P("@uid",uid)], ct);
+            // Test SELECT
+            var rows = await Q("SELECT \"Id\",\"Title\" FROM \"WebProjects\" WHERE \"Id\"::text=@id", Ps("@id",testId), ct);
+            // Test DELETE
+            var deleted = await E("DELETE FROM \"WebProjects\" WHERE \"Id\"::text=@id", Ps("@id",testId), ct);
+            return Ok(new { status = "ok", inserted = true, found = rows.Count, deleted, version = "2026-04-25-v2" });
+        } catch (Exception ex) {
+            return Ok(new { status = "error", error = ex.Message, inner = ex.InnerException?.Message, version = "2026-04-25-v2" });
+        }
+    }
+
     [HttpGet("whoami")]
     public async Task<IActionResult> WhoAmI(CancellationToken ct)
     {
