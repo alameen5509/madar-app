@@ -56,7 +56,7 @@ public class PhoneAddictionController : ControllerBase
     [HttpGet("logs")]
     public async Task<IActionResult> GetLogs([FromQuery] int days = 30, CancellationToken ct = default)
     {
-        var rows = await Q("SELECT * FROM \"ScreenTimeLogs\" WHERE \"UserId\"=@uid AND \"Date\" >= DATE_SUB(CURDATE(), INTERVAL @d DAY) ORDER BY \"Date\" DESC",
+        var rows = await Q("SELECT * FROM \"ScreenTimeLogs\" WHERE \"UserId\"=@uid AND \"Date\" >= CURRENT_DATE - CAST(@d AS INTEGER) * INTERVAL '1 day' ORDER BY \"Date\" DESC",
             [P("@uid", Uid), P("@d", days)], ct);
         return Ok(rows);
     }
@@ -234,11 +234,11 @@ public class PhoneAddictionController : ControllerBase
     public async Task<IActionResult> GetStats(CancellationToken ct)
     {
         var goal = await Q("SELECT * FROM \"ScreenTimeGoals\" WHERE \"UserId\"=@uid AND \"Status\"='active' LIMIT 1", Ps("@uid", Uid), ct);
-        var todayLog = await Q("SELECT * FROM \"ScreenTimeLogs\" WHERE \"UserId\"=@uid AND \"Date\"=CURDATE() LIMIT 1", Ps("@uid", Uid), ct);
-        var yesterdayLog = await Q("SELECT * FROM \"ScreenTimeLogs\" WHERE \"UserId\"=@uid AND \"Date\"=DATE_SUB(CURDATE(), INTERVAL 1 DAY) LIMIT 1", Ps("@uid", Uid), ct);
-        var last7 = await Q("SELECT \"Date\", \"ActualMinutes\", \"TargetMinutes\" FROM \"ScreenTimeLogs\" WHERE \"UserId\"=@uid AND \"Date\" >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) ORDER BY \"Date\"", Ps("@uid", Uid), ct);
+        var todayLog = await Q("SELECT * FROM \"ScreenTimeLogs\" WHERE \"UserId\"=@uid AND \"Date\"=CURRENT_DATE LIMIT 1", Ps("@uid", Uid), ct);
+        var yesterdayLog = await Q("SELECT * FROM \"ScreenTimeLogs\" WHERE \"UserId\"=@uid AND \"Date\"=CURRENT_DATE - INTERVAL '1 day' LIMIT 1", Ps("@uid", Uid), ct);
+        var last7 = await Q("SELECT \"Date\", \"ActualMinutes\", \"TargetMinutes\" FROM \"ScreenTimeLogs\" WHERE \"UserId\"=@uid AND \"Date\" >= CURRENT_DATE - INTERVAL '7 days' ORDER BY \"Date\"", Ps("@uid", Uid), ct);
         var streak = await Q(@"SELECT COUNT(*) as c FROM (
-            SELECT ""Date"", ""ActualMinutes"", ""TargetMinutes"" FROM ""ScreenTimeLogs"" WHERE ""UserId""::text=@uid AND ""Date"" <= CURDATE() ORDER BY ""Date"" DESC LIMIT 30
+            SELECT ""Date"", ""ActualMinutes"", ""TargetMinutes"" FROM ""ScreenTimeLogs"" WHERE ""UserId""::text=@uid AND ""Date"" <= CURRENT_DATE ORDER BY ""Date"" DESC LIMIT 30
         ) t WHERE ""ActualMinutes"" <= ""TargetMinutes""", Ps("@uid", Uid), ct);
         var triggers = await Q("SELECT COUNT(*) as c FROM \"PhoneTriggers\" WHERE \"UserId\"=@uid", Ps("@uid", Uid), ct);
         var zones = await Q("SELECT COUNT(*) as c FROM \"PhoneFreeZones\" WHERE \"UserId\"=@uid AND \"IsActive\"=1", Ps("@uid", Uid), ct);

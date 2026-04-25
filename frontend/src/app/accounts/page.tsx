@@ -45,7 +45,7 @@ export default function AccountsPage() {
     if (!newEmail.trim() || !newName.trim() || !newPass.trim()) { setAddError("جميع الحقول مطلوبة"); return; }
     setAddError(""); setAddSuccess("");
     try {
-      await api.post("/auth/register", { fullName: newName.trim(), email: newEmail.trim(), password: newPass, role: "User" });
+      await api.post("/api/auth/register", { fullName: newName.trim(), email: newEmail.trim(), password: newPass, role: "User" });
       setAddSuccess(`تم إنشاء حساب ${newName.trim()} بنجاح`);
       setNewEmail(""); setNewName(""); setNewPass("");
       loadUsers();

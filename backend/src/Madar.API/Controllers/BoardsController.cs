@@ -25,7 +25,7 @@ public class BoardsController : ControllerBase
     {
         var q = _db.Database.GetDbConnection();
         // Use raw SQL since Boards is not in EF model
-        var sql = "SELECT Id, Name, EntityType, EntityId, Data, CreatedAt, UpdatedAt FROM Boards WHERE UserId = @uid";
+        var sql = @"SELECT ""Id"", ""Name"", ""EntityType"", ""EntityId"", ""Data"", ""CreatedAt"", ""UpdatedAt"" FROM ""Boards"" WHERE ""UserId"" = @uid";
         var parameters = new List<NpgsqlParameter>
         {
             P("@uid", UserId.ToString()),
@@ -33,15 +33,15 @@ public class BoardsController : ControllerBase
 
         if (!string.IsNullOrEmpty(entityType))
         {
-            sql += " AND EntityType = @et";
+            sql += @" AND ""EntityType"" = @et";
             parameters.Add(P("@et", entityType));
         }
         if (entityId.HasValue)
         {
-            sql += " AND EntityId = @eid";
+            sql += @" AND ""EntityId"" = @eid";
             parameters.Add(P("@eid", entityId.Value.ToString()));
         }
-        sql += " ORDER BY UpdatedAt DESC";
+        sql += @" ORDER BY ""UpdatedAt"" DESC";
 
         var boards = new List<object>();
         await q.OpenAsync(ct);
@@ -81,7 +81,7 @@ public class BoardsController : ControllerBase
         try
         {
             using var cmd = q.CreateCommand();
-            cmd.CommandText = "SELECT Id, Name, EntityType, EntityId, Data, CreatedAt, UpdatedAt FROM Boards WHERE Id = @id AND UserId = @uid";
+            cmd.CommandText = @"SELECT ""Id"", ""Name"", ""EntityType"", ""EntityId"", ""Data"", ""CreatedAt"", ""UpdatedAt"" FROM ""Boards"" WHERE ""Id"" = @id AND ""UserId"" = @uid";
             cmd.Parameters.Add(P("@id", id.ToString()));
             cmd.Parameters.Add(P("@uid", UserId.ToString()));
 
@@ -113,7 +113,7 @@ public class BoardsController : ControllerBase
         try
         {
             using var cmd = q.CreateCommand();
-            cmd.CommandText = @"INSERT INTO Boards (Id, UserId, Name, EntityType, EntityId, Data, CreatedAt, UpdatedAt)
+            cmd.CommandText = @"INSERT INTO ""Boards"" (""Id"", ""UserId"", ""Name"", ""EntityType"", ""EntityId"", ""Data"", ""CreatedAt"", ""UpdatedAt"")
                                 VALUES (@id, @uid, @name, @et, @eid, @data, @now, @now)";
             cmd.Parameters.Add(P("@id", id.ToString()));
             cmd.Parameters.Add(P("@uid", UserId.ToString()));
@@ -138,8 +138,8 @@ public class BoardsController : ControllerBase
         try
         {
             using var cmd = q.CreateCommand();
-            cmd.CommandText = @"UPDATE Boards SET Data = @data, Name = COALESCE(@name, Name), UpdatedAt = @now
-                                WHERE Id = @id AND UserId = @uid";
+            cmd.CommandText = @"UPDATE ""Boards"" SET ""Data"" = @data, ""Name"" = COALESCE(@name, ""Name""), ""UpdatedAt"" = @now
+                                WHERE ""Id"" = @id AND ""UserId"" = @uid";
             cmd.Parameters.Add(P("@data", req.Data ?? (object)DBNull.Value));
             cmd.Parameters.Add(P("@name", req.Name ?? (object)DBNull.Value));
             cmd.Parameters.Add(P("@now", DateTime.UtcNow));
@@ -162,7 +162,7 @@ public class BoardsController : ControllerBase
         try
         {
             using var cmd = q.CreateCommand();
-            cmd.CommandText = "DELETE FROM Boards WHERE Id = @id AND UserId = @uid";
+            cmd.CommandText = @"DELETE FROM ""Boards"" WHERE ""Id"" = @id AND ""UserId"" = @uid";
             cmd.Parameters.Add(P("@id", id.ToString()));
             cmd.Parameters.Add(P("@uid", UserId.ToString()));
             var rows = await cmd.ExecuteNonQueryAsync(ct);

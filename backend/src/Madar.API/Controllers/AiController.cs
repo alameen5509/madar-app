@@ -2,11 +2,13 @@ using Madar.Application.Interfaces;
 using Madar.Domain.Entities.Core;
 using Madar.Domain.Enums;
 using Madar.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Madar.API.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class AiController : ControllerBase

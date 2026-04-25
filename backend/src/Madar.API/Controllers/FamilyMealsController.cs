@@ -18,13 +18,13 @@ public class FamilyMealsController : ControllerBase
 
     [HttpGet("members")]
     public async Task<IActionResult> GetMembers(CancellationToken ct) =>
-        Ok(await Q("SELECT * FROM FamilyMembers WHERE UserId=@uid AND IsActive=1 ORDER BY Name", Ps("@uid",Uid), ct));
+        Ok(await Q(@"SELECT * FROM ""FamilyMembers"" WHERE ""UserId""=@uid AND ""IsActive""=1 ORDER BY ""Name""", Ps("@uid",Uid), ct));
 
     [HttpPost("members")]
     public async Task<IActionResult> CreateMember([FromBody] MemberReq req, CancellationToken ct)
     {
         var id = NewId();
-        await E("INSERT INTO FamilyMembers (Id,UserId,Name,Relationship,BirthDate,Gender,Notes) VALUES(@id,@uid,@n,@r,@bd,@g,@nt)",
+        await E(@"INSERT INTO ""FamilyMembers"" (""Id"",""UserId"",""Name"",""Relationship"",""BirthDate"",""Gender"",""Notes"") VALUES(@id,@uid,@n,@r,@bd,@g,@nt)",
             [P("@id",id),P("@uid",Uid),P("@n",req.Name),P("@r",req.Relationship),P("@bd",req.BirthDate),P("@g",req.Gender),P("@nt",req.Notes)], ct);
         return Ok(new { id, name = req.Name });
     }
@@ -32,7 +32,7 @@ public class FamilyMealsController : ControllerBase
     [HttpPut("members/{id}")]
     public async Task<IActionResult> UpdateMember(string id, [FromBody] MemberReq req, CancellationToken ct)
     {
-        var rows = await E("UPDATE FamilyMembers SET Name=COALESCE(@n,Name),Relationship=COALESCE(@r,Relationship),Gender=COALESCE(@g,Gender),Notes=COALESCE(@nt,Notes) WHERE Id=@id AND UserId=@uid",
+        var rows = await E(@"UPDATE ""FamilyMembers"" SET ""Name""=COALESCE(@n,""Name""),""Relationship""=COALESCE(@r,""Relationship""),""Gender""=COALESCE(@g,""Gender""),""Notes""=COALESCE(@nt,""Notes"") WHERE ""Id""=@id AND ""UserId""=@uid",
             [P("@id",id),P("@uid",Uid),P("@n",req.Name),P("@r",req.Relationship),P("@g",req.Gender),P("@nt",req.Notes)], ct);
         return rows > 0 ? Ok(new { id }) : NotFound();
     }
@@ -40,8 +40,8 @@ public class FamilyMealsController : ControllerBase
     [HttpDelete("members/{id}")]
     public async Task<IActionResult> DeleteMember(string id, CancellationToken ct)
     {
-        await E("DELETE FROM PersonalMealPlans WHERE MemberId=@id", Ps("@id",id), ct);
-        return (await E("DELETE FROM FamilyMembers WHERE Id=@id AND UserId=@uid", [P("@id",id),P("@uid",Uid)], ct)) > 0 ? NoContent() : NotFound();
+        await E(@"DELETE FROM ""PersonalMealPlans"" WHERE ""MemberId""=@id", Ps("@id",id), ct);
+        return (await E(@"DELETE FROM ""FamilyMembers"" WHERE ""Id""=@id AND ""UserId""=@uid", [P("@id",id),P("@uid",Uid)], ct)) > 0 ? NoContent() : NotFound();
     }
 
     // ═══ PERSONAL MEAL PLANS ═════════════════════════════════════════
@@ -84,7 +84,7 @@ public class FamilyMealsController : ControllerBase
 
     [HttpDelete("plans/{id}")]
     public async Task<IActionResult> DeletePlan(string id, CancellationToken ct) =>
-        (await E("DELETE FROM PersonalMealPlans WHERE Id=@id AND UserId=@uid", [P("@id",id),P("@uid",Uid)], ct)) > 0 ? NoContent() : NotFound();
+        (await E(@"DELETE FROM ""PersonalMealPlans"" WHERE ""Id""=@id AND ""UserId""=@uid", [P("@id",id),P("@uid",Uid)], ct)) > 0 ? NoContent() : NotFound();
 
     // Helpers
     static string NewId() => Guid.NewGuid().ToString();
