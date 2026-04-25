@@ -236,7 +236,10 @@ public class WorksController : ControllerBase
     }
 
     // ═══ Raw SQL helpers ═══
-    static NpgsqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);
+    static NpgsqlParameter P(string n, object? v) =>
+        v is string s && Guid.TryParse(s, out var g)
+            ? new NpgsqlParameter(n, NpgsqlTypes.NpgsqlDbType.Uuid) { Value = g }
+            : new(n, v ?? DBNull.Value);
 
     private async Task<int> Exec(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {

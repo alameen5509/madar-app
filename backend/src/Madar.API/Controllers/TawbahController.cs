@@ -152,7 +152,10 @@ public class TawbahController : ControllerBase
 
     // Helpers
     static string NewId() => Guid.NewGuid().ToString();
-    static NpgsqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);
+    static NpgsqlParameter P(string n, object? v) =>
+        v is string s && Guid.TryParse(s, out var g)
+            ? new NpgsqlParameter(n, NpgsqlTypes.NpgsqlDbType.Uuid) { Value = g }
+            : new(n, v ?? DBNull.Value);
     static List<NpgsqlParameter> Ps(string n, object? v) => [P(n, v)];
     private async Task<List<Dictionary<string, object?>>> Q(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     { var conn = _db.Database.GetDbConnection(); var w = conn.State == System.Data.ConnectionState.Open; if (!w) await conn.OpenAsync(ct);

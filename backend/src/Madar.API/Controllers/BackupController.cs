@@ -65,7 +65,10 @@ public class BackupController : ControllerBase
         Ok(await Q("SELECT * FROM \"BackupLogs\" WHERE \"UserId\"=@uid ORDER BY \"BackupDate\" DESC LIMIT 20", Ps("@uid", Uid), ct));
 
     // Helpers
-    static NpgsqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);
+    static NpgsqlParameter P(string n, object? v) =>
+        v is string s && Guid.TryParse(s, out var g)
+            ? new NpgsqlParameter(n, NpgsqlTypes.NpgsqlDbType.Uuid) { Value = g }
+            : new(n, v ?? DBNull.Value);
     static List<NpgsqlParameter> Ps(string n, object? v) => [P(n, v)];
     private async Task<List<Dictionary<string, object?>>> Q(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     { var c = _db.Database.GetDbConnection(); var w = c.State == System.Data.ConnectionState.Open; if (!w) await c.OpenAsync(ct);

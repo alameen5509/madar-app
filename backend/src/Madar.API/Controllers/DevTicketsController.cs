@@ -22,7 +22,7 @@ public class DevTicketsController : ControllerBase
         var rows = await Q(@"SELECT * FROM ""DevTickets"" WHERE ""UserId""::text=@uid ORDER BY
             CASE ""Status"" WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'failed' THEN 2 ELSE 3 END,
             ""CreatedAt"" DESC",
-            [new("@uid", Uid)], ct);
+            [P("@uid", Uid)], ct);
         return Ok(rows);
     }
 
@@ -33,8 +33,8 @@ public class DevTicketsController : ControllerBase
         var id = Guid.NewGuid().ToString();
         await E(@"INSERT INTO ""DevTickets"" (""Id"",""UserId"",""Title"",""UserRequest"",""AiCommand"",""Status"",""Attempts"",""CreatedAt"",""UpdatedAt"")
             VALUES(@id,@uid,@t,@ur,@cmd,'open',0,NOW(),NOW())",
-            [new("@id",id),new("@uid",Uid),new("@t",req.Title),
-             new("@ur",(object?)req.Description??DBNull.Value),new("@cmd",(object?)req.Command??DBNull.Value)], ct);
+            [P("@id",id),P("@uid",Uid),P("@t",req.Title),
+             P("@ur",req.Description),P("@cmd",req.Command)], ct);
         return Ok(new { id, title = req.Title, command = req.Command, status = "open" });
     }
 
@@ -45,9 +45,9 @@ public class DevTicketsController : ControllerBase
             ""Title""=COALESCE(@t,""Title""), ""UserRequest""=COALESCE(@ur,""UserRequest""),
             ""AiCommand""=COALESCE(@cmd,""AiCommand""), ""Status""=COALESCE(@st,""Status""), ""UpdatedAt""=NOW()
             WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
-            [new("@id",id),new("@uid",Uid),new("@t",(object?)req.Title??DBNull.Value),
-             new("@ur",(object?)req.Description??DBNull.Value),new("@cmd",(object?)req.Command??DBNull.Value),
-             new("@st",(object?)req.Status??DBNull.Value)], ct);
+            [P("@id",id),P("@uid",Uid),new("@t",(object?)req.Title??DBNull.Value),
+             P("@ur",req.Description),P("@cmd",req.Command),
+             P("@st",req.Status)], ct);
         return rows > 0 ? Ok(new { id }) : NotFound();
     }
 
@@ -55,7 +55,7 @@ public class DevTicketsController : ControllerBase
     public async Task<IActionResult> Resolve(string id, CancellationToken ct)
     {
         var rows = await E(@"UPDATE ""DevTickets"" SET ""Status""='resolved', ""ResolvedAt""=NOW(), ""UpdatedAt""=NOW()
-            WHERE ""Id""::text=@id AND ""UserId""::text=@uid", [new("@id",id),new("@uid",Uid)], ct);
+            WHERE ""Id""::text=@id AND ""UserId""::text=@uid", [P("@id",id),P("@uid",Uid)], ct);
         return rows > 0 ? Ok(new { id, status = "resolved" }) : NotFound();
     }
 
@@ -63,15 +63,15 @@ public class DevTicketsController : ControllerBase
     public async Task<IActionResult> NotModified(string id, CancellationToken ct)
     {
         var rows = await E(@"UPDATE ""DevTickets"" SET ""Status""='not_modified', ""UpdatedAt""=NOW()
-            WHERE ""Id""::text=@id AND ""UserId""::text=@uid", [new("@id",id),new("@uid",Uid)], ct);
+            WHERE ""Id""::text=@id AND ""UserId""::text=@uid", [P("@id",id),P("@uid",Uid)], ct);
         return rows > 0 ? Ok(new { id, status = "not_modified" }) : NotFound();
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id, CancellationToken ct)
     {
-        await E("DELETE FROM \"DevTicketHistory\" WHERE \"TicketId\"=@id", [new("@id",id)], ct);
-        return (await E("DELETE FROM \"DevTickets\" WHERE \"Id\"=@id AND \"UserId\"=@uid", [new("@id",id),new("@uid",Uid)], ct)) > 0
+        await E("DELETE FROM \"DevTicketHistory\" WHERE \"TicketId\"=@id", [P("@id",id)], ct);
+        return (await E("DELETE FROM \"DevTickets\" WHERE \"Id\"=@id AND \"UserId\"=@uid", [P("@id",id),P("@uid",Uid)], ct)) > 0
             ? NoContent() : NotFound();
     }
 
@@ -79,24 +79,29 @@ public class DevTicketsController : ControllerBase
     [HttpGet("context")]
     public async Task<IActionResult> GetContext(CancellationToken ct)
     {
-        var rows = await Q("SELECT * FROM \"DevContext\" WHERE \"UserId\"=@uid AND \"IsActive\"=1 LIMIT 1", [new("@uid", Uid)], ct);
+        var rows = await Q("SELECT * FROM \"DevContext\" WHERE \"UserId\"=@uid AND \"IsActive\"=1 LIMIT 1", [P("@uid", Uid)], ct);
         return Ok(rows.Count > 0 ? rows[0] : new Dictionary<string, object?> { ["content"] = "" });
     }
 
     [HttpPut("context")]
     public async Task<IActionResult> SaveContext([FromBody] ContextReq req, CancellationToken ct)
     {
-        var existing = await Q("SELECT \"Id\" FROM \"DevContext\" WHERE \"UserId\"=@uid AND \"IsActive\"=1 LIMIT 1", [new("@uid", Uid)], ct);
+        var existing = await Q("SELECT \"Id\" FROM \"DevContext\" WHERE \"UserId\"=@uid AND \"IsActive\"=1 LIMIT 1", [P("@uid", Uid)], ct);
         if (existing.Count > 0)
             await E("UPDATE \"DevContext\" SET \"Content\"=@c, \"UpdatedAt\"=NOW() WHERE \"Id\"=@id",
-                [new("@id", existing[0]["id"]!.ToString()!), new("@c", req.Content ?? "")], ct);
+                [P("@id", existing[0]["id"]!.ToString()!), P("@c", req.Content ?? "")], ct);
         else
             await E("INSERT INTO \"DevContext\" (\"Id\",\"UserId\",\"Content\",\"IsActive\",\"UpdatedAt\") VALUES(@id,@uid,@c,1,NOW())",
-                [new("@id", Guid.NewGuid().ToString()), new("@uid", Uid), new("@c", req.Content ?? "")], ct);
+                [P("@id", Guid.NewGuid().ToString()), P("@uid", Uid), P("@c", req.Content ?? "")], ct);
         return Ok(new { saved = true });
     }
 
     // Helpers
+    static NpgsqlParameter P(string n, object? v) =>
+        v is string s && Guid.TryParse(s, out var g)
+            ? new NpgsqlParameter(n, NpgsqlTypes.NpgsqlDbType.Uuid) { Value = g }
+            : new(n, v ?? DBNull.Value);
+
     private async Task<List<Dictionary<string, object?>>> Q(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection(); var w = conn.State == System.Data.ConnectionState.Open; if (!w) await conn.OpenAsync(ct);

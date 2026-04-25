@@ -148,7 +148,10 @@ public class RemindersController : ControllerBase
         };
     }
 
-    static NpgsqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);
+    static NpgsqlParameter P(string n, object? v) =>
+        v is string s && Guid.TryParse(s, out var g)
+            ? new NpgsqlParameter(n, NpgsqlTypes.NpgsqlDbType.Uuid) { Value = g }
+            : new(n, v ?? DBNull.Value);
     static List<NpgsqlParameter> Ps(string n, object? v) => [P(n, v)];
 
     private async Task<List<Dictionary<string, object?>>> Q(string sql, List<NpgsqlParameter> ps, CancellationToken ct)

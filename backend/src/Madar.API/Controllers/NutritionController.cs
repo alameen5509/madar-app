@@ -300,7 +300,10 @@ public class NutritionController : ControllerBase
 
     static string NewId() => Guid.NewGuid().ToString();
     static DateTime StartOfWeek(DateTime dt) { int diff = ((int)dt.DayOfWeek + 1) % 7; return dt.AddDays(-diff).Date; }
-    static NpgsqlParameter P(string name, object? val) => new(name, val ?? DBNull.Value);
+    static NpgsqlParameter P(string name, object? val) =>
+        val is string s && Guid.TryParse(s, out var g)
+            ? new NpgsqlParameter(name, NpgsqlTypes.NpgsqlDbType.Uuid) { Value = g }
+            : new(name, val ?? DBNull.Value);
     static List<NpgsqlParameter> Ps(string n, object? v) => [P(n, v)];
 
     private async Task<List<Dictionary<string, object?>>> Q(string sql, List<NpgsqlParameter> ps, CancellationToken ct)

@@ -5,6 +5,8 @@ using Madar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using NpgsqlTypes;
 
 namespace Madar.API.Controllers;
 
@@ -76,7 +78,8 @@ public class GoalsController : BaseController
             try
             {
                 using var cmd = conn.CreateCommand();
-                cmd.CommandText = $"SELECT Id, WorkId FROM Goals WHERE OwnerId='{userId}' AND WorkId IS NOT NULL";
+                cmd.CommandText = "SELECT \"Id\", \"WorkId\" FROM \"Goals\" WHERE \"OwnerId\" = @ownerId AND \"WorkId\" IS NOT NULL";
+                cmd.Parameters.Add(new NpgsqlParameter("@ownerId", NpgsqlDbType.Uuid) { Value = userId });
                 using var r = await cmd.ExecuteReaderAsync(ct);
                 while (await r.ReadAsync(ct))
                     workIds[r.GetString(0)] = r.IsDBNull(1) ? "" : r.GetString(1);
