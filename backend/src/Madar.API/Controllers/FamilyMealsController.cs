@@ -76,8 +76,8 @@ public class FamilyMealsController : ControllerBase
     {
         var id = NewId();
         // Upsert: if exists for same member+date+mealTime, update
-        await E(@"INSERT INTO PersonalMealPlans (Id,UserId,MemberId,PlanDate,MealTime,MealId,CustomDesc,Notes) VALUES(@id,@uid,@mid,@d,@mt,@mlid,@cd,@nt)
-            ON DUPLICATE KEY UPDATE MealId=VALUES(MealId),CustomDesc=VALUES(CustomDesc),Notes=VALUES(Notes)",
+        await E(@"INSERT INTO ""PersonalMealPlans"" (""Id"",""UserId"",""MemberId"",""PlanDate"",""MealTime"",""MealId"",""CustomDesc"",""Notes"") VALUES(@id,@uid,@mid,@d,@mt,@mlid,@cd,@nt)
+            ON CONFLICT (""MemberId"",""PlanDate"",""MealTime"") DO UPDATE SET ""MealId""=EXCLUDED.""MealId"",""CustomDesc""=EXCLUDED.""CustomDesc"",""Notes""=EXCLUDED.""Notes""",
             [P("@id",id),P("@uid",Uid),P("@mid",req.MemberId),P("@d",req.Date),P("@mt",req.MealTime),P("@mlid",req.MealId),P("@cd",req.CustomDesc),P("@nt",req.Notes)], ct);
         return Ok(new { id });
     }

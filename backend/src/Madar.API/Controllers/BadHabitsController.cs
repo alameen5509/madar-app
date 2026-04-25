@@ -20,7 +20,7 @@ public class BadHabitsController : ControllerBase
         var rows = await Q(@"SELECT h.*,
             (SELECT COUNT(*) FROM ""BadHabitLogs"" l WHERE l.""HabitId""=h.""Id"" AND l.""Status""='clean') as ""CleanDays"",
             (SELECT COUNT(*) FROM ""BadHabitLogs"" l WHERE l.""HabitId""=h.""Id"" AND l.""Status""='urge_resisted') as ""ResistedDays"",
-            (SELECT ""Status"" FROM ""BadHabitLogs"" l WHERE l.""HabitId""=h.""Id"" AND l.""LogDate""=CURDATE() LIMIT 1) as ""TodayStatus""
+            (SELECT ""Status"" FROM ""BadHabitLogs"" l WHERE l.""HabitId""=h.""Id"" AND l.""LogDate""=CURRENT_DATE LIMIT 1) as ""TodayStatus""
             FROM ""BadHabits"" h WHERE h.""UserId""::text=@uid ORDER BY h.""Status""='active' DESC, h.""CurrentStreak"" DESC",
             Ps("@uid", Uid), ct);
         return Ok(rows);
@@ -41,7 +41,7 @@ public class BadHabitsController : ControllerBase
     {
         var id = NewId();
         await E(@"INSERT INTO ""BadHabits"" (""Id"",""UserId"",""Name"",""Category"",""TriggerText"",""Reward"",""Replacement"",""Motivation"",""IslamicContext"",""RelapsePlan"",""StartDate"",""TargetDays"")
-            VALUES(@id,@uid,@n,@cat,@tr,@rw,@rep,@mot,@isl,@rp,CURDATE(),@td)",
+            VALUES(@id,@uid,@n,@cat,@tr,@rw,@rep,@mot,@isl,@rp,CURRENT_DATE,@td)",
             [P("@id",id),P("@uid",Uid),P("@n",req.Name),P("@cat",req.Category??"سلوكية"),
              P("@tr",req.Trigger),P("@rw",req.Reward),P("@rep",req.Replacement),
              P("@mot",req.Motivation),P("@isl",req.IslamicContext),P("@rp",req.RelapsePlan),
@@ -67,8 +67,8 @@ public class BadHabitsController : ControllerBase
     {
         var status = req.Status ?? "clean";
         await E(@"INSERT INTO ""BadHabitLogs"" (""Id"",""HabitId"",""LogDate"",""Status"",""TriggerOccurred"",""ReplacementUsed"",""UrgeLevel"",""Notes"")
-            VALUES(@id,@hid,CURDATE(),@s,@to,@ru,@ul,@n)
-            ON DUPLICATE KEY UPDATE ""Status""=VALUES(""Status""),""TriggerOccurred""=VALUES(""TriggerOccurred""),""ReplacementUsed""=VALUES(""ReplacementUsed""),""UrgeLevel""=VALUES(""UrgeLevel""),""Notes""=VALUES(""Notes"")",
+            VALUES(@id,@hid,CURRENT_DATE,@s,@to,@ru,@ul,@n)
+            ON CONFLICT (""HabitId"",""LogDate"") DO UPDATE SET ""Status""=EXCLUDED.""Status"",""TriggerOccurred""=EXCLUDED.""TriggerOccurred"",""ReplacementUsed""=EXCLUDED.""ReplacementUsed"",""UrgeLevel""=EXCLUDED.""UrgeLevel"",""Notes""=EXCLUDED.""Notes""",
             [P("@id",NewId()),P("@hid",id),P("@s",status),P("@to",req.TriggerOccurred??false),
              P("@ru",req.ReplacementUsed??false),P("@ul",req.UrgeLevel??0),P("@n",req.Notes)], ct);
 
@@ -86,8 +86,8 @@ public class BadHabitsController : ControllerBase
     [HttpPost("{id}/relapse")]
     public async Task<IActionResult> Relapse(string id, [FromBody] LogReq? req, CancellationToken ct)
     {
-        await E(@"INSERT INTO ""BadHabitLogs"" (""Id"",""HabitId"",""LogDate"",""Status"",""UrgeLevel"",""Notes"") VALUES(@id,@hid,CURDATE(),'relapsed',@ul,@n)
-            ON DUPLICATE KEY UPDATE ""Status""='relapsed',""UrgeLevel""=VALUES(""UrgeLevel""),""Notes""=VALUES(""Notes"")",
+        await E(@"INSERT INTO ""BadHabitLogs"" (""Id"",""HabitId"",""LogDate"",""Status"",""UrgeLevel"",""Notes"") VALUES(@id,@hid,CURRENT_DATE,'relapsed',@ul,@n)
+            ON CONFLICT (""HabitId"",""LogDate"") DO UPDATE SET ""Status""='relapsed',""UrgeLevel""=EXCLUDED.""UrgeLevel"",""Notes""=EXCLUDED.""Notes""",
             [P("@id",NewId()),P("@hid",id),P("@ul",req?.UrgeLevel??5),P("@n",req?.Notes)], ct);
         await E("UPDATE \"BadHabits\" SET \"CurrentStreak\"=0, \"RelapseCount\"=\"RelapseCount\"+1 WHERE \"Id\"=@id AND \"UserId\"=@uid", [P("@id",id),P("@uid",Uid)], ct);
         return Ok(new { id, status = "relapsed" });
@@ -96,8 +96,8 @@ public class BadHabitsController : ControllerBase
     [HttpPost("{id}/urge-resisted")]
     public async Task<IActionResult> UrgeResisted(string id, [FromBody] LogReq? req, CancellationToken ct)
     {
-        await E(@"INSERT INTO ""BadHabitLogs"" (""Id"",""HabitId"",""LogDate"",""Status"",""ReplacementUsed"",""UrgeLevel"",""Notes"") VALUES(@id,@hid,CURDATE(),'urge_resisted',@ru,@ul,@n)
-            ON DUPLICATE KEY UPDATE ""Status""='urge_resisted',""ReplacementUsed""=VALUES(""ReplacementUsed""),""UrgeLevel""=VALUES(""UrgeLevel""),""Notes""=VALUES(""Notes"")",
+        await E(@"INSERT INTO ""BadHabitLogs"" (""Id"",""HabitId"",""LogDate"",""Status"",""ReplacementUsed"",""UrgeLevel"",""Notes"") VALUES(@id,@hid,CURRENT_DATE,'urge_resisted',@ru,@ul,@n)
+            ON CONFLICT (""HabitId"",""LogDate"") DO UPDATE SET ""Status""='urge_resisted',""ReplacementUsed""=EXCLUDED.""ReplacementUsed"",""UrgeLevel""=EXCLUDED.""UrgeLevel"",""Notes""=EXCLUDED.""Notes""",
             [P("@id",NewId()),P("@hid",id),P("@ru",req?.ReplacementUsed??true),P("@ul",req?.UrgeLevel??5),P("@n",req?.Notes)], ct);
         await E("UPDATE \"BadHabits\" SET \"CurrentStreak\"=\"CurrentStreak\"+1, \"LongestStreak\"=GREATEST(\"LongestStreak\",\"CurrentStreak\"+1) WHERE \"Id\"=@id AND \"UserId\"=@uid", [P("@id",id),P("@uid",Uid)], ct);
         return Ok(new { id, status = "urge_resisted" });

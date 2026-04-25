@@ -267,7 +267,7 @@ using (var scope_legacy = app.Services.CreateScope())
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.UseDeveloperExceptionPage();
+if (app.Environment.IsDevelopment()) app.UseDeveloperExceptionPage();
 app.UseSerilogRequestLogging();
 app.UseCors("FrontendPolicy");
 // HTTPS redirection disabled on Azure (TLS termination handled by the load balancer)
@@ -335,6 +335,14 @@ using (var scope = app.Services.CreateScope())
     {
         Log.Warning(ex, "Manual tables auto-create skipped");
     }
+
+    // Unique indexes required for ON CONFLICT (upsert) in controllers
+    foreach (var idx in new[] {
+        @"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_BadHabitLogs_HabitDate"" ON ""BadHabitLogs"" (""HabitId"", ""LogDate"")",
+        @"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_PersonalMealPlans_MemberDate"" ON ""PersonalMealPlans"" (""MemberId"", ""PlanDate"", ""MealTime"")",
+        @"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_MealPlans_UserDate"" ON ""MealPlans"" (""UserId"", ""PlanDate"")",
+    })
+        try { await db.Database.ExecuteSqlRawAsync(idx); } catch { /* index or table may not exist yet */ }
 }
 // ═══ Legacy MySQL table auto-creation removed — handled by EF Migrations ═══
 

@@ -190,7 +190,8 @@ public class HistoryController : ControllerBase
     private async Task<List<Dictionary<string, object?>>> Query(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection();
-        await conn.OpenAsync(ct);
+        var w = conn.State == System.Data.ConnectionState.Open;
+        if (!w) await conn.OpenAsync(ct);
         try
         {
             using var cmd = conn.CreateCommand();
@@ -207,13 +208,14 @@ public class HistoryController : ControllerBase
             }
             return rows;
         }
-        finally { await conn.CloseAsync(); }
+        finally { if (!w) await conn.CloseAsync(); }
     }
 
     private async Task<int> Exec(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
     {
         var conn = _db.Database.GetDbConnection();
-        await conn.OpenAsync(ct);
+        var w = conn.State == System.Data.ConnectionState.Open;
+        if (!w) await conn.OpenAsync(ct);
         try
         {
             using var cmd = conn.CreateCommand();
@@ -221,7 +223,7 @@ public class HistoryController : ControllerBase
             foreach (var p in ps) cmd.Parameters.Add(p);
             return await cmd.ExecuteNonQueryAsync(ct);
         }
-        finally { await conn.CloseAsync(); }
+        finally { if (!w) await conn.CloseAsync(); }
     }
 
     static string ToCamel(string s) => string.IsNullOrEmpty(s) ? s : char.ToLowerInvariant(s[0]) + s[1..];

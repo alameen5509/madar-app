@@ -58,6 +58,9 @@ CREATE TABLE IF NOT EXISTS "ShoppingListItems" ("Id" UUID PRIMARY KEY, "ListId" 
 CREATE TABLE IF NOT EXISTS "FamilyMembers" ("Id" UUID PRIMARY KEY, "UserId" UUID NOT NULL, "Name" VARCHAR(200) NOT NULL, "Relation" VARCHAR(50), "Age" INT, "CreatedAt" TIMESTAMP DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS "BackupLogs" ("Id" UUID PRIMARY KEY, "UserId" UUID NOT NULL, "BackupType" VARCHAR(50), "Status" VARCHAR(20), "Size" BIGINT DEFAULT 0, "CreatedAt" TIMESTAMP DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS "WorkRequests" ("Id" UUID PRIMARY KEY, "WorkId" UUID NOT NULL, "Title" VARCHAR(500) NOT NULL, "Description" TEXT, "Status" VARCHAR(30) DEFAULT 'new', "Priority" VARCHAR(20) DEFAULT 'medium', "CreatedAt" TIMESTAMP DEFAULT NOW());
+CREATE UNIQUE INDEX IF NOT EXISTS "IX_BadHabitLogs_HabitId_LogDate" ON "BadHabitLogs" ("HabitId", "LogDate");
+CREATE UNIQUE INDEX IF NOT EXISTS "IX_PersonalMealPlans_MemberId_PlanDate_MealTime" ON "PersonalMealPlans" ("MemberId", "PlanDate", "MealTime");
+CREATE UNIQUE INDEX IF NOT EXISTS "IX_MealPlans_UserId_PlanDate" ON "MealPlans" ("UserId", "PlanDate");
 `;
 
 (async () => {
