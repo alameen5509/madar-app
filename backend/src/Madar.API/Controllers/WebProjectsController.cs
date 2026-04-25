@@ -106,18 +106,18 @@ public class WebProjectsController : ControllerBase
     {
         try {
             var testId = NewId();
-            var uid = "health-check";
+            var testUid = NewId();
             // Test INSERT
             await E(@"INSERT INTO ""WebProjects"" (""Id"",""OwnerId"",""Title"",""ClientName"",""Description"",""CurrentPhase"",""Status"",""Priority"",""CreatedAt"",""UpdatedAt"")
                 VALUES(@id,@uid,'__health_test__',NULL,NULL,1,'active','medium',NOW(),NOW())",
-                [P("@id",testId),P("@uid",uid)], ct);
+                [P("@id",testId),P("@uid",testUid)], ct);
             // Test SELECT
-            var rows = await Q("SELECT \"Id\",\"Title\" FROM \"WebProjects\" WHERE \"Id\"::text=@id", Ps("@id",testId), ct);
+            var rows = await Q("SELECT \"Id\",\"Title\" FROM \"WebProjects\" WHERE \"Id\"=@id", Ps("@id",testId), ct);
             // Test DELETE
-            var deleted = await E("DELETE FROM \"WebProjects\" WHERE \"Id\"::text=@id", Ps("@id",testId), ct);
-            return Ok(new { status = "ok", inserted = true, found = rows.Count, deleted, version = "2026-04-25-v2" });
+            var deleted = await E("DELETE FROM \"WebProjects\" WHERE \"Id\"=@id", Ps("@id",testId), ct);
+            return Ok(new { status = "ok", inserted = true, found = rows.Count, deleted, version = "2026-04-25-v3" });
         } catch (Exception ex) {
-            return Ok(new { status = "error", error = ex.Message, inner = ex.InnerException?.Message, version = "2026-04-25-v2" });
+            return Ok(new { status = "error", error = ex.Message, inner = ex.InnerException?.Message, version = "2026-04-25-v3" });
         }
     }
 
@@ -414,7 +414,10 @@ public class WebProjectsController : ControllerBase
         return Ok(new { success = true });
     }
 
-    static NpgsqlParameter P(string n, object? v) => new(n, v ?? DBNull.Value);
+    static NpgsqlParameter P(string n, object? v) =>
+        v is string s && Guid.TryParse(s, out var g)
+            ? new NpgsqlParameter(n, NpgsqlTypes.NpgsqlDbType.Uuid) { Value = g }
+            : new(n, v ?? DBNull.Value);
     static List<NpgsqlParameter> Ps(string n, object? v) => [P(n, v)];
 
     private async Task<List<Dictionary<string, object?>>> Q(string sql, List<NpgsqlParameter> ps, CancellationToken ct)
