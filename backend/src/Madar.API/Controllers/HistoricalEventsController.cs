@@ -218,6 +218,22 @@ public class HistoricalEventsController : ControllerBase
         return Ok(new { message = $"تم إدخال {count} أحداث جديدة", count });
     }
 
+    [HttpGet("search")]
+    public async Task<IActionResult> Search([FromQuery] string q, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(q)) return BadRequest(new { error = "أدخل كلمة بحث" });
+        return Ok(await Query(@"SELECT * FROM ""HistoricalEvents"" WHERE ""UserId""=@uid AND (""Title"" ILIKE @q OR ""Description"" ILIKE @q OR ""Category"" ILIKE @q) ORDER BY ""OrderIndex""",
+            [P("@uid", Uid), P("@q", $"%{q}%")], ct));
+    }
+
+    [HttpPatch("{id}/fix-date")]
+    public async Task<IActionResult> FixDate(string id, [FromBody] FixDateReq req, CancellationToken ct)
+    {
+        var rows = await Exec(@"UPDATE ""HistoricalEvents"" SET ""GregorianDate""=COALESCE(@gd,""GregorianDate""), ""HijriDate""=COALESCE(@hd,""HijriDate"") WHERE ""Id""::text=@id AND ""UserId""::text=@uid",
+            [P("@id",id),P("@uid",Uid),P("@gd",(object?)req.GregorianDate??DBNull.Value),P("@hd",(object?)req.HijriDate??DBNull.Value)], ct);
+        return rows > 0 ? Ok(new { id, updated = true }) : NotFound();
+    }
+
     [HttpGet("categories")]
     public async Task<IActionResult> GetCategories(CancellationToken ct)
     {
@@ -443,3 +459,4 @@ public class HistoricalEventReq
     public int? OrderIndex { get; set; }
     public string? Category { get; set; }
 }
+public class FixDateReq { public string? GregorianDate { get; set; } public string? HijriDate { get; set; } }
