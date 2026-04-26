@@ -161,7 +161,18 @@ export default function HistoryPage() {
             <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>📜 التاريخ والتوثيق</h2>
             <p className="text-xs" style={{ color: "var(--muted)" }}>{allRecords.length} حدث · {figures.length} شخصية</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={async () => {
+                try {
+                  const res = await api.get("/api/historical-events/template", { responseType: "blob" });
+                  const url = URL.createObjectURL(res.data);
+                  const a = document.createElement("a"); a.href = url; a.download = "نموذج-أحداث-تاريخية.xlsx"; a.click();
+                  URL.revokeObjectURL(url);
+                } catch { alert("فشل تحميل النموذج"); }
+              }}
+              className="px-3 py-2 rounded-xl text-xs font-bold" style={{ background: "var(--bg)", color: "#3D8C5A", border: "1px solid #3D8C5A30" }}>
+              📥 تحميل النموذج
+            </button>
             <label className="px-3 py-2 rounded-xl text-xs font-bold cursor-pointer" style={{ background: "var(--bg)", color: "#2C2C54", border: "1px solid #2C2C5430" }}>
               📤 رفع Excel
               <input type="file" accept=".xlsx" className="hidden" onChange={async (e) => {

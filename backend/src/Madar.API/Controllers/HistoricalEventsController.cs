@@ -225,6 +225,56 @@ public class HistoricalEventsController : ControllerBase
             [P("@uid", Uid)], ct));
     }
 
+    // ─── EXCEL TEMPLATE DOWNLOAD ────────────────────────────────────────
+    [HttpGet("template")]
+    public IActionResult DownloadTemplate()
+    {
+        OfficeOpenXml.ExcelPackage.LicenseContext = OfficeOpenXml.LicenseContext.NonCommercial;
+        using var pkg = new OfficeOpenXml.ExcelPackage();
+        var ws = pkg.Workbook.Worksheets.Add("أحداث تاريخية");
+        ws.View.RightToLeft = true;
+
+        // Headers (row 1)
+        var headers = new[] { "العنوان *", "التاريخ الميلادي", "التاريخ الهجري", "المكان", "الوصف", "الأهمية الاستراتيجية", "الفئة", "الترتيب" };
+        for (int i = 0; i < headers.Length; i++)
+        {
+            ws.Cells[1, i + 1].Value = headers[i];
+            ws.Cells[1, i + 1].Style.Font.Bold = true;
+            ws.Cells[1, i + 1].Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+            ws.Cells[1, i + 1].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(44, 44, 84));
+            ws.Cells[1, i + 1].Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(212, 175, 55));
+        }
+
+        // Example rows
+        ws.Cells[2, 1].Value = "فتح مكة"; ws.Cells[2, 2].Value = "630-01-11"; ws.Cells[2, 3].Value = "20 رمضان 8 هـ";
+        ws.Cells[2, 4].Value = "مكة المكرمة"; ws.Cells[2, 5].Value = "دخل النبي ﷺ مكة فاتحاً بعشرة آلاف مقاتل";
+        ws.Cells[2, 6].Value = "نقطة تحول في تاريخ الإسلام"; ws.Cells[2, 7].Value = "فتوحات"; ws.Cells[2, 8].Value = 1;
+
+        ws.Cells[3, 1].Value = "معركة بدر"; ws.Cells[3, 2].Value = "624-03-13"; ws.Cells[3, 3].Value = "17 رمضان 2 هـ";
+        ws.Cells[3, 4].Value = "بدر"; ws.Cells[3, 5].Value = "أول معركة فاصلة في الإسلام";
+        ws.Cells[3, 6].Value = "أثبتت قوة المسلمين"; ws.Cells[3, 7].Value = "غزوات"; ws.Cells[3, 8].Value = 2;
+
+        // Style example rows lighter
+        for (int row = 2; row <= 3; row++)
+            for (int col = 1; col <= 8; col++)
+            {
+                ws.Cells[row, col].Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+                ws.Cells[row, col].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(255, 253, 235));
+                ws.Cells[row, col].Style.Font.Color.SetColor(System.Drawing.Color.Gray);
+            }
+
+        // Instructions row
+        ws.Cells[4, 1].Value = "← ابدأ إدخال بياناتك من هذا الصف (احذف الأمثلة أعلاه)";
+        ws.Cells[4, 1].Style.Font.Color.SetColor(System.Drawing.Color.Red);
+        ws.Cells[4, 1].Style.Font.Bold = true;
+
+        // Auto-fit columns
+        ws.Cells[ws.Dimension.Address].AutoFitColumns(12, 50);
+
+        var bytes = pkg.GetAsByteArray();
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "نموذج-أحداث-تاريخية.xlsx");
+    }
+
     // ─── BULK EXCEL UPLOAD ──────────────────────────────────────────────
     [HttpPost("upload")]
     [RequestSizeLimit(10_000_000)]
