@@ -225,6 +225,35 @@ public class HistoricalEventsController : ControllerBase
             [P("@uid", Uid)], ct));
     }
 
+    // ─── DATE CONVERSION ─────────────────────────────────────────────────
+    [HttpGet("convert-date")]
+    public IActionResult ConvertDate([FromQuery] string? hijriYear, [FromQuery] string? hijriMonth, [FromQuery] string? hijriDay,
+        [FromQuery] string? gregorianDate)
+    {
+        // Hijri → Gregorian
+        if (int.TryParse(hijriYear, out var hy) && int.TryParse(hijriMonth, out var hm) && int.TryParse(hijriDay, out var hd))
+        {
+            var greg = Helpers.DateConverter.HijriToGregorian(hy, hm, hd);
+            if (greg == null) return BadRequest(new { error = "تاريخ هجري غير صحيح" });
+            return Ok(new {
+                hijriText = Helpers.DateConverter.FormatHijri(hy, hm, hd),
+                gregorianText = Helpers.DateConverter.FormatGregorian(greg.Value),
+                gregorianDate = greg.Value.ToString("yyyy-MM-dd"),
+            });
+        }
+        // Gregorian → Hijri
+        if (DateTime.TryParse(gregorianDate, out var gd))
+        {
+            var (y, m, d) = Helpers.DateConverter.GregorianToHijri(gd);
+            return Ok(new {
+                hijriText = Helpers.DateConverter.FormatHijri(y, m, d),
+                gregorianText = Helpers.DateConverter.FormatGregorian(gd),
+                hijriYear = y, hijriMonth = m, hijriDay = d,
+            });
+        }
+        return BadRequest(new { error = "أدخل hijriYear+hijriMonth+hijriDay أو gregorianDate" });
+    }
+
     // ─── EXCEL TEMPLATE DOWNLOAD ────────────────────────────────────────
     [HttpGet("template")]
     public IActionResult DownloadTemplate()
@@ -234,25 +263,41 @@ public class HistoricalEventsController : ControllerBase
         var ws = pkg.Workbook.Worksheets.Add("أحداث تاريخية");
         ws.View.RightToLeft = true;
 
-        // Headers (row 1)
-        var headers = new[] { "العنوان *", "التاريخ الميلادي", "التاريخ الهجري", "المكان", "الوصف", "الأهمية الاستراتيجية", "الفئة", "الترتيب" };
+        // Headers (row 1): 8 main + 3 hijri helper columns
+        var headers = new[] { "العنوان *", "التاريخ الميلادي", "التاريخ الهجري", "المكان", "الوصف", "الأهمية الاستراتيجية", "الفئة", "الترتيب",
+            "السنة الهجرية (تحويل تلقائي)", "الشهر الهجري", "اليوم الهجري" };
         for (int i = 0; i < headers.Length; i++)
         {
             ws.Cells[1, i + 1].Value = headers[i];
             ws.Cells[1, i + 1].Style.Font.Bold = true;
             ws.Cells[1, i + 1].Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
-            ws.Cells[1, i + 1].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(44, 44, 84));
-            ws.Cells[1, i + 1].Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(212, 175, 55));
+            var isHelper = i >= 8;
+            ws.Cells[1, i + 1].Style.Fill.BackgroundColor.SetColor(isHelper
+                ? System.Drawing.Color.FromArgb(61, 140, 90) : System.Drawing.Color.FromArgb(44, 44, 84));
+            ws.Cells[1, i + 1].Style.Font.Color.SetColor(System.Drawing.Color.White);
         }
 
-        // Example rows
-        ws.Cells[2, 1].Value = "فتح مكة"; ws.Cells[2, 2].Value = "630-01-11"; ws.Cells[2, 3].Value = "20 رمضان 8 هـ";
-        ws.Cells[2, 4].Value = "مكة المكرمة"; ws.Cells[2, 5].Value = "دخل النبي ﷺ مكة فاتحاً بعشرة آلاف مقاتل";
-        ws.Cells[2, 6].Value = "نقطة تحول في تاريخ الإسلام"; ws.Cells[2, 7].Value = "فتوحات"; ws.Cells[2, 8].Value = 1;
+        // Instructions row (row 2)
+        ws.Cells[2, 1].Value = "⬇ أدخل بياناتك من الصف 3";
+        ws.Cells[2, 1].Style.Font.Color.SetColor(System.Drawing.Color.Red);
+        ws.Cells[2, 1].Style.Font.Bold = true;
+        ws.Cells[2, 2].Value = "نص حر: 28 يونيو 1914 م";
+        ws.Cells[2, 3].Value = "نص حر: 4 شعبان 1332 هـ";
+        ws.Cells[2, 9].Value = "اختياري: أدخل السنة الهجرية هنا";
+        ws.Cells[2, 10].Value = "1-12";
+        ws.Cells[2, 11].Value = "1-30";
+        for (int c = 1; c <= 11; c++) ws.Cells[2, c].Style.Font.Color.SetColor(System.Drawing.Color.Gray);
 
-        ws.Cells[3, 1].Value = "معركة بدر"; ws.Cells[3, 2].Value = "624-03-13"; ws.Cells[3, 3].Value = "17 رمضان 2 هـ";
-        ws.Cells[3, 4].Value = "بدر"; ws.Cells[3, 5].Value = "أول معركة فاصلة في الإسلام";
-        ws.Cells[3, 6].Value = "أثبتت قوة المسلمين"; ws.Cells[3, 7].Value = "غزوات"; ws.Cells[3, 8].Value = 2;
+        // Example rows (3-4)
+        ws.Cells[3, 1].Value = "فتح مكة"; ws.Cells[3, 2].Value = "11 يناير 630 م"; ws.Cells[3, 3].Value = "20 رمضان 8 هـ";
+        ws.Cells[3, 4].Value = "مكة المكرمة"; ws.Cells[3, 5].Value = "دخل النبي ﷺ مكة فاتحاً بعشرة آلاف مقاتل";
+        ws.Cells[3, 6].Value = "نقطة تحول في تاريخ الإسلام"; ws.Cells[3, 7].Value = "فتوحات"; ws.Cells[3, 8].Value = 1;
+        ws.Cells[3, 9].Value = 8; ws.Cells[3, 10].Value = 9; ws.Cells[3, 11].Value = 20;
+
+        ws.Cells[4, 1].Value = "اغتيال ولي عهد النمسا"; ws.Cells[4, 2].Value = "28 يونيو 1914 م"; ws.Cells[4, 3].Value = "4 شعبان 1332 هـ";
+        ws.Cells[4, 4].Value = "سراييفو"; ws.Cells[4, 5].Value = "شرارة الحرب العالمية الأولى";
+        ws.Cells[4, 6].Value = "بداية تغيير خريطة العالم"; ws.Cells[4, 7].Value = "الحرب العالمية الأولى"; ws.Cells[4, 8].Value = 2;
+        ws.Cells[4, 9].Value = 1332; ws.Cells[4, 10].Value = 8; ws.Cells[4, 11].Value = 4;
 
         // Style example rows lighter
         for (int row = 2; row <= 3; row++)
@@ -262,11 +307,6 @@ public class HistoricalEventsController : ControllerBase
                 ws.Cells[row, col].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(255, 253, 235));
                 ws.Cells[row, col].Style.Font.Color.SetColor(System.Drawing.Color.Gray);
             }
-
-        // Instructions row
-        ws.Cells[4, 1].Value = "← ابدأ إدخال بياناتك من هذا الصف (احذف الأمثلة أعلاه)";
-        ws.Cells[4, 1].Style.Font.Color.SetColor(System.Drawing.Color.Red);
-        ws.Cells[4, 1].Style.Font.Bold = true;
 
         // Auto-fit columns
         ws.Cells[ws.Dimension.Address].AutoFitColumns(12, 50);
@@ -295,8 +335,8 @@ public class HistoricalEventsController : ControllerBase
 
         var errors = new List<string>();
         int saved = 0;
-        // Start from row 2 (row 1 = headers)
-        for (int row = 2; row <= ws.Dimension.End.Row; row++)
+        // Start from row 3 (row 1 = headers, row 2 = instructions)
+        for (int row = 3; row <= ws.Dimension.End.Row; row++)
         {
             var title = ws.Cells[row, 1].Text?.Trim();
             if (string.IsNullOrEmpty(title)) continue;
@@ -309,8 +349,22 @@ public class HistoricalEventsController : ControllerBase
             var category = ws.Cells[row, 7].Text?.Trim();
             int.TryParse(ws.Cells[row, 8].Text?.Trim(), out var orderIdx);
 
-            if (string.IsNullOrEmpty(title))
-            { errors.Add($"صف {row}: العنوان مطلوب"); continue; }
+            // Auto-convert from Hijri columns (I, J, K) if hijriDate text is empty
+            if (string.IsNullOrEmpty(hijriDate))
+            {
+                int.TryParse(ws.Cells[row, 9].Text?.Trim(), out var hy);
+                int.TryParse(ws.Cells[row, 10].Text?.Trim(), out var hm);
+                int.TryParse(ws.Cells[row, 11].Text?.Trim(), out var hday);
+                if (hy > 0 && hm > 0 && hday > 0)
+                {
+                    hijriDate = Helpers.DateConverter.FormatHijri(hy, hm, hday);
+                    if (string.IsNullOrEmpty(gregorianDate))
+                    {
+                        var greg = Helpers.DateConverter.HijriToGregorian(hy, hm, hday);
+                        if (greg != null) gregorianDate = Helpers.DateConverter.FormatGregorian(greg.Value);
+                    }
+                }
+            }
 
             try
             {
