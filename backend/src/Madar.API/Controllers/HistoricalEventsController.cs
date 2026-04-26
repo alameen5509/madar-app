@@ -225,6 +225,62 @@ public class HistoricalEventsController : ControllerBase
             [P("@uid", Uid)], ct));
     }
 
+    // ─── BULK EXCEL UPLOAD ──────────────────────────────────────────────
+    [HttpPost("upload")]
+    [RequestSizeLimit(10_000_000)]
+    public async Task<IActionResult> UploadExcel(IFormFile file, CancellationToken ct)
+    {
+        if (file == null || file.Length == 0) return BadRequest(new { error = "لا يوجد ملف" });
+        if (!file.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { error = "يجب أن يكون الملف Excel (.xlsx)" });
+
+        OfficeOpenXml.ExcelPackage.LicenseContext = OfficeOpenXml.LicenseContext.NonCommercial;
+        using var stream = new MemoryStream();
+        await file.CopyToAsync(stream, ct);
+        stream.Position = 0;
+
+        using var pkg = new OfficeOpenXml.ExcelPackage(stream);
+        var ws = pkg.Workbook.Worksheets.FirstOrDefault();
+        if (ws == null) return BadRequest(new { error = "الملف فارغ" });
+
+        var errors = new List<string>();
+        int saved = 0;
+        // Start from row 2 (row 1 = headers)
+        for (int row = 2; row <= ws.Dimension.End.Row; row++)
+        {
+            var title = ws.Cells[row, 1].Text?.Trim();
+            if (string.IsNullOrEmpty(title)) continue;
+
+            var gregorianDate = ws.Cells[row, 2].Text?.Trim();
+            var hijriDate = ws.Cells[row, 3].Text?.Trim();
+            var location = ws.Cells[row, 4].Text?.Trim();
+            var description = ws.Cells[row, 5].Text?.Trim();
+            var strategicSig = ws.Cells[row, 6].Text?.Trim();
+            var category = ws.Cells[row, 7].Text?.Trim();
+            int.TryParse(ws.Cells[row, 8].Text?.Trim(), out var orderIdx);
+
+            if (string.IsNullOrEmpty(title))
+            { errors.Add($"صف {row}: العنوان مطلوب"); continue; }
+
+            try
+            {
+                await Exec(@"INSERT INTO ""HistoricalEvents"" (""Id"",""UserId"",""Title"",""GregorianDate"",""HijriDate"",""Location"",""Description"",""StrategicSignificance"",""OrderIndex"",""Category"")
+                    VALUES(@id,@uid,@ti,@gd,@hd,@lo,@de,@ss,@oi,@ca)",
+                    [P("@id",Guid.NewGuid().ToString()),P("@uid",Uid),P("@ti",title),
+                     P("@gd",string.IsNullOrEmpty(gregorianDate)?DBNull.Value:gregorianDate),
+                     P("@hd",string.IsNullOrEmpty(hijriDate)?DBNull.Value:hijriDate),
+                     P("@lo",string.IsNullOrEmpty(location)?DBNull.Value:location),
+                     P("@de",string.IsNullOrEmpty(description)?DBNull.Value:description),
+                     P("@ss",string.IsNullOrEmpty(strategicSig)?DBNull.Value:strategicSig),
+                     P("@oi",orderIdx),P("@ca",category??"")], ct);
+                saved++;
+            }
+            catch (Exception ex) { errors.Add($"صف {row}: {ex.Message}"); }
+        }
+
+        return Ok(new { message = $"تم حفظ {saved} حدث", count = saved, errors = errors.Count > 0 ? errors : null });
+    }
+
     // ─── Helpers ────────────────────────────────────────────────────────
 
     static NpgsqlParameter P(string n, object? v) =>

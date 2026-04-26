@@ -1,0 +1,377 @@
+اقرأ الملف في المسار `C:\Projects\mdar\1` ثم نفّذ الأمر الموجود فيه.
+```powershell
+Get-Content "C:\Projects\mdar\1.txt"
+```
+بعد قراءة المحتوى، نفّذ الأمر الموجود في الملف بالضبط كما هو مكتوب.
+
+
+
+بناء نظام رفع ملف Excel لإدخال أحداث تاريخية بالمئات في مدار.
+
+## المهمة الكاملة
+إنشاء Excel template + API endpoint + Frontend UI لرفع أحداث تاريخية بكميات كبيرة.
+
+### 1. فحص جدول الأحداث التاريخية
+
+```powershell
+# شغّل Backend محلياً للوصول لقاعدة البيانات
+dotnet run --project src/Mdar.API --urls "http://localhost:5000"
+```
+
+في terminal منفصل:
+```powershell
+# فحص structure جدول الأحداث التاريخية
+curl "http://localhost:5000/api/historical-events" -Headers @{"Accept"="application/json"} | ConvertFrom-Json | Select-Object -First 1
+
+# فحص الـ schema
+Get-ChildItem src/ -Recurse -Include "*.cs" | Select-String -Pattern "HistoricalEvent|Historical" -Context 3
+```
+
+### 2. إنشاء Excel Template
+
+أنشئ ملف `templates/historical-events-template.xlsx` بالأعمدة التالية (بالعربية والإنجليزية):
+
+| العمود | Field Name | نوع البيانات | إجباري | ملاحظات |
+|---|---|---|---|---|
+| أ | calendar_type | نص | نعم | "hijri" أو "gregorian" |
+| ب | hijri_day | رقم | لا | 1-30 (إذا هجري) |
+| ج | hijri_month | رقم | لا | 1-12 (إذا هجري) |  
+| د | hijri_year | رقم | إذا هجري | السنة الهجرية |
+| ه | gregorian_date | تاريخ | إذا ميلادي | yyyy-mm-dd |
+| و | title | نص | نعم | عنوان الحدث |
+| ز | description | نص | لا | وصف مفصل |
+| ح | category | نص | لا | الفئة |
+| ط | importance | رقم | لا | 1-5 |
+| ي | personality | نص | لا | الشخصية المرتبطة |
+| ك | place | نص | لا | المكان |
+| ل | country | نص | لا | الدولة |
+| م | strategic_importance | نص | لا | الأهمية الاستراتيجية |
+| ن | source | نص | لا | المصدر |
+| س | tags | نص | لا | الوسوم (مفصولة بفاصلة) |
+
+مع صف الأمثلة:
+```
+hijri|15|3|1445||فتح القسطنطينية|حدث تاريخي مهم|عسكري|5|محمد الفاتح|القسطنطينية|الدولة العثمانية|عالية|التاريخ الإسلامي|فتوحات,عثماني,القسطنطينية
+gregorian|||29/05/1453|||||||||||||
+```
+
+### 3. إنشاء HistoricalEventsBulkController
+
+أنشئ `src/Mdar.API/Controllers/HistoricalEventsBulkController.cs`:
+
+```csharp
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+public class HistoricalEventsBulkController : ControllerBase
+{
+    private readonly IApplicationDbContext _context;
+    private readonly ILogger<HistoricalEventsBulkController> _logger;
+
+    public HistoricalEventsBulkController(IApplicationDbContext context, ILogger<HistoricalEventsBulkController> logger)
+    {
+        _context = context;
+        _logger = logger;
+    }
+
+    [HttpPost("upload")]
+    public async Task<ActionResult> BulkUploadEvents(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("لا يوجد ملف للرفع");
+
+        if (!file.FileName.EndsWith(".xlsx"))
+            return BadRequest("يجب أن يكون الملف من نوع Excel (.xlsx)");
+
+        try
+        {
+            var events = await ParseExcelFile(file);
+            var validationResult = ValidateEvents(events);
+            
+            if (validationResult.HasErrors)
+                return BadRequest(new { errors = validationResult.Errors, validEvents = validationResult.ValidEvents });
+
+            // حفظ الأحداث في قاعدة البيانات
+            var savedCount = await SaveEventsToDatabase(events);
+            
+            return Ok(new { 
+                message = $"تم حفظ {savedCount} حدث بنجاح", 
+                count = savedCount 
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in bulk upload");
+            return StatusCode(500, "خطأ في رفع الملف");
+        }
+    }
+
+    private async Task<List<HistoricalEventDto>> ParseExcelFile(IFormFile file)
+    {
+        var events = new List<HistoricalEventDto>();
+        
+        using var stream = new MemoryStream();
+        await file.CopyToAsync(stream);
+        
+        using var package = new ExcelPackage(stream);
+        var worksheet = package.Workbook.Worksheets[0];
+        
+        // بدء من الصف 3 (تجاوز العناوين والمثال)
+        for (int row = 3; row <= worksheet.Dimension.End.Row; row++)
+        {
+            var calendarType = worksheet.Cells[row, 1].Text;
+            if (string.IsNullOrWhiteSpace(calendarType)) continue;
+
+            var eventDto = new HistoricalEventDto();
+            
+            // تحليل التاريخ
+            if (calendarType.ToLower() == "hijri")
+            {
+                eventDto.HijriDay = ParseInt(worksheet.Cells[row, 2].Text);
+                eventDto.HijriMonth = ParseInt(worksheet.Cells[row, 3].Text);
+                eventDto.HijriYear = ParseInt(worksheet.Cells[row, 4].Text);
+                
+                // تحويل للميلادي
+                if (eventDto.HijriYear.HasValue && eventDto.HijriMonth.HasValue && eventDto.HijriDay.HasValue)
+                {
+                    eventDto.GregorianDate = ConvertHijriToGregorian(
+                        eventDto.HijriDay.Value, 
+                        eventDto.HijriMonth.Value, 
+                        eventDto.HijriYear.Value);
+                }
+            }
+            else
+            {
+                var dateText = worksheet.Cells[row, 5].Text;
+                if (DateTime.TryParse(dateText, out var gregDate))
+                    eventDto.GregorianDate = gregDate;
+            }
+
+            // باقي الحقول
+            eventDto.Title = worksheet.Cells[row, 6].Text;
+            eventDto.Description = worksheet.Cells[row, 7].Text;
+            eventDto.Category = worksheet.Cells[row, 8].Text;
+            eventDto.Importance = ParseInt(worksheet.Cells[row, 9].Text);
+            eventDto.Personality = worksheet.Cells[row, 10].Text;
+            eventDto.Place = worksheet.Cells[row, 11].Text;
+            eventDto.Country = worksheet.Cells[row, 12].Text;
+            eventDto.StrategicImportance = worksheet.Cells[row, 13].Text;
+            eventDto.Source = worksheet.Cells[row, 14].Text;
+            
+            // الوسوم
+            var tagsText = worksheet.Cells[row, 15].Text;
+            if (!string.IsNullOrWhiteSpace(tagsText))
+                eventDto.Tags = tagsText.Split(',').Select(t => t.Trim()).ToList();
+
+            events.Add(eventDto);
+        }
+        
+        return events;
+    }
+
+    private ValidationResult ValidateEvents(List<HistoricalEventDto> events)
+    {
+        var errors = new List<string>();
+        var validEvents = new List<HistoricalEventDto>();
+        
+        for (int i = 0; i < events.Count; i++)
+        {
+            var evt = events[i];
+            var rowErrors = new List<string>();
+            
+            // التحقق من الحقول الإجبارية
+            if (string.IsNullOrWhiteSpace(evt.Title))
+                rowErrors.Add("العنوان مطلوب");
+                
+            if (!evt.GregorianDate.HasValue)
+                rowErrors.Add("التاريخ مطلوب");
+                
+            if (evt.Importance.HasValue && (evt.Importance < 1 || evt.Importance > 5))
+                rowErrors.Add("الأهمية يجب أن تكون بين 1-5");
+            
+            if (rowErrors.Any())
+                errors.Add($"الصف {i + 3}: {string.Join(", ", rowErrors)}");
+            else
+                validEvents.Add(evt);
+        }
+        
+        return new ValidationResult 
+        { 
+            HasErrors = errors.Any(), 
+            Errors = errors, 
+            ValidEvents = validEvents 
+        };
+    }
+
+    private async Task<int> SaveEventsToDatabase(List<HistoricalEventDto> events)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var historicalEvents = new List<HistoricalEvent>();
+        
+        foreach (var eventDto in events)
+        {
+            var historicalEvent = new HistoricalEvent
+            {
+                UserId = userId,
+                Title = eventDto.Title,
+                Description = eventDto.Description,
+                GregorianDate = eventDto.GregorianDate.Value,
+                HijriDay = eventDto.HijriDay,
+                HijriMonth = eventDto.HijriMonth,
+                HijriYear = eventDto.HijriYear,
+                Category = eventDto.Category,
+                Importance = eventDto.Importance,
+                Personality = eventDto.Personality,
+                Place = eventDto.Place,
+                Country = eventDto.Country,
+                StrategicImportance = eventDto.StrategicImportance,
+                Source = eventDto.Source,
+                Tags = eventDto.Tags != null ? string.Join(",", eventDto.Tags) : null,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            
+            historicalEvents.Add(historicalEvent);
+        }
+        
+        _context.HistoricalEvents.AddRange(historicalEvents);
+        await _context.SaveChangesAsync();
+        
+        return historicalEvents.Count;
+    }
+
+    private int? ParseInt(string text)
+    {
+        return int.TryParse(text, out var result) ? result : null;
+    }
+
+    private DateTime ConvertHijriToGregorian(int day, int month, int year)
+    {
+        // استخدم مكتبة تحويل التاريخ الهجري
+        var hijriDate = new System.Globalization.HijriCalendar();
+        try
+        {
+            return hijriDate.ToDateTime(year, month, day, 0, 0, 0, 0);
+        }
+        catch
+        {
+            // في حالة تاريخ غير صحيح، استخدم تقدير تقريبي
+            return new DateTime(year + 622, month, Math.Min(day, 28));
+        }
+    }
+}
+
+public class HistoricalEventDto
+{
+    public string Title { get; set; }
+    public string Description { get; set; }
+    public DateTime? GregorianDate { get; set; }
+    public int? HijriDay { get; set; }
+    public int? HijriMonth { get; set; }
+    public int? HijriYear { get; set; }
+    public string Category { get; set; }
+    public int? Importance { get; set; }
+    public string Personality { get; set; }
+    public string Place { get; set; }
+    public string Country { get; set; }
+    public string StrategicImportance { get; set; }
+    public string Source { get; set; }
+    public List<string> Tags { get; set; }
+}
+
+public class ValidationResult
+{
+    public bool HasErrors { get; set; }
+    public List<string> Errors { get; set; }
+    public List<HistoricalEventDto> ValidEvents { get; set; }
+}
+```
+
+### 4. إضافة EPPlus package للـ Excel
+
+```powershell
+dotnet add src/Mdar.API package EPPlus --version 7.1.3
+```
+
+### 5. إضافة Download Template Endpoint
+
+```csharp
+[HttpGet("template")]
+public IActionResult DownloadTemplate()
+{
+    var templatePath = Path.Combine(Directory.GetCurrentDirectory(), "templates", "historical-events-template.xlsx");
+    
+    if (!System.IO.File.Exists(templatePath))
+        return NotFound("قالب Excel غير موجود");
+    
+    var fileBytes = System.IO.File.ReadAllBytes(templatePath);
+    return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "قالب-الأحداث-التاريخية.xlsx");
+}
+```
+
+### 6. اختبار النظام
+
+```powershell
+# إنشاء ملف Excel للاختبار
+$testData = @(
+    @{title="فتح مكة"; date="630-01-01"; category="ديني"; importance=5; place="مكة"}
+    @{title="معركة القادسية"; date="636-01-01"; category="عسكري"; importance=5; place="العراق"}
+)
+
+# تحويل لـ Excel (يدوياً أو عبر script)
+# ثم اختبار الرفع
+curl "http://localhost:5000/api/HistoricalEventsBulk/upload" -Method POST -InFile "test-events.xlsx"
+```
+
+### 7. إضافة Frontend UI (اختياري)
+
+أضف مكون رفع الملفات في صفحة التاريخ:
+
+```jsx
+const BulkUploadModal = () => {
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  
+  const handleUpload = async () => {
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const response = await fetch('/api/HistoricalEventsBulk/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const result = await response.json();
+      alert(`تم رفع ${result.count} حدث`);
+    } catch (error) {
+      alert('خطأ في الرفع');
+    }
+    setUploading(false);
+  };
+  
+  return (
+    <div className="bulk-upload-modal">
+      <h3>رفع أحداث تاريخية بالجملة</h3>
+      <input type="file" accept=".xlsx" onChange={(e) => setFile(e.target.files[0])} />
+      <button onClick={handleUpload} disabled={!file || uploading}>
+        {uploading ? 'جاري الرفع...' : 'رفع الملف'}
+      </button>
+      <a href="/api/HistoricalEventsBulk/template">تحميل قالب Excel</a>
+    </div>
+  );
+};
+```
+
+## النتائج المتوقعة
+
+اطبع تقرير:
+- ✅ Excel template جاهز للتحميل
+- ✅ API endpoint يقبل رفع Excel ويحلل البيانات
+- ✅ Validation شامل مع تقرير أخطاء مفصل
+- ✅ تحويل التاريخ الهجري ↔ الميلادي
+- ✅ Bulk insert سريع لمئات الأحداث
+- ✅ دعم كامل للغة العربية
+- ✅ ملفات محفوظة في: [قائمة الملفات]
+
+أوقف الـ API بعد الاختبار (Ctrl+C).

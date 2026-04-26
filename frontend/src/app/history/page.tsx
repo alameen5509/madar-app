@@ -161,11 +161,26 @@ export default function HistoryPage() {
             <h2 className="font-bold text-lg" style={{ color: "var(--text)" }}>📜 التاريخ والتوثيق</h2>
             <p className="text-xs" style={{ color: "var(--muted)" }}>{allRecords.length} حدث · {figures.length} شخصية</p>
           </div>
-          <button onClick={() => setShowAdd(true)}
-            className="px-4 py-2 rounded-xl text-xs font-bold text-white"
-            style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
-            + حدث جديد
-          </button>
+          <div className="flex gap-2">
+            <label className="px-3 py-2 rounded-xl text-xs font-bold cursor-pointer" style={{ background: "var(--bg)", color: "#2C2C54", border: "1px solid #2C2C5430" }}>
+              📤 رفع Excel
+              <input type="file" accept=".xlsx" className="hidden" onChange={async (e) => {
+                const f = e.target.files?.[0]; if (!f) return;
+                const fd = new FormData(); fd.append("file", f);
+                try {
+                  const { data } = await api.post("/api/historical-events/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+                  alert(`✅ ${data.message}${data.errors?.length ? "\n\n⚠️ أخطاء:\n" + data.errors.join("\n") : ""}`);
+                  fetchData();
+                } catch (err: any) { alert("فشل الرفع: " + (err?.response?.data?.error || err?.message || "")); }
+                e.target.value = "";
+              }} />
+            </label>
+            <button onClick={() => setShowAdd(true)}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white"
+              style={{ background: "linear-gradient(135deg, #2C2C54, #D4AF37)" }}>
+              + حدث جديد
+            </button>
+          </div>
         </div>
         {/* تبويبات */}
         <div className="flex gap-1.5 mt-2">
